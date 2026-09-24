@@ -4,7 +4,7 @@
 //  Works out how much a party needs — drinks, mixers, ice, starters, mains,
 //  munchies, disposables — from the guest list and what's in the liquor cart.
 //  Cooked food is ordered on Zomato (live restaurants + prices per city);
-//  groceries/mixers/ice on Blinkit (live reference prices from DMart).
+//  mixers, ice, munchies and disposables on Blinkit.
 //
 //  Quantities follow common Indian party-catering rules of thumb:
 //    • drinks: 2 in the first hour, then 1 per hour, per drinker
@@ -75,27 +75,77 @@ export const COURSES = {
   dessert: { label: "Desserts",    emoji: "🍨" },
 };
 
-// ── Blinkit groceries (live reference prices from DMart) ─────────────────────
-// unit: what the calculator measures (ml / g / pc). `must` / `not` filter the
-// live search results so e.g. "club soda" never picks baking soda.
+// ── Blinkit party supplies ───────────────────────────────────────────────────
+// Blinkit blocks automated price lookups, so each supply comes with a few common
+// products and their usual printed price (MRP). Blinkit shows the exact price
+// when you open the item. `blinkit` is the search term sent to Blinkit.
+const opt = (id, name, amount, unit, packText, price, blinkit) => ({ id, name, pack: { count: 1, amount, unit }, packText, price, blinkit: blinkit || name });
 export const GROCERIES = [
-  { id: "soda",    name: "Club soda",          emoji: "🫧", group: "mixers",   unit: "ml", query: "club soda",       must: ["soda"],               not: ["eating", "baking"] },
-  { id: "tonic",   name: "Tonic water",        emoji: "🍋", group: "mixers",   unit: "ml", query: "tonic water",     must: ["tonic"] },
-  { id: "cola",    name: "Cola",               emoji: "🥤", group: "mixers",   unit: "ml", query: "coca cola",       must: ["cola"] },
-  { id: "lemon",   name: "Lemon-lime soda",    emoji: "🍈", group: "mixers",   unit: "ml", query: "sprite",          must: ["sprite", "7up", "lemon"] },
-  { id: "water",   name: "Drinking water",     emoji: "💧", group: "mixers",   unit: "ml", query: "bisleri water",   must: ["water"],              not: ["chestnut"] },
-  { id: "ice",     name: "Ice cubes",          emoji: "🧊", group: "ice",      unit: "g",  query: null, blinkit: "ice cubes",
-    fallback: { name: "Ice cubes (1 kg pack)", price: 60, pack: { count: 1, amount: 1000, unit: "g" }, packText: "1 kg" } },
-  { id: "limes",   name: "Lemons",             emoji: "🍋", group: "garnish",  unit: "pc", query: "fresh lemon",     must: ["lemon"],              not: ["squeezer", "juice", "concentrate"] },
-  { id: "chips",   name: "Potato chips",       emoji: "🥔", group: "munchies", unit: "g",  query: "potato chips",    must: ["chips", "potato"] },
-  { id: "namkeen", name: "Namkeen & bhujia",   emoji: "🥨", group: "munchies", unit: "g",  query: "haldiram bhujia", must: ["bhujia", "namkeen", "mixture", "sev"] },
-  { id: "peanuts", name: "Masala peanuts",     emoji: "🥜", group: "munchies", unit: "g",  query: "masala peanuts",  must: ["peanut", "groundnut", "sing"] },
-  { id: "cashews", name: "Cashews",            emoji: "🌰", group: "munchies", unit: "g",  query: "cashew",          must: ["kaju", "cashew"] },
-  { id: "nachos",  name: "Nachos",             emoji: "🌮", group: "munchies", unit: "g",  query: "nacho chips",     must: ["nacho", "doritos"] },
-  { id: "cheese",  name: "Cheese cubes",       emoji: "🧀", group: "munchies", unit: "g",  query: "cheese cubes",    must: ["cheese"] },
-  { id: "cups",    name: "Disposable glasses", emoji: "🥛", group: "supplies", unit: "pc", query: "paper glass",     must: ["glass", "cup"],       not: ["tray"] },
-  { id: "plates",  name: "Paper plates",       emoji: "🍽️", group: "supplies", unit: "pc", query: "paper plates",    must: ["plate"] },
-  { id: "napkins", name: "Napkins",            emoji: "🧻", group: "supplies", unit: "pc", query: "tissue napkins",  must: ["napkin", "serviette", "tissue"], not: ["kitchen"] },
+  { id: "soda", name: "Club soda", emoji: "🫧", group: "mixers", unit: "ml", options: [
+    opt("kinley-soda-750", "Kinley Club Soda", 750, "ml", "750 ml", 20),
+    opt("bisleri-soda-750", "Bisleri Soda", 750, "ml", "750 ml", 20),
+    opt("schweppes-soda-300", "Schweppes Soda Water Can", 300, "ml", "300 ml", 45),
+  ] },
+  { id: "tonic", name: "Tonic water", emoji: "🍋", group: "mixers", unit: "ml", options: [
+    opt("schweppes-tonic-300", "Schweppes Indian Tonic Water Can", 300, "ml", "300 ml", 60),
+    opt("sepoy-tonic-200", "Sepoy & Co Indian Tonic Water", 200, "ml", "200 ml", 110),
+    opt("svami-tonic-250", "Svami Tonic Water", 250, "ml", "250 ml", 70),
+  ] },
+  { id: "cola", name: "Cola", emoji: "🥤", group: "mixers", unit: "ml", options: [
+    opt("coke-2250", "Coca-Cola", 2250, "ml", "2.25 L", 100),
+    opt("thumsup-2250", "Thums Up", 2250, "ml", "2.25 L", 100),
+    opt("coke-750", "Coca-Cola", 750, "ml", "750 ml", 40),
+  ] },
+  { id: "lemon", name: "Lemon-lime soda", emoji: "🍈", group: "mixers", unit: "ml", options: [
+    opt("sprite-2250", "Sprite", 2250, "ml", "2.25 L", 100),
+    opt("7up-2250", "7UP", 2250, "ml", "2.25 L", 100),
+    opt("sprite-750", "Sprite", 750, "ml", "750 ml", 40),
+  ] },
+  { id: "water", name: "Drinking water", emoji: "💧", group: "mixers", unit: "ml", options: [
+    opt("bisleri-5l", "Bisleri Packaged Drinking Water", 5000, "ml", "5 L", 80),
+    opt("bisleri-1l", "Bisleri Packaged Drinking Water", 1000, "ml", "1 L", 20),
+    opt("kinley-2l", "Kinley Packaged Drinking Water", 2000, "ml", "2 L", 35),
+  ] },
+  { id: "ice", name: "Ice cubes", emoji: "🧊", group: "ice", unit: "g", options: [
+    opt("ice-1kg", "Ice Cubes", 1000, "g", "1 kg", 60),
+  ] },
+  { id: "limes", name: "Lemons", emoji: "🍋", group: "garnish", unit: "pc", options: [
+    opt("lemon-250g", "Lemon (Nimbu)", 5, "pc", "250 g (~5 pcs)", 40, "lemon"),
+  ] },
+  { id: "chips", name: "Potato chips", emoji: "🥔", group: "munchies", unit: "g", options: [
+    opt("lays-classic-90", "Lay's Classic Salted", 90, "g", "90 g", 50),
+    opt("lays-magic-masala-90", "Lay's India's Magic Masala", 90, "g", "90 g", 50),
+    opt("pringles-107", "Pringles Original", 107, "g", "107 g", 110),
+  ] },
+  { id: "namkeen", name: "Namkeen & bhujia", emoji: "🥨", group: "munchies", unit: "g", options: [
+    opt("haldiram-aloo-bhujia-400", "Haldiram's Aloo Bhujia", 400, "g", "400 g", 120),
+    opt("haldiram-bhujia-1kg", "Haldiram's Bhujia Sev", 1000, "g", "1 kg", 290),
+    opt("haldiram-navrattan-400", "Haldiram's Navrattan Mixture", 400, "g", "400 g", 120),
+  ] },
+  { id: "peanuts", name: "Masala peanuts", emoji: "🥜", group: "munchies", unit: "g", options: [
+    opt("haldiram-masala-peanuts-200", "Haldiram's Masala Peanuts", 200, "g", "200 g", 60),
+    opt("jabsons-peanuts-160", "Jabsons Roasted Peanuts Classic Salted", 160, "g", "160 g", 70),
+  ] },
+  { id: "cashews", name: "Cashews", emoji: "🌰", group: "munchies", unit: "g", options: [
+    opt("cashew-roasted-200", "Roasted & Salted Cashews", 200, "g", "200 g", 300, "roasted salted cashew"),
+  ] },
+  { id: "nachos", name: "Nachos", emoji: "🌮", group: "munchies", unit: "g", options: [
+    opt("cornitos-150", "Cornitos Nacho Crisps Cheese & Herbs", 150, "g", "150 g", 90),
+    opt("doritos-150", "Doritos Nacho Cheese", 150, "g", "150 g", 90),
+  ] },
+  { id: "cheese", name: "Cheese cubes", emoji: "🧀", group: "munchies", unit: "g", options: [
+    opt("amul-cheese-cubes-200", "Amul Processed Cheese Cubes", 200, "g", "200 g", 130),
+    opt("britannia-cheese-cubes-200", "Britannia Cheese Cubes", 200, "g", "200 g", 130),
+  ] },
+  { id: "cups", name: "Disposable glasses", emoji: "🥛", group: "supplies", unit: "pc", options: [
+    opt("paper-glass-50", "Disposable Paper Glass 200 ml", 50, "pc", "50 pcs", 80, "paper glass"),
+  ] },
+  { id: "plates", name: "Paper plates", emoji: "🍽️", group: "supplies", unit: "pc", options: [
+    opt("bagasse-plates-25", "Disposable Bagasse Plates", 25, "pc", "25 pcs", 150, "disposable plates"),
+  ] },
+  { id: "napkins", name: "Napkins", emoji: "🧻", group: "supplies", unit: "pc", options: [
+    opt("tissue-napkins-100", "Tissue Paper Napkins", 100, "pc", "100 pcs", 50, "tissue napkins"),
+  ] },
 ];
 export const GROCERY = Object.fromEntries(GROCERIES.map((g) => [g.id, g]));
 
@@ -106,19 +156,6 @@ export const GROUPS = {
   munchies: { label: "Munchies",       emoji: "🥜" },
   supplies: { label: "Party supplies", emoji: "🥛" },
 };
-
-// Keep only live results that are actually the thing we asked for.
-export function pickProducts(grocery, products) {
-  const ok = products.filter((p) => {
-    const n = `${p.name} ${p.fullName || ""}`.toLowerCase();
-    if (!p.inStock) return false;
-    if (grocery.must && !grocery.must.some((w) => n.includes(w))) return false;
-    if (grocery.not && grocery.not.some((w) => n.includes(w))) return false;
-    if (p.pack && p.pack.unit !== grocery.unit) return false;
-    return true;
-  });
-  return ok.length ? ok : [];
-}
 
 // ── Drinks maths ─────────────────────────────────────────────────────────────
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
@@ -256,8 +293,5 @@ export function suggestDishes(catIds, course) {
     .sort((a, b) => b.score - a.score);
 }
 
-// Short Blinkit search term for a product ("Lay's Magic Masala Potato Chips : 80 g" → "Lay's Magic Masala Potato Chips").
-export function blinkitQuery(grocery, product) {
-  if (!product || product.fallback) return grocery.blinkit || grocery.query || grocery.name;
-  return product.name.replace(/\s*[-–(].*$/, "").split(/\s+/).slice(0, 5).join(" ");
-}
+// Blinkit search term for a chosen product.
+export const blinkitQuery = (grocery, product) => product?.blinkit || product?.name || grocery.name;

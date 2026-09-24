@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { planParty, servingsInBottle, groceryNeeds, packsFor, suggestDishes, pickProducts, GROCERY, blinkitQuery } from "../src/lib/food.js";
+import { planParty, servingsInBottle, groceryNeeds, packsFor, suggestDishes, GROCERIES, GROCERY, blinkitQuery } from "../src/lib/food.js";
 
 test("bottle servings by category", () => {
   assert.equal(servingsInBottle("malts", 750, 60), 12);
@@ -50,12 +50,17 @@ test("pairings follow the liquor cart", () => {
   assert.ok(["rolls", "shawarma", "pizza"].includes(suggestDishes(["tequila"], "starter")[0].id));
 });
 
-test("live result filtering drops the wrong products", () => {
-  const soda = GROCERY.soda;
-  const res = pickProducts(soda, [
-    { name: "DMart Premia Eating Soda", inStock: true, pack: { amount: 200, unit: "g" } },
-    { name: "Duke's Club Soda", inStock: true, pack: { amount: 750, unit: "ml" } },
-  ]);
-  assert.deepEqual(res.map((r) => r.name), ["Duke's Club Soda"]);
-  assert.equal(blinkitQuery(soda, res[0]), "Duke's Club Soda");
+test("every Blinkit supply has usable product options", () => {
+  const plan = planParty({ guests: 10, hours: 4 }, [{ cat: "tequila", ml: 750, qty: 1 }, { cat: "redwine", ml: 750, qty: 1 }]);
+  const needs = groceryNeeds(plan);
+  for (const g of GROCERIES) {
+    assert.ok(g.options.length > 0, g.id);
+    for (const o of g.options) {
+      assert.equal(o.pack.unit, g.unit, `${o.id} unit`);
+      assert.ok(o.price > 0 && o.pack.amount > 0 && o.blinkit, o.id);
+    }
+    assert.ok(g.id in needs, `calculator covers ${g.id}`);
+  }
+  assert.equal(packsFor(needs.soda, GROCERY.soda.options[0]), Math.ceil(needs.soda / 750));
+  assert.equal(blinkitQuery(GROCERY.limes, GROCERY.limes.options[0]), "lemon");
 });

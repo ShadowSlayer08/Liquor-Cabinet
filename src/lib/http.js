@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 //  HTTP — one GET helper for every scraper in the app.
 //  • On Android the request goes through CapacitorHttp (native networking), so
-//    cross-origin sites like livcheers.com / zomato.com / dmart.in just work.
+//    cross-origin sites like livcheers.com / zomato.com just work.
 //  • In a desktop browser (npm run dev) it goes through the Vite dev proxy.
 // ═══════════════════════════════════════════════════════════════════════════════
 import { Capacitor, CapacitorHttp } from "@capacitor/core";
@@ -12,7 +12,6 @@ export const UA =
 const DEV_PROXY = {
   "https://www.livcheers.com": "/proxy/livcheers",
   "https://www.zomato.com": "/proxy/zomato",
-  "https://digital.dmart.in": "/proxy/dmart",
 };
 
 export class HttpError extends Error {

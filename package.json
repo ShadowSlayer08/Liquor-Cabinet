@@ -1,9 +1,9 @@
 {
   "name": "liquor-cabinet",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
-  "description": "Liquor Cabinet — party planner with live Livcheers prices, a food calculator and Blinkit/Zomato ordering.",
+  "description": "Liquor Cabinet — Android party planner: live Livcheers liquor prices, a food calculator, Zomato + Blinkit ordering.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

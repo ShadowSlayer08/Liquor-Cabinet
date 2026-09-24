@@ -1,67 +1,94 @@
-### Keybase proof
+<p align="center">
+  <img src="resources/icon-512.png" width="120" alt="Liquor Cabinet logo">
+</p>
 
-I hereby claim:
+<h1 align="center">Liquor Cabinet</h1>
 
-  * I am shadowslayer08 on github.
-  * I am shadowslayer (https://keybase.io/shadowslayer) on keybase.
-  * I have a public key ASAVgZUwwxZRAEho2-s5kEkgEjcDYXNC9Q9znMDNSdgGRQo
+<p align="center">
+  An Android party planner. Stock the bar with live <b>Livcheers</b> prices, work out the food with the calculator,<br>
+  then order the food on <b>Zomato</b> and the supplies on <b>Blinkit</b>.
+</p>
 
-To claim this, I am signing this object:
+<p align="center">
+  <a href="release/LiquorCabinet-1.1.apk"><b>⬇ Download the APK (v1.1)</b></a>
+</p>
 
-```json
-{
-  "body": {
-    "key": {
-      "eldest_kid": "010175315c3a57d6e63b7b737a02cdea156328d7a4b082d165c2865729daacd5a5940a",
-      "host": "keybase.io",
-      "kid": "012015819530c31651004868dbeb39904920123703617342f50f739cc0cd49d806450a",
-      "uid": "b9cfc0bd3ff409a962b1b19ac3908919",
-      "username": "shadowslayer"
-    },
-    "merkle_root": {
-      "ctime": 1553194804,
-      "hash": "8e3971874ae571139ad8bb40f93ce899878e95a44bf43c06b5738e8243bc7ad1bff60e424aded05945101e8841667082d8b41cd4ee8a097401cd0f49916431f0",
-      "hash_meta": "48f4078b68df1a53bce1b7844a668245c4fbcd5d1cb2f11819d129901aae9c72",
-      "seqno": 4997077
-    },
-    "service": {
-      "entropy": "6OOhFvqUEF03jVSOeAV1kbAo",
-      "name": "github",
-      "username": "shadowslayer08"
-    },
-    "type": "web_service_binding",
-    "version": 2
-  },
-  "client": {
-    "name": "keybase.io go client",
-    "version": "3.1.2"
-  },
-  "ctime": 1553194854,
-  "expire_in": 504576000,
-  "prev": "3c6cb166a4d4bac0af82599106112a4ede102ce7ee56b85cbf2e05f75288b73e",
-  "seqno": 13,
-  "tag": "signature"
-}
+---
+
+## Install
+
+1. On your Android phone, download [`release/LiquorCabinet-1.1.apk`](release/LiquorCabinet-1.1.apk).
+2. Open it. When Android asks, allow installs from that source.
+3. Launch **Liquor Cabinet** and tap **⚡ Smart Sync** to pull today's prices for your city.
+
+It needs Android 7.0 or newer and an internet connection. If you have v1.0, v1.1 installs over it and keeps your carts.
+
+## What it does
+
+| Tab | |
+| --- | --- |
+| 🥃 **Cabinet** | Every Livcheers category (single malts, blended scotch, Indian whisky, world whisky, gin, rum, vodka, tequila, brandy, beer, red/white/rosé/sparkling wine, champagne, liqueurs, sake, ready-to-drink) with prices for 30 Indian cities. Filter by Editor's Choice / Best Pick / Good Value or India vs imported, search, and sort by price, rating or value for money. Tap a bottle to flip it for tasting notes. |
+| 🍽️ **Food** | The calculator. Set guests, hours, how many are drinking, vegetarian share, appetite, peg size (30/60 ml) and whether there's dinner. It tells you whether your bottles cover the night, then works out mixers, ice, water, lemons, munchies, cups/plates/napkins, starter plates, main servings, breads and desserts. Dishes that pair with what's in your cabinet are marked 🍸. |
+| 🛒 **Cart** | Your liquor list plus the food & supplies cart. Zomato items are grouped by restaurant, each with an **Order on Zomato** button. Blinkit supplies form a tick-off checklist with **Find on Blinkit** per item. Any list can be shared on WhatsApp. |
+| 📊 **Plan** | Budget ring, where the money goes, shopping batches and how fresh the price data is. |
+
+## Where the data comes from
+
+The app collects its own data on the phone. There are no API keys and no AI services involved.
+
+- **Liquor: Livcheers.** The app reads each `livcheers.com/<city>/category/<type>` page directly and pulls out every product: price, ratings (taste, value, rebuy), tasting notes, origin, bottle photo and product link. Prices are stored on the phone for 7 days; **Force Refresh** downloads them again.
+- **Food: Zomato.** For each dish, the app loads Zomato's city page for it and lists the restaurants that deliver it, with rating, "₹X for one", delivery time and distance. It refreshes every 12 hours.
+- **Supplies: Blinkit.** Blinkit blocks automated price lookups, so the planner comes with a list of common mixers, snacks, ice and disposables at their usual MRP. Blinkit shows the exact price when you open the item.
+
+## Ordering
+
+Zomato and Blinkit don't let other apps add items to your cart, so Liquor Cabinet opens exactly the right page in their apps:
+
+- **Zomato:** opens the chosen restaurant's menu in the Zomato app (`zomato://order/<id>`), or zomato.com if the app isn't installed. Your dish list is copied first so you can paste it into instructions.
+- **Blinkit:** opens each supply as a Blinkit search in the app or website. Tick it off and tap **Next item on Blinkit** to move down the list.
+
+Liquor itself isn't sold on either service. Share the liquor list and buy from your local store.
+
+## Project layout
+
+```
+src/
+  App.jsx                 app shell: header, tabs, carts, persistence
+  components/             Cabinet, Food, Cart, Plan tabs + sheets
+  lib/parse/livcheers.js  Livcheers page parser (categories, cities, tiers)
+  lib/parse/zomato.js     Zomato dish-page parser
+  lib/food.js             party calculator, dishes, Blinkit supply list
+  lib/sources.js          scrapers with on-device caching
+  lib/order.js            Zomato / Blinkit hand-off, share, clipboard
+android/                  Capacitor Android project (ExternalAppPlugin opens Zomato/Blinkit)
+resources/logo-mark.svg   the logo; `npm run icons` renders every icon + splash from it
+tests/                    calculator tests + live parser tests
+release/                  the built APK
 ```
 
-with the key [ASAVgZUwwxZRAEho2-s5kEkgEjcDYXNC9Q9znMDNSdgGRQo](https://keybase.io/shadowslayer), yielding the signature:
+## Build from source
 
-```
-hKRib2R5hqhkZXRhY2hlZMOpaGFzaF90eXBlCqNrZXnEIwEgFYGVMMMWUQBIaNvrOZBJIBI3A2FzQvUPc5zAzUnYBkUKp3BheWxvYWTESpcCDcQgPGyxZqTUusCvglmRBhEqTt4QLOfuVrhcvy4F91KItz7EIDixFlWXBeZaxVyzX8J28EdiavJ6nOfP/HkJsf8MarZtAgHCo3NpZ8RAQWlLUh0fVOVXzWCSAVOqRfdjkF0OJlbFH+fn5ghyfnxuCj4ZM8XchtFGJ41nDZLKgwxdHkdA68Z0rC9XYcyPDqhzaWdfdHlwZSCkaGFzaIKkdHlwZQildmFsdWXEIATA+I/cIxGQOa1xhkLTc7m8ja7liUicsaDuWcsgwajjo3RhZ80CAqd2ZXJzaW9uAQ==
-
-```
-
-And finally, I am proving ownership of the github account by posting this as a gist.
-
-### My publicly-auditable identity:
-
-https://keybase.io/shadowslayer
-
-### From the command line:
-
-Consider the [keybase command line program](https://keybase.io/download).
+You need Node 20+, JDK 21 and the Android SDK (platform 36) with `ANDROID_HOME` set.
 
 ```bash
-# look me up
-keybase id shadowslayer
+npm install
+npm test          # calculator tests + live Livcheers/Zomato parser tests
+npm run dev       # preview in a desktop browser (a dev proxy stands in for native HTTP)
+npm run icons     # regenerate launcher icons and splash screens from the logo
+npm run apk       # → android/app/build/outputs/apk/release/LiquorCabinet-<version>-release.apk
 ```
+
+To sign a release, create `android/keystore.properties` (git-ignored). Without it, release builds are signed with the debug key.
+
+```
+storeFile=keystore/your-key.jks
+storePassword=…
+keyAlias=…
+keyPassword=…
+```
+
+## Notes
+
+- Prices are indicative. In some states (e.g. Haryana) there is no MRP on liquor and shops set their own prices. Zomato's "for one" is an average, and exact menu prices show in Zomato.
+- If Livcheers or Zomato changes its pages, the scraper log says so ("page loaded but no products found") instead of failing silently.
+- Drink responsibly, and only where it's legal for you.

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Stepper } from "./Sheet.jsx";
 import DishSheet from "./DishSheet.jsx";
 import GrocerySheet from "./GrocerySheet.jsx";
@@ -6,7 +6,6 @@ import {
   APPETITE, COURSES, GROCERIES, GROUPS, MIXERS, groceryNeeds, packsFor, formatAmount, suggestDishes, blinkitQuery,
 } from "../lib/food.js";
 import { CAT } from "../lib/parse/livcheers.js";
-import { fetchGrocery } from "../lib/sources.js";
 import { fmt } from "../lib/format.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -15,45 +14,29 @@ import { fmt } from "../lib/format.js";
 export default function FoodTab({ city, party, setParty, plan, liquorCats, foodCart, addFood, goToCart, toast }) {
   const [dishOpen, setDishOpen] = useState(null);
   const [groceryOpen, setGroceryOpen] = useState(null);
-  const [live, setLive] = useState({});        // grocery id → { products, live } | { error }
-  const [filling, setFilling] = useState(false);
   const set = (k) => (v) => setParty({ ...party, [k]: v });
 
   const needs = useMemo(() => groceryNeeds(plan), [plan]);
   const neededGroceries = GROCERIES.filter((g) => needs[g.id] > 0);
 
-  // Pull live prices for every supply the party needs (cached for 24 h).
-  useEffect(() => {
-    let alive = true;
-    for (const g of neededGroceries) {
-      if (live[g.id]) continue;
-      fetchGrocery(g).then((d) => alive && setLive((p) => ({ ...p, [g.id]: d })))
-        .catch((e) => alive && setLive((p) => ({ ...p, [g.id]: { error: e.message, products: [] } })));
-    }
-    return () => { alive = false; };
-  }, [neededGroceries.map((g) => g.id).join()]);
-
   const inCart = (key) => foodCart.some((l) => l.key === key);
+  // The product shown for a supply: whatever is in the cart, else the first option.
+  const chosen = (g) => {
+    const line = foodCart.find((l) => l.key === `b:${g.id}`);
+    return g.options.find((o) => o.id === line?.product.id) || g.options[0];
+  };
   const groceryLine = (g, product, packs) => ({
     key: `b:${g.id}`, kind: "blinkit", groceryId: g.id, name: g.name, emoji: g.emoji, group: g.group,
-    product: { id: product.id, name: product.name, packText: product.packText, price: product.price, img: product.img || null, fallback: !!product.fallback },
+    product: { id: product.id, name: product.name, packText: product.packText, price: product.price },
     qty: packs, query: blinkitQuery(g, product), ordered: false,
   });
 
-  const fillGroceries = async () => {
-    setFilling(true);
-    let added = 0;
+  const fillGroceries = () => {
     for (const g of neededGroceries) {
-      try {
-        const d = live[g.id]?.products?.length ? live[g.id] : await fetchGrocery(g);
-        const p = d.products[0];
-        if (!p) continue;
-        addFood(groceryLine(g, p, packsFor(needs[g.id], p)));
-        added++;
-      } catch { /* skip items whose prices failed to load */ }
+      const p = chosen(g);
+      addFood(groceryLine(g, p, packsFor(needs[g.id], p)));
     }
-    setFilling(false);
-    toast(`Added ${added} party supplies to your Blinkit list`);
+    toast(`Added ${neededGroceries.length} party supplies to your Blinkit list`);
   };
 
   const suggestedServings = (dish) => {
@@ -63,10 +46,7 @@ export default function FoodTab({ city, party, setParty, plan, liquorCats, foodC
   };
 
   const coverage = plan.needed ? Math.min(1, plan.available / plan.needed) : 1;
-  const groceryTotal = neededGroceries.reduce((s, g) => {
-    const p = live[g.id]?.products?.[0];
-    return s + (p ? p.price * packsFor(needs[g.id], p) : 0);
-  }, 0);
+  const groceryTotal = neededGroceries.reduce((s, g) => { const p = chosen(g); return s + p.price * packsFor(needs[g.id], p); }, 0);
   const foodCount = foodCart.length;
   const foodTotal = foodCart.reduce((s, l) => s + (l.kind === "zomato" ? l.unitPrice * l.servings : l.product.price * l.qty), 0);
 
@@ -140,25 +120,22 @@ export default function FoodTab({ city, party, setParty, plan, liquorCats, foodC
               <div key={gid}>
                 <div className="tiny muted" style={{ letterSpacing: 2, margin: "10px 0 2px" }}>{grp.label.toUpperCase()}</div>
                 {rows.map((g) => {
-                  const d = live[g.id];
-                  const p = d?.products?.[0];
-                  const packs = p ? packsFor(needs[g.id], p) : 0;
+                  const p = chosen(g);
+                  const packs = packsFor(needs[g.id], p);
                   const added = inCart(`b:${g.id}`);
                   return (
                     <div key={g.id} className="line-item" onClick={() => setGroceryOpen(g)} style={{ cursor: "pointer" }}>
-                      {p?.img ? <img className="thumb contain" src={p.img} alt="" loading="lazy" /> : <div className="emo">{g.emoji}</div>}
+                      <div className="emo">{g.emoji}</div>
                       <div className="grow">
                         <div className="between">
                           <span style={{ fontWeight: 700 }}>{g.name}</span>
                           <span className="gold small">{formatAmount(needs[g.id], g.unit)}</span>
                         </div>
-                        <div className="tiny muted ellipsis">
-                          {!d ? "loading live price…" : d.error ? "price unavailable — tap to retry" : p ? `${p.name} · ${p.packText} × ${packs}` : "no match"}
-                        </div>
+                        <div className="tiny muted ellipsis">{p.name} · {p.packText} × {packs}</div>
                       </div>
                       <div style={{ textAlign: "right", minWidth: 58 }}>
-                        <div className="small" style={{ fontWeight: 700 }}>{p ? fmt(p.price * packs) : "—"}</div>
-                        <div className="tiny" style={{ color: added ? "var(--green)" : "var(--dim)" }}>{added ? "✓ in cart" : p?.fallback ? "estimate" : "change ›"}</div>
+                        <div className="small" style={{ fontWeight: 700 }}>{fmt(p.price * packs)}</div>
+                        <div className="tiny" style={{ color: added ? "var(--green)" : "var(--dim)" }}>{added ? "✓ in cart" : "change ›"}</div>
                       </div>
                     </div>
                   );
@@ -166,11 +143,11 @@ export default function FoodTab({ city, party, setParty, plan, liquorCats, foodC
               </div>
             );
           })}
-          <button className="btn btn-blinkit btn-block" style={{ marginTop: 12 }} disabled={filling} onClick={fillGroceries}>
-            {filling ? "Adding…" : "＋ Add all supplies to cart"}
+          <button className="btn btn-blinkit btn-block" style={{ marginTop: 12 }} onClick={fillGroceries}>
+            ＋ Add all supplies to cart
           </button>
           <div className="tiny dim" style={{ marginTop: 6, textAlign: "center" }}>
-            Mixers: {Object.entries(plan.mixerMl).filter(([, v]) => v).map(([k, v]) => `${MIXERS[k].label} ${formatAmount(v, "ml")}`).join(" · ") || "none"} · live prices from DMart
+            Mixers: {Object.entries(plan.mixerMl).filter(([, v]) => v).map(([k, v]) => `${MIXERS[k].label} ${formatAmount(v, "ml")}`).join(" · ") || "none"} · prices ≈ MRP, exact price on Blinkit
           </div>
         </div>
       </div>
@@ -238,10 +215,9 @@ export default function FoodTab({ city, party, setParty, plan, liquorCats, foodC
           }} />
       )}
       {groceryOpen && (
-        <GrocerySheet grocery={groceryOpen} need={needs[groceryOpen.id]} onClose={() => setGroceryOpen(null)}
+        <GrocerySheet grocery={groceryOpen} need={needs[groceryOpen.id]} selectedId={chosen(groceryOpen).id} onClose={() => setGroceryOpen(null)}
           onPick={(p, packs) => {
             addFood(groceryLine(groceryOpen, p, packs));
-            setLive((prev) => ({ ...prev, [groceryOpen.id]: { ...(prev[groceryOpen.id] || {}), products: [p, ...(prev[groceryOpen.id]?.products || []).filter((x) => x.id !== p.id)] } }));
             toast(`${groceryOpen.name} added to Blinkit list`);
             setGroceryOpen(null);
           }} />

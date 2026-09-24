@@ -1,18 +1,15 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 //  SCRAPERS — the app's own code, no AI/API keys involved.
-//  • Checks the IndexedDB cache first (liquor 7 days, Zomato 12 h, groceries 24 h)
+//  • Checks the IndexedDB cache first (liquor 7 days, Zomato 12 h)
 //  • Only hits the network when stale/missing or on Force Refresh
 // ═══════════════════════════════════════════════════════════════════════════════
 import { getText, HttpError } from "./http.js";
 import { store } from "./store.js";
 import { parseCategoryHtml, categoryUrl } from "./parse/livcheers.js";
 import { parseDishPage, dishUrl, searchUrl, zomatoCity } from "./parse/zomato.js";
-import { parseSearch, dmartSearchUrl } from "./parse/dmart.js";
-import { pickProducts } from "./food.js";
 
 export const STALE_MS = 7 * 86400 * 1000;
 const ZOMATO_TTL = 12 * 3600 * 1000;
-const GROCERY_TTL = 24 * 3600 * 1000;
 
 // ── Livcheers ────────────────────────────────────────────────────────────────
 export const priceKey = (city, catId) => `price:${city}:${catId}`;
@@ -77,22 +74,5 @@ export async function fetchDish(city, dish, { force = false } = {}) {
     } else throw e;
   }
   await store.set(key, result);
-  return { ...result, fromCache: false };
-}
-
-// ── Groceries (DMart live prices, ordered on Blinkit) ────────────────────────
-export async function fetchGrocery(grocery, { force = false } = {}) {
-  if (!grocery.query) {
-    return { products: [{ ...grocery.fallback, id: `${grocery.id}-est`, fallback: true, img: null }], live: false };
-  }
-  const key = `grocery:${grocery.id}`;
-  if (!force) {
-    const cached = await store.get(key);
-    if (cached && Date.now() - cached.fetchedAt < GROCERY_TTL) return { ...cached, fromCache: true };
-  }
-  const json = JSON.parse(await getText(dmartSearchUrl(grocery.query, 12), { timeout: 20000 }));
-  const products = pickProducts(grocery, parseSearch(json)).slice(0, 8);
-  const result = { products, live: true, fetchedAt: Date.now() };
-  if (products.length) await store.set(key, result);
   return { ...result, fromCache: false };
 }

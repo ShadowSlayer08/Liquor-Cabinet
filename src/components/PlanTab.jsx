@@ -86,8 +86,8 @@ export default function PlanTab({
         <div className="card-title">Data sources</div>
         <div>🥃 <b className="gold">Livcheers</b> — liquor prices, ratings & tasting notes, scraped straight from livcheers.com category pages.</div>
         <div>🍽️ <b style={{ color: "#f07080" }}>Zomato</b> — live restaurants, ratings and “cost for one” per dish in your city; orders open in the Zomato app.</div>
-        <div>🛒 <b style={{ color: "var(--blinkit)" }}>Blinkit</b> — supplies open as Blinkit searches; reference prices are DMart's live shelf prices.</div>
-        <div className="tiny dim" style={{ marginTop: 8 }}>Liquor Cabinet v1.0 · Prices are indicative. Please drink responsibly and only where legal (21+ in most states).</div>
+        <div>🛒 <b style={{ color: "var(--blinkit)" }}>Blinkit</b> — mixers, ice, munchies and disposables open straight in Blinkit; the planner uses their usual MRP and Blinkit shows the exact price.</div>
+        <div className="tiny dim" style={{ marginTop: 8 }}>Liquor Cabinet v1.1 · Prices are indicative. Please drink responsibly and only where legal (21+ in most states).</div>
       </div>
     </div>
   );

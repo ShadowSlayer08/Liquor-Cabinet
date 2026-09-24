@@ -1,9 +1,8 @@
-// Live checks against the real sites: `npm test`. Skips cleanly when offline.
+// Live checks against livcheers.com and zomato.com (needs internet): `npm test`.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseCategoryHtml, CATEGORIES, categoryUrl, parseMl } from "../src/lib/parse/livcheers.js";
 import { parseDishPage, dishUrl } from "../src/lib/parse/zomato.js";
-import { parseSearch, dmartSearchUrl, parsePack } from "../src/lib/parse/dmart.js";
 
 const UA = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36";
 const get = async (url) => {
@@ -45,20 +44,7 @@ test("zomato: dish pages list restaurants with prices and deeplinks", { timeout:
   }
 });
 
-test("dmart: live grocery prices", { timeout: 120000 }, async () => {
-  for (const q of ["tonic water", "coca cola", "aloo bhujia", "club soda", "ice cubes 1kg", "paper cups"]) {
-    const { text } = await get(dmartSearchUrl(q, 5));
-    const res = parseSearch(JSON.parse(text));
-    console.log(`  ${q.padEnd(14)} ${res.slice(0, 2).map((r) => `${r.name} [${r.packText}] ₹${r.price} ${JSON.stringify(r.pack)}`).join(" | ")}`);
-    assert.ok(res.length > 0, q);
-  }
-});
-
-test("pack + volume parsing", () => {
-  assert.deepEqual(parsePack("Coca-Cola Bottle : 8x250 ml"), { count: 8, amount: 2000, unit: "ml" });
-  assert.deepEqual(parsePack("1.25 L"), { count: 1, amount: 1250, unit: "ml" });
-  assert.deepEqual(parsePack("Haldiram's Bhujia Sev : 1 kg"), { count: 1, amount: 1000, unit: "g" });
-  assert.deepEqual(parsePack("25 Pieces"), { count: 1, amount: 25, unit: "pc" });
+test("bottle volume parsing", () => {
   assert.equal(parseMl("750ML"), 750);
   assert.equal(parseMl("1L"), 1000);
   assert.equal(parseMl("650 ML"), 650);

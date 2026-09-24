@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react";
 const UA =
   "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36";
 
-// The Android app fetches Livcheers / Zomato / DMart natively (CapacitorHttp, no CORS).
+// The Android app fetches Livcheers / Zomato natively (CapacitorHttp, no CORS).
 // In a desktop browser those requests would be blocked by CORS, so `npm run dev`
 // routes them through these proxies instead. See src/lib/http.js.
 // Browser-only headers (client hints, fetch metadata, cookies) are stripped so the
@@ -31,14 +31,12 @@ export default defineConfig({
     proxy: {
       "/proxy/livcheers": proxy("https://www.livcheers.com"),
       "/proxy/zomato": proxy("https://www.zomato.com"),
-      "/proxy/dmart": proxy("https://digital.dmart.in"),
     },
   },
   preview: {
     proxy: {
       "/proxy/livcheers": proxy("https://www.livcheers.com"),
       "/proxy/zomato": proxy("https://www.zomato.com"),
-      "/proxy/dmart": proxy("https://digital.dmart.in"),
     },
   },
   build: { outDir: "dist", target: "es2020", chunkSizeWarningLimit: 900 },
