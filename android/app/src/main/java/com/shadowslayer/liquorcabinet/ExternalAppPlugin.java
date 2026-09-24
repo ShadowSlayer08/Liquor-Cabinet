@@ -11,8 +11,9 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 /**
- * Hands orders off to Blinkit / Zomato: opens the link inside their Android app when it is
- * installed (e.g. zomato://order/123, https://blinkit.com/s/?q=soda), otherwise in the browser.
+ * Hands orders off to Zomato / Bistro / Blinkit: opens the link inside their Android app when
+ * it is installed (e.g. zomato://order/123, https://blinkit.com/s/?q=soda), otherwise in the
+ * browser.
  * Called from src/lib/order.js.
  */
 @CapacitorPlugin(name = "ExternalApp")
@@ -39,6 +40,32 @@ public class ExternalAppPlugin extends Plugin {
             return;
         }
         call.resolve(ret);
+    }
+
+    /** Starts an app by package name (its launcher screen), or opens `fallback` in the browser. */
+    @PluginMethod
+    public void launch(PluginCall call) {
+        String pkg = call.getString("pkg");
+        String fallback = call.getString("fallback");
+        JSObject ret = new JSObject();
+        Intent launch = pkg == null ? null : getContext().getPackageManager().getLaunchIntentForPackage(pkg);
+        if (launch != null) {
+            launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            try {
+                getActivity().startActivity(launch);
+                ret.put("opened", "app");
+                call.resolve(ret);
+                return;
+            } catch (ActivityNotFoundException | SecurityException ignored) {
+                // fall through to the browser
+            }
+        }
+        if (fallback != null && tryStart(fallback, null)) {
+            ret.put("opened", "browser");
+            call.resolve(ret);
+        } else {
+            call.reject("Cannot open " + pkg);
+        }
     }
 
     @PluginMethod

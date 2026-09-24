@@ -63,6 +63,19 @@ async function launcherIcons() {
   }
 }
 
+// Status-bar icon for the order-checklist notification: white line-art, 24dp.
+async function notificationIcons() {
+  const { mkdirSync } = await import("node:fs");
+  for (const [d, s] of Object.entries(DENSITIES)) {
+    const px = Math.round(24 * s), art = Math.round(px * 1.18);
+    const buf = await sharp(await mark(art)).extract({ left: Math.round((art - px) / 2), top: Math.round((art - px) / 2), width: px, height: px }).png().toBuffer();
+    const alpha = await sharp(buf).flatten({ background: "#000000" }).greyscale().threshold(70).extractChannel(0).toBuffer();
+    const dir = join(RES, `drawable-${d}`);
+    mkdirSync(dir, { recursive: true });
+    await sharp({ create: { width: px, height: px, channels: 3, background: "#ffffff" } }).joinChannel(alpha).png().toFile(join(dir, "ic_stat_liquor.png"));
+  }
+}
+
 async function splash(w, h) {
   const r = Math.min(w, h);
   const markPx = Math.round(r * 0.36);
@@ -96,6 +109,7 @@ await webIcons();
 if (existsSync(RES)) {
   await launcherIcons();
   await splashScreens();
+  await notificationIcons();
   console.log("Android icons + splash screens written to", RES);
 }
 console.log("Web icons written to public/");

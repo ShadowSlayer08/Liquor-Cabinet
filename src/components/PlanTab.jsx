@@ -1,93 +1,141 @@
 import { useState } from "react";
-import BudgetRing from "./BudgetRing.jsx";
-import { CATEGORIES, CAT, cityName } from "../lib/parse/livcheers.js";
+import { CATEGORIES, cityName } from "../lib/parse/livcheers.js";
 import { STALE_MS } from "../lib/sources.js";
-import { fmt, ageStr } from "../lib/format.js";
+import { fmt, fmtShort, ageStr } from "../lib/format.js";
+import { Icon, Ring } from "./Art.jsx";
+
+function Donut({ rows, size = 150, stroke = 20 }) {
+  const total = rows.reduce((s, r) => s + r.v, 0) || 1;
+  const r = (size - stroke) / 2, c = size / 2, circ = 2 * Math.PI * r;
+  let offset = 0;
+  return (
+    <svg width={size} height={size} style={{ flexShrink: 0 }}>
+      <circle cx={c} cy={c} r={r} fill="none" stroke="rgba(255,255,255,.06)" strokeWidth={stroke} />
+      {rows.map((row) => {
+        const len = (row.v / total) * circ;
+        const el = (
+          <circle key={row.id} cx={c} cy={c} r={r} fill="none" stroke={row.color} strokeWidth={stroke}
+            strokeDasharray={`${Math.max(0, len - 2)} ${circ}`} strokeDashoffset={-offset} transform={`rotate(-90 ${c} ${c})`}
+            style={{ transition: "stroke-dasharray .8s" }} />
+        );
+        offset += len;
+        return el;
+      })}
+      <text x={c} y={c - 2} textAnchor="middle" fill="#f8f0e3" fontSize="20" fontWeight="700" fontFamily="Outfit Variable, system-ui">{fmtShort(total === 1 ? 0 : total)}</text>
+      <text x={c} y={c + 16} textAnchor="middle" fill="#a39581" fontSize="10" letterSpacing="1.5" fontFamily="Outfit Variable, system-ui">PLANNED</text>
+    </svg>
+  );
+}
 
 export default function PlanTab({
-  city, budget, saveBudget, spent, catSpend, zomatoTotal, blinkitTotal, plan,
-  batches, activeBatch, setActiveBatch, addBatch, ages, openScraper, clearCache,
+  city, loc, locating, onLocate, budget, saveBudget, spent, catSpend, zomatoTotal, blinkitTotal, plan,
+  batches, activeBatch, setActiveBatch, addBatch, ages, openScraper, clearCache, openCity,
 }) {
   const [draft, setDraft] = useState(String(budget));
   const [editing, setEditing] = useState(false);
+  const left = budget - spent;
+  const pct = budget > 0 ? spent / budget : 0;
 
   const rows = [
     ...CATEGORIES.filter((c) => catSpend[c.id]).map((c) => ({ id: c.id, label: `${c.emoji} ${c.label}`, color: c.color, v: catSpend[c.id] })),
     zomatoTotal ? { id: "zomato", label: "🍽️ Zomato food", color: "#e23744", v: zomatoTotal } : null,
     blinkitTotal ? { id: "blinkit", label: "🛒 Blinkit supplies", color: "#f8cb46", v: blinkitTotal } : null,
   ].filter(Boolean);
-
   const synced = CATEGORIES.filter((c) => ages[c.id]);
 
   return (
     <div>
-      <div className="card" style={{ display: "flex", gap: 16, alignItems: "center" }}>
-        <BudgetRing spent={spent} total={budget} />
-        <div className="grow">
-          <div className="card-title" style={{ marginBottom: 4 }}>Party budget</div>
+      <div className="section-head" style={{ marginTop: 14 }}>
+        <div><div className="kicker">{plan.guests} guests · {plan.hours} hours</div><div className="h1" style={{ fontSize: 28 }}>The <em>plan</em></div></div>
+      </div>
+
+      <div className="hero fade-up" style={{ display: "flex", gap: 16, alignItems: "center" }}>
+        <Ring value={pct} size={128} stroke={11} label={`${Math.round(pct * 100)}%`} sub="USED" color={pct > 0.92 ? "#ff5d62" : undefined} />
+        <div className="grow" style={{ position: "relative", zIndex: 1 }}>
+          <div className="kicker">Party budget</div>
           {editing ? (
-            <div className="row">
+            <div className="row" style={{ marginTop: 6 }}>
               <input className="input" inputMode="numeric" value={draft} autoFocus onChange={(e) => setDraft(e.target.value.replace(/\D/g, ""))}
                 onKeyDown={(e) => e.key === "Enter" && (saveBudget(Number(draft) || budget), setEditing(false))} />
-              <button className="btn btn-gold btn-sm" onClick={() => { saveBudget(Number(draft) || budget); setEditing(false); }}>✓</button>
+              <button className="icon-btn gold" onClick={() => { saveBudget(Number(draft) || budget); setEditing(false); }}><Icon.check size={18} /></button>
             </div>
           ) : (
-            <button style={{ fontSize: 24, fontWeight: 700, color: "var(--text)" }} onClick={() => { setDraft(String(budget)); setEditing(true); }}>
-              {fmt(budget)} <span className="small gold">✎</span>
+            <button className="row" style={{ marginTop: 2 }} onClick={() => { setDraft(String(budget)); setEditing(true); }}>
+              <span className="h1" style={{ fontSize: 30 }}>{fmt(budget)}</span><span className="gold small">✎</span>
             </button>
           )}
-          <div className="small muted" style={{ marginTop: 6 }}>{plan.guests} guests · {plan.hours} h · {cityName(city)}</div>
-          <div className="small muted">≈ {fmt(spent / Math.max(1, plan.guests))} per guest</div>
+          <div className={`small ${left < 0 ? "red" : "green"}`} style={{ marginTop: 4 }}>{left < 0 ? `${fmt(-left)} over budget` : `${fmt(left)} left`}</div>
+          <div className="tiny muted">≈ {fmt(spent / Math.max(1, plan.guests))} per guest</div>
         </div>
       </div>
 
-      <div className="card">
-        <div className="card-title">Where the money goes <span className="right">{fmt(spent)}</span></div>
-        {rows.length === 0 && <div className="small dim">Nothing in your carts yet.</div>}
-        {rows.map((r) => (
-          <div key={r.id} style={{ marginBottom: 9 }}>
-            <div className="between small" style={{ marginBottom: 3 }}><span className="muted">{r.label}</span><span style={{ color: r.color }}>{fmt(r.v)}</span></div>
-            <div className="bar" style={{ height: 4 }}><div style={{ width: `${Math.min(100, (r.v / Math.max(budget, spent)) * 100)}%`, background: r.color }} /></div>
+      <div className="card fade-up">
+        <div className="card-title"><span className="kicker">Where the money goes</span><span className="small b">{fmt(spent)}</span></div>
+        {rows.length === 0 ? <div className="small muted">Nothing planned yet — add bottles and food.</div> : (
+          <div className="row" style={{ gap: 18, alignItems: "center" }}>
+            <Donut rows={rows} />
+            <div className="grow">
+              {rows.map((r) => (
+                <div key={r.id} className="between small" style={{ padding: "4px 0" }}>
+                  <span className="row ellipsis" style={{ gap: 7 }}><span style={{ width: 9, height: 9, borderRadius: 3, background: r.color, flexShrink: 0 }} /><span className="ellipsis soft">{r.label}</span></span>
+                  <b>{fmtShort(r.v)}</b>
+                </div>
+              ))}
+            </div>
           </div>
-        ))}
+        )}
       </div>
 
-      <div className="card">
-        <div className="card-title">Batches</div>
+      <div className="card fade-up">
+        <div className="card-title"><span className="kicker">Location</span></div>
+        <div className="row" style={{ gap: 12 }}>
+          <div className="icon-btn gold"><Icon.pin size={20} /></div>
+          <div className="grow">
+            <div className="h3 ellipsis">{loc?.label || cityName(city)}</div>
+            <div className="tiny muted">{loc ? `GPS · prices for ${cityName(city)}${loc.zomato ? ` · Zomato ${loc.zomato.cityName}` : ""}` : `Prices for ${cityName(city)} · GPS off`}</div>
+          </div>
+        </div>
+        <div className="row" style={{ marginTop: 12 }}>
+          <button className="btn btn-gold btn-sm grow" disabled={locating} onClick={onLocate}>{locating ? <span className="spin">◌</span> : <Icon.locate size={16} />} Use my location</button>
+          <button className="btn btn-ghost btn-sm grow" onClick={openCity}>Choose city</button>
+        </div>
+      </div>
+
+      <div className="card fade-up">
+        <div className="card-title"><span className="kicker">Shopping batches</span></div>
         {batches.map((b, i) => (
           <button key={i} className="between" onClick={() => setActiveBatch(i)}
-            style={{ width: "100%", padding: "8px 10px", borderRadius: 8, background: activeBatch === i ? "#1c1611" : "transparent", color: activeBatch === i ? "var(--gold)" : "var(--muted)", marginBottom: 2 }}>
-            <span>{activeBatch === i ? "▶ " : ""}{b.name}</span>
-            <span className="small">{Object.values(b.items || {}).reduce((s, q) => s + q, 0)} bottles</span>
+            style={{ width: "100%", padding: "10px 12px", borderRadius: 12, marginBottom: 4, background: activeBatch === i ? "rgba(231,168,70,.12)" : "transparent", color: activeBatch === i ? "var(--gold)" : "var(--soft)" }}>
+            <span>{activeBatch === i ? "● " : "○ "}{b.name}</span>
+            <span className="small muted">{Object.values(b.items || {}).reduce((s, q) => s + q, 0)} bottles</span>
           </button>
         ))}
-        <button className="btn btn-ghost btn-block btn-sm" style={{ marginTop: 6, borderStyle: "dashed" }} onClick={addBatch}>+ New batch</button>
-        <div className="tiny dim" style={{ marginTop: 6 }}>Bottles you add go into the active batch — handy for splitting a shopping run across stores or days.</div>
+        <button className="btn btn-ghost btn-block btn-sm" style={{ marginTop: 6, borderStyle: "dashed" }} onClick={addBatch}><Icon.plus size={14} /> New batch</button>
+        <div className="tiny dim" style={{ marginTop: 8 }}>Bottles you add go into the active batch — split one shopping run across stores or days.</div>
       </div>
 
-      <div className="card">
-        <div className="card-title">Price database <button className="btn btn-gold btn-sm" onClick={openScraper}>⚡ Scrape</button></div>
-        {synced.length === 0 && <div className="small dim">No prices synced for {cityName(city)} yet.</div>}
+      <div className="card fade-up">
+        <div className="card-title"><span className="kicker">Price database · {cityName(city)}</span><button className="btn btn-xs btn-gold" onClick={openScraper}><Icon.bolt size={13} /> Sync</button></div>
+        {synced.length === 0 && <div className="small muted">No prices synced for {cityName(city)} yet.</div>}
         {synced.map((c) => {
           const stale = Date.now() - ages[c.id] > STALE_MS;
           return (
-            <div key={c.id} className="between small" style={{ padding: "3px 0" }}>
-              <span style={{ color: stale ? "#a07a30" : "var(--muted)" }}>{c.emoji} {c.label}</span>
-              <span style={{ color: stale ? "#a07a30" : "var(--dim)" }}>{ageStr(ages[c.id])}{stale ? " ⚠" : ""}</span>
+            <div key={c.id} className="between small" style={{ padding: "4px 0" }}>
+              <span className="soft">{c.emoji} {c.label}</span>
+              <span style={{ color: stale ? "var(--gold)" : "var(--dim)" }}>{ageStr(ages[c.id])}{stale ? " · stale" : ""}</span>
             </div>
           );
         })}
-        <button className="btn btn-ghost btn-sm btn-block" style={{ marginTop: 10 }} onClick={() => { if (confirm("Delete all cached prices? Your carts are kept.")) clearCache(); }}>
-          Clear cached prices
-        </button>
+        <button className="btn btn-ghost btn-sm btn-block" style={{ marginTop: 12 }} onClick={() => { if (confirm("Delete all cached prices and menus? Your carts are kept.")) clearCache(); }}>Clear cached data</button>
       </div>
 
-      <div className="card small muted" style={{ lineHeight: 1.6 }}>
-        <div className="card-title">Data sources</div>
-        <div>🥃 <b className="gold">Livcheers</b> — liquor prices, ratings & tasting notes, scraped straight from livcheers.com category pages.</div>
-        <div>🍽️ <b style={{ color: "#f07080" }}>Zomato</b> — live restaurants, ratings and “cost for one” per dish in your city; orders open in the Zomato app.</div>
-        <div>🛒 <b style={{ color: "var(--blinkit)" }}>Blinkit</b> — mixers, ice, munchies and disposables open straight in Blinkit; the planner uses their usual MRP and Blinkit shows the exact price.</div>
-        <div className="tiny dim" style={{ marginTop: 8 }}>Liquor Cabinet v1.1 · Prices are indicative. Please drink responsibly and only where legal (21+ in most states).</div>
+      <div className="card small soft" style={{ lineHeight: 1.65 }}>
+        <div className="kicker" style={{ marginBottom: 8 }}>Where the data comes from</div>
+        <div>🥃 <b className="gold">Livcheers</b> — liquor prices, ratings & tasting notes, read straight from livcheers.com.</div>
+        <div>🍽️ <b style={{ color: "#ff8a92" }}>Zomato</b> — restaurants delivering to your GPS location, their menus and "cost for one".</div>
+        <div>⚡ <b style={{ color: "var(--bistro)" }}>Bistro</b> — Blinkit's 10-minute kitchen; order opens in the Bistro app.</div>
+        <div>🛒 <b style={{ color: "var(--blinkit)" }}>Blinkit</b> — mixers, ice & munchies at usual MRP; each opens in Blinkit.</div>
+        <div className="tiny dim" style={{ marginTop: 10 }}>Liquor Cabinet v1.2 · Prices are indicative. Drink responsibly, and only where it's legal for you.</div>
       </div>
     </div>
   );

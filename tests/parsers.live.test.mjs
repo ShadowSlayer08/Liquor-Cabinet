@@ -2,11 +2,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseCategoryHtml, CATEGORIES, categoryUrl, parseMl } from "../src/lib/parse/livcheers.js";
-import { parseDishPage, dishUrl } from "../src/lib/parse/zomato.js";
+import { parseDishPage, parseMenuPage, dishUrl } from "../src/lib/parse/zomato.js";
 
 const UA = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36";
-const get = async (url) => {
-  const r = await fetch(url, { headers: { "User-Agent": UA, "Accept-Language": "en-IN,en;q=0.9" } });
+const get = async (url, cookie) => {
+  const r = await fetch(url, { headers: { "User-Agent": UA, "Accept-Language": "en-IN,en;q=0.9", ...(cookie ? { Cookie: cookie } : {}) } });
   return { status: r.status, text: await r.text() };
 };
 
@@ -42,6 +42,20 @@ test("zomato: dish pages list restaurants with prices and deeplinks", { timeout:
     assert.ok(d.restaurants.length > 0);
     assert.ok(d.restaurants.every((r) => r.appLink.startsWith("zomato://") && r.orderUrl?.startsWith("https://www.zomato.com/")));
   }
+});
+
+test("zomato: GPS zone localises restaurants and menus load", { timeout: 150000 }, async () => {
+  // Sector 57, Gurugram → Zomato delivery subzone → ltv/lty cookies
+  const zone = JSON.parse((await get("https://www.zomato.com/webroutes/location/get?lat=28.4595&lon=77.0266")).text).locationDetails;
+  assert.ok(zone.entityId && zone.entityType, "zone");
+  const cookie = `ltv=${zone.entityId}; lty=${zone.entityType}`;
+  const d = parseDishPage((await get("https://www.zomato.com/ncr/delivery/dish-biryani", cookie)).text);
+  console.log(`  near ${zone.entityName}: ${d.restaurants.slice(0, 3).map((r) => `${r.name} [${r.locality}] ${r.distance}`).join(" | ")}`);
+  assert.ok(d.restaurants.some((r) => /gurgaon|gurugram/i.test(r.locality)), "results should be in Gurugram");
+  const menu = parseMenuPage((await get(d.restaurants[0].orderUrl, cookie)).text);
+  const items = menu.menus.flatMap((m) => m.items);
+  console.log(`  menu ${menu.name}: ${menu.menus.length} sections, ${items.length} items, ${items.filter((i) => i.img).length} with photos`);
+  assert.ok(items.length > 5 && items.every((i) => i.id && i.name));
 });
 
 test("bottle volume parsing", () => {

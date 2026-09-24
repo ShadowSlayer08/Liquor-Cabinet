@@ -24,7 +24,10 @@ export class HttpError extends Error {
 
 export const isNative = () => Capacitor.isNativePlatform();
 
-export async function getText(url, { timeout = 30000, headers = {} } = {}) {
+// `cookie` is sent as a real Cookie header natively; browsers forbid setting
+// Cookie from JS, so in dev it travels as x-proxy-cookie and the Vite proxy
+// turns it back into a Cookie header.
+export async function getText(url, { timeout = 30000, headers = {}, cookie = null } = {}) {
   if (isNative()) {
     const res = await CapacitorHttp.get({
       url,
@@ -32,6 +35,7 @@ export async function getText(url, { timeout = 30000, headers = {} } = {}) {
         "User-Agent": UA,
         Accept: "text/html,application/json;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-IN,en;q=0.9",
+        ...(cookie ? { Cookie: cookie } : {}),
         ...headers,
       },
       responseType: "text",
@@ -47,7 +51,7 @@ export async function getText(url, { timeout = 30000, headers = {} } = {}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeout);
   try {
-    const res = await fetch(target, { signal: ctrl.signal, headers });
+    const res = await fetch(target, { signal: ctrl.signal, headers: { ...headers, ...(cookie ? { "x-proxy-cookie": cookie } : {}) } });
     if (!res.ok) throw new HttpError(res.status, url);
     return await res.text();
   } catch (e) {

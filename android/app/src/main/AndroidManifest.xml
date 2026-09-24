@@ -38,11 +38,17 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Finds restaurants and delivery zones near you (Zomato / Bistro). -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Order checklist notification while you shop in Zomato / Bistro / Blinkit. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Lets the app check whether Blinkit / Zomato are installed (Android 11+ package visibility). -->
+    <!-- Lets the app check whether Blinkit / Zomato / Bistro are installed and launch them (Android 11+ package visibility). -->
     <queries>
         <package android:name="com.grofers.customerapp" />
         <package android:name="com.application.zomato" />
+        <package android:name="com.blinkit.bistro" />
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.BROWSABLE" />

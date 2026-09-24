@@ -4,38 +4,45 @@ import { CATEGORIES, CITIES, cityName } from "./lib/parse/livcheers.js";
 import { loadCachedCatalog, STALE_MS } from "./lib/sources.js";
 import { store } from "./lib/store.js";
 import { DEFAULT_PARTY, planParty } from "./lib/food.js";
-import { fmt } from "./lib/format.js";
+import { locate } from "./lib/location.js";
 import { handleBack } from "./lib/back.js";
 import { isNative } from "./lib/http.js";
+import { onChecklistTap, tap } from "./lib/order.js";
 import ScraperPanel from "./components/ScraperPanel.jsx";
 import CabinetTab from "./components/CabinetTab.jsx";
 import FoodTab from "./components/FoodTab.jsx";
 import CartTab from "./components/CartTab.jsx";
 import PlanTab from "./components/PlanTab.jsx";
 import Sheet from "./components/Sheet.jsx";
+import { Icon } from "./components/Art.jsx";
 
 const TABS = [
-  { id: "cabinet", icon: "🥃", label: "Cabinet" },
-  { id: "food", icon: "🍽️", label: "Food" },
-  { id: "cart", icon: "🛒", label: "Cart" },
-  { id: "plan", icon: "📊", label: "Plan" },
+  { id: "cabinet", icon: Icon.cabinet, label: "Cabinet" },
+  { id: "food", icon: Icon.food, label: "Food" },
+  { id: "cart", icon: Icon.bag, label: "Cart" },
+  { id: "plan", icon: Icon.chart, label: "Plan" },
 ];
 
 // Only what the cart needs to survive a re-scrape or a city switch.
 const slim = (it) => ({ id: it.id, name: it.name, brand: it.brand, sub: it.sub, vol: it.vol, ml: it.ml, price: it.price, img: it.img, url: it.url, flag: it.flag });
+// v1.0/1.1 food lines used `servings`; everything is `qty` now.
+const migrateFood = (lines) => (lines || []).map((l) => (l.qty == null && l.servings != null ? { ...l, qty: l.servings, restaurant: l.restaurant && { ...l.restaurant, costForOne: l.restaurant.costForOne ?? l.unitPrice } } : l));
 
 export default function App() {
   const [ready, setReady] = useState(false);
+  const [onboarded, setOnboarded] = useState(true);
   const [tab, setTab] = useState("cabinet");
   const [city, setCity] = useState("gurgaon");
+  const [loc, setLoc] = useState(null);           // GPS + Zomato delivery zone (lib/location.js)
+  const [locating, setLocating] = useState(false);
   const [budget, setBudget] = useState(80000);
-  const [catalog, setCatalog] = useState({});   // catId → items[]
-  const [ages, setAges] = useState({});         // catId → fetchedAt
+  const [catalog, setCatalog] = useState({});
+  const [ages, setAges] = useState({});
   const [activeCat, setActiveCat] = useState("malts");
-  const [liquor, setLiquor] = useState({});     // "cat:id" → { cat, qty, item }
+  const [liquor, setLiquor] = useState({});       // "cat:id" → { cat, qty, item }
   const [batches, setBatches] = useState([{ name: "Batch 1", items: {} }]);
   const [activeBatch, setActiveBatch] = useState(0);
-  const [food, setFood] = useState([]);         // food-cart lines (Zomato + Blinkit)
+  const [food, setFood] = useState([]);           // Zomato + Bistro + Blinkit lines
   const [party, setParty] = useState(DEFAULT_PARTY);
   const [syncIds, setSyncIds] = useState(CATEGORIES.filter((c) => c.sync).map((c) => c.id));
   const [showScraper, setShowScraper] = useState(false);
@@ -53,23 +60,24 @@ export default function App() {
       if (cfg.liquor) setLiquor(cfg.liquor);
       if (cfg.batches?.length) setBatches(cfg.batches);
       if (cfg.activeBatch != null) setActiveBatch(cfg.activeBatch);
-      if (cfg.food) setFood(cfg.food);
+      if (cfg.food) setFood(migrateFood(cfg.food));
       if (cfg.party) setParty({ ...DEFAULT_PARTY, ...cfg.party });
       if (cfg.syncIds) setSyncIds(cfg.syncIds);
       if (cfg.activeCat) setActiveCat(cfg.activeCat);
+      if (cfg.loc) setLoc(cfg.loc);
       const { catalog, ages } = await loadCachedCatalog(c, CATEGORIES);
       setCatalog(catalog); setAges(ages);
+      // First launch (or upgrading from a version without onboarding) → welcome screen.
+      setOnboarded(!!cfg.onboarded || (!!Object.keys(catalog).length && !!cfg.loc));
       setReady(true);
-      if (!Object.keys(catalog).length) setShowScraper(true); // first launch → offer a sync
     })();
   }, []);
 
-  // ── Persist (after restore, so defaults never overwrite saved data) ────────
   useEffect(() => {
-    if (ready) store.set("cfg", { city, budget, liquor, batches, activeBatch, food, party, syncIds, activeCat });
-  }, [ready, city, budget, liquor, batches, activeBatch, food, party, syncIds, activeCat]);
+    if (ready) store.set("cfg", { city, loc, budget, liquor, batches, activeBatch, food, party, syncIds, activeCat, onboarded });
+  }, [ready, city, loc, budget, liquor, batches, activeBatch, food, party, syncIds, activeCat, onboarded]);
 
-  // ── Android back button ────────────────────────────────────────────────────
+  // ── Android back button + notification taps ──────────────────────────────
   useEffect(() => {
     if (!isNative()) return;
     const sub = CapApp.addListener("backButton", () => {
@@ -79,32 +87,55 @@ export default function App() {
     });
     return () => { sub.then((s) => s.remove()); };
   }, [tab]);
+  useEffect(() => onChecklistTap(() => { setCartView("food"); setTab("cart"); }), []);
 
   const toast = useCallback((msg) => {
     setToastMsg(msg);
     clearTimeout(window.__lcToast);
-    window.__lcToast = setTimeout(() => setToastMsg(null), 2600);
+    window.__lcToast = setTimeout(() => setToastMsg(null), 2800);
   }, []);
 
-  const changeCity = async (slug) => {
-    setShowCity(false);
-    if (slug === city) return;
+  const switchCity = async (slug) => {
     setCity(slug);
     const { catalog, ages } = await loadCachedCatalog(slug, CATEGORIES);
     setCatalog(catalog); setAges(ages);
-    toast(Object.keys(catalog).length ? `Loaded saved ${cityName(slug)} prices` : `No ${cityName(slug)} prices yet — tap ⚡ Scrape`);
+    return Object.keys(catalog).length;
+  };
+
+  // Manual choice. A city far from your GPS fix means you're planning elsewhere → drop GPS.
+  const pickCity = async (slug) => {
+    setShowCity(false);
+    if (loc && loc.citySlug !== slug) setLoc(null);
+    if (slug === city) return;
+    const n = await switchCity(slug);
+    toast(n ? `Loaded saved ${cityName(slug)} prices` : `No ${cityName(slug)} prices yet — tap ⚡ to sync`);
+  };
+
+  const detectLocation = async () => {
+    setLocating(true);
+    try {
+      const l = await locate();
+      setLoc(l);
+      if (l.citySlug !== city) await switchCity(l.citySlug);
+      toast(`📍 ${l.label || cityName(l.citySlug)}${l.cityKm > 80 ? ` · prices from ${cityName(l.citySlug)}` : ""}`);
+      return l;
+    } catch (e) {
+      toast(/denied|permission/i.test(e.message) ? "Location is off — pick your city instead" : `Couldn't get your location (${e.message})`);
+      return null;
+    } finally {
+      setLocating(false);
+    }
   };
 
   // ── Liquor cart ────────────────────────────────────────────────────────────
   const lkey = (cat, item) => `${cat}:${item.id}`;
   const qtyOf = (cat, item) => liquor[lkey(cat, item)]?.qty || 0;
-
   const addItem = (cat, item) => {
     const k = lkey(cat, item);
+    tap();
     setLiquor((p) => ({ ...p, [k]: { cat, item: slim(item), qty: (p[k]?.qty || 0) + 1 } }));
     setBatches((bs) => bs.map((b, i) => (i === activeBatch ? { ...b, items: { ...b.items, [k]: (b.items[k] || 0) + 1 } } : b)));
   };
-
   const remItem = (cat, item) => {
     const k = lkey(cat, item);
     setLiquor((p) => {
@@ -113,7 +144,6 @@ export default function App() {
       if (n[k].qty <= 1) delete n[k]; else n[k] = { ...n[k], qty: n[k].qty - 1 };
       return n;
     });
-    // Take it out of the active batch, or the latest batch that holds it.
     setBatches((bs) => {
       let idx = bs[activeBatch]?.items[k] ? activeBatch : -1;
       for (let i = bs.length - 1; idx < 0 && i >= 0; i--) if (bs[i].items[k]) idx = i;
@@ -126,7 +156,6 @@ export default function App() {
       });
     });
   };
-
   const clearLiquor = () => { setLiquor({}); setBatches((bs) => bs.map((b) => ({ ...b, items: {} }))); };
 
   const handleScraperData = useCallback((results) => {
@@ -136,16 +165,14 @@ export default function App() {
     setAges((p) => ({ ...p, ...am }));
   }, []);
 
-  // Cart lines use the latest scraped price when the bottle is in the current catalog.
   const liquorLines = useMemo(() => {
     const index = {};
     for (const [cat, items] of Object.entries(catalog)) for (const it of items) index[`${cat}:${it.id}`] = it;
     return Object.entries(liquor).map(([key, v]) => {
       const live = index[key];
-      return { key, cat: v.cat, qty: v.qty, item: live ? { ...v.item, price: live.price } : v.item, stale: !live };
+      return { key, cat: v.cat, qty: v.qty, item: live ? { ...v.item, price: live.price, img: live.img || v.item.img } : v.item, stale: !live };
     });
   }, [liquor, catalog]);
-
   const liquorTotal = liquorLines.reduce((s, l) => s + l.item.price * l.qty, 0);
   const catSpend = useMemo(() => {
     const m = {};
@@ -154,127 +181,149 @@ export default function App() {
   }, [liquorLines]);
 
   // ── Food cart ──────────────────────────────────────────────────────────────
-  const addFood = useCallback((line) => setFood((p) => [...p.filter((l) => l.key !== line.key), line]), []);
+  const upsertFood = useCallback((line) => setFood((p) => {
+    const i = p.findIndex((l) => l.key === line.key);
+    if (i < 0) return [...p, line];
+    const n = [...p];
+    n[i] = { ...p[i], ...line };
+    return n;
+  }), []);
   const updateFood = (key, patch) => setFood((p) => p.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   const removeFood = (key) => setFood((p) => p.filter((l) => l.key !== key));
-  const zomatoTotal = food.filter((l) => l.kind === "zomato").reduce((s, l) => s + l.unitPrice * l.servings, 0);
+  const zomatoTotal = food.filter((l) => l.kind === "zomato").reduce((s, l) => s + (l.unitPrice || 0) * (l.qty || 0), 0);
   const blinkitTotal = food.filter((l) => l.kind === "blinkit").reduce((s, l) => s + l.product.price * l.qty, 0);
 
   const plan = useMemo(() => planParty(party, liquorLines.map((l) => ({ cat: l.cat, ml: l.item.ml, qty: l.qty }))), [party, liquorLines]);
   const liquorCats = [...new Set(liquorLines.map((l) => l.cat))];
-
   const spent = liquorTotal + zomatoTotal + blinkitTotal;
   const left = budget - spent;
-  const pct = budget > 0 ? Math.min(1, spent / budget) : 0;
-  const barColor = pct > 0.92 ? "#e84040" : pct > 0.7 ? "#e8c030" : "#22c97a";
   const staleCount = Object.values(ages).filter((t) => Date.now() - t > STALE_MS).length;
   const bottles = liquorLines.reduce((s, l) => s + l.qty, 0);
+  const foodCount = food.length; // distinct dishes / products
 
-  const addBatch = () => {
-    setBatches((bs) => [...bs, { name: `Batch ${bs.length + 1}`, items: {} }]);
-    setActiveBatch(batches.length);
-  };
-
+  const addBatch = () => { setBatches((bs) => [...bs, { name: `Batch ${bs.length + 1}`, items: {} }]); setActiveBatch(batches.length); };
   const clearCache = async () => {
-    for (const k of await store.list("price:")) await store.del(k);
-    for (const k of await store.list("zomato:")) await store.del(k);
-    for (const k of await store.list("grocery:")) await store.del(k);
+    for (const prefix of ["price:", "zomato:", "menu:", "dishphoto:"]) for (const k of await store.list(prefix)) await store.del(k);
     setCatalog({}); setAges({});
-    toast("Cached prices cleared");
+    toast("Cached data cleared");
   };
+  const goTab = (t) => { setTab(t); window.scrollTo({ top: 0 }); };
 
   if (!ready) {
     return (
-      <div className="app" style={{ alignItems: "center", justifyContent: "center" }}>
-        <img src="./logo-mark.svg" alt="" style={{ width: 96, height: 96, animation: "pulse 1.4s infinite" }} />
+      <div className="welcome" style={{ background: "var(--bg)" }}>
+        <img src="./logo-mark.svg" alt="" style={{ width: 110, height: 110 }} />
       </div>
     );
   }
 
   return (
-    <div className="app">
-      {/* ── HEADER ── */}
-      <header className="header">
-        <div className="header-inner">
-          <div className="brand-row">
-            <div className="brand">
+    <>
+      <div className="aurora" aria-hidden="true"><i /><i /><i /></div>
+      <div className="vignette" aria-hidden="true" />
+      <div className="app">
+        <header className="topbar">
+          <div className="topbar-inner">
+            <button className="brand" onClick={() => setShowCity(true)}>
               <img src="./logo-mark.svg" alt="" />
               <div style={{ minWidth: 0 }}>
-                <div className="brand-kicker">PARTY PLANNER</div>
-                <div className="brand-name">Liquor <span>Cabinet</span></div>
+                <div className="brand-name">Liquor <em>Cabinet</em></div>
+                <div className="loc-chip"><Icon.pin size={12} /><span>{loc?.label || cityName(city)}</span><span className="dim">▾</span></div>
               </div>
-            </div>
-            <button className="btn btn-ghost btn-sm" onClick={() => setShowCity(true)}>📍 {cityName(city)} ▾</button>
-            <button className="btn btn-gold btn-sm" onClick={() => setShowScraper(true)} title="Scrape Livcheers">
-              ⚡{staleCount > 0 && <span style={{ fontSize: 9 }}>{staleCount}</span>}
+            </button>
+            <button className="icon-btn" onClick={detectLocation} disabled={locating} aria-label="Use my location">
+              {locating ? <span className="spin">◌</span> : <Icon.locate size={20} />}
+            </button>
+            <button className="icon-btn gold" onClick={() => setShowScraper(true)} aria-label="Sync Livcheers prices">
+              <Icon.bolt size={20} />{staleCount > 0 && <span className="dot" />}
             </button>
           </div>
-          <div className="budget-row" onClick={() => setTab("plan")}>
-            <div className="budget-meta">
-              <span><b style={{ color: barColor }}>{fmt(spent)}</b> spent · {bottles} btl{food.length ? ` · ${food.length} food` : ""}</span>
-              <span>{left >= 0 ? `${fmt(left)} left of ${fmt(budget)}` : <b className="red">{fmt(-left)} over budget</b>}</span>
-            </div>
-            <div className="bar"><div style={{ width: `${pct * 100}%`, background: barColor }} /></div>
-          </div>
-        </div>
-      </header>
+        </header>
 
-      {/* ── CONTENT ── */}
-      <main className="main">
-        {tab === "cabinet" && (
-          <CabinetTab city={city} catalog={catalog} ages={ages} activeCat={activeCat} setActiveCat={setActiveCat}
-            qtyOf={qtyOf} addItem={addItem} remItem={remItem} budgetLeft={left} openScraper={() => setShowScraper(true)} />
-        )}
-        {tab === "food" && (
-          <FoodTab city={city} party={party} setParty={setParty} plan={plan} liquorCats={liquorCats}
-            foodCart={food} addFood={addFood} toast={toast} goToCart={() => { setCartView("food"); setTab("cart"); }} />
-        )}
-        {tab === "cart" && (
-          <CartTab city={city} view={cartView} setView={setCartView}
-            liquorLines={liquorLines} liquorTotal={liquorTotal} addItem={addItem} remItem={remItem} clearLiquor={clearLiquor}
-            batches={batches} activeBatch={activeBatch}
-            foodCart={food} updateFood={updateFood} removeFood={removeFood} clearFood={() => setFood([])} toast={toast} />
-        )}
-        {tab === "plan" && (
-          <PlanTab city={city} budget={budget} saveBudget={setBudget} spent={spent} catSpend={catSpend}
-            zomatoTotal={zomatoTotal} blinkitTotal={blinkitTotal} plan={plan}
-            batches={batches} activeBatch={activeBatch} setActiveBatch={setActiveBatch} addBatch={addBatch}
-            ages={ages} openScraper={() => setShowScraper(true)} clearCache={clearCache} />
-        )}
-      </main>
+        <main className="main">
+          {tab === "cabinet" && (
+            <CabinetTab city={city} loc={loc} catalog={catalog} ages={ages} activeCat={activeCat} setActiveCat={setActiveCat}
+              qtyOf={qtyOf} addItem={addItem} remItem={remItem} budgetLeft={left} openScraper={() => setShowScraper(true)}
+              plan={plan} spent={spent} budget={budget} bottles={bottles} onPairing={() => goTab("food")} />
+          )}
+          {tab === "food" && (
+            <FoodTab city={city} loc={loc} locating={locating} onLocate={detectLocation} party={party} setParty={setParty} plan={plan}
+              liquorCats={liquorCats} foodCart={food} upsertFood={upsertFood} removeFood={removeFood} toast={toast}
+              goToCart={() => { setCartView("food"); goTab("cart"); }} />
+          )}
+          {tab === "cart" && (
+            <CartTab city={city} view={cartView} setView={setCartView}
+              liquorLines={liquorLines} liquorTotal={liquorTotal} addItem={addItem} remItem={remItem} clearLiquor={clearLiquor}
+              batches={batches} activeBatch={activeBatch}
+              foodCart={food} updateFood={updateFood} removeFood={removeFood} clearFood={() => setFood([])} toast={toast} />
+          )}
+          {tab === "plan" && (
+            <PlanTab city={city} loc={loc} locating={locating} onLocate={detectLocation} budget={budget} saveBudget={setBudget}
+              spent={spent} catSpend={catSpend} zomatoTotal={zomatoTotal} blinkitTotal={blinkitTotal} plan={plan}
+              batches={batches} activeBatch={activeBatch} setActiveBatch={setActiveBatch} addBatch={addBatch}
+              ages={ages} openScraper={() => setShowScraper(true)} clearCache={clearCache} openCity={() => setShowCity(true)} />
+          )}
+        </main>
 
-      {/* ── BOTTOM NAV ── */}
-      <nav className="nav">
-        <div className="nav-inner">
+        <nav className="nav">
           {TABS.map((t) => {
-            const badge = t.id === "cart" ? bottles + food.length : 0;
+            const badge = t.id === "cart" ? bottles + foodCount : 0;
+            const I = t.icon;
             return (
-              <button key={t.id} className={tab === t.id ? "on" : ""} onClick={() => { setTab(t.id); window.scrollTo(0, 0); }}>
-                <span className="ico">{t.icon}</span>
+              <button key={t.id} className={tab === t.id ? "on" : ""} onClick={() => { tap(); goTab(t.id); }}>
+                <I size={22} />
                 {t.label}
                 {badge > 0 && <span className="badge">{badge}</span>}
               </button>
             );
           })}
-        </div>
-      </nav>
+        </nav>
+      </div>
 
-      {showCity && <CityPicker city={city} onPick={changeCity} onClose={() => setShowCity(false)} />}
-      {showScraper && (
-        <ScraperPanel city={city} syncIds={syncIds} setSyncIds={setSyncIds} onData={handleScraperData} onClose={() => setShowScraper(false)} />
+      {!onboarded && (
+        <Welcome locating={locating}
+          onLocate={async () => { await detectLocation(); setOnboarded(true); setShowScraper(true); }}
+          onManual={() => { setOnboarded(true); setShowCity(true); }} />
       )}
+      {showCity && (
+        <CityPicker city={city} loc={loc} locating={locating} onPick={pickCity} onClose={() => setShowCity(false)}
+          onLocate={async () => { setShowCity(false); await detectLocation(); }} />
+      )}
+      {showScraper && <ScraperPanel city={city} syncIds={syncIds} setSyncIds={setSyncIds} onData={handleScraperData} onClose={() => setShowScraper(false)} />}
       {toastMsg && <div className="toast">{toastMsg}</div>}
+    </>
+  );
+}
+
+function Welcome({ locating, onLocate, onManual }) {
+  return (
+    <div className="welcome">
+      <img src="./logo-mark.svg" alt="" />
+      <div className="kicker" style={{ marginTop: 18 }}>Party planner</div>
+      <h1 className="h1" style={{ fontSize: 38, marginTop: 8 }}>Liquor <em>Cabinet</em></h1>
+      <p className="muted" style={{ maxWidth: 320, marginTop: 12, lineHeight: 1.6 }}>
+        Live bottle prices from Livcheers, a party food calculator, and one-tap ordering on Zomato, Bistro & Blinkit.
+      </p>
+      <div style={{ width: "100%", maxWidth: 340, marginTop: 30, display: "grid", gap: 10 }}>
+        <button className="btn btn-gold btn-block" disabled={locating} onClick={onLocate}>
+          {locating ? <span className="spin">◌</span> : <Icon.pin size={18} />} Use my location
+        </button>
+        <button className="btn btn-ghost btn-block" onClick={onManual}>Choose my city</button>
+      </div>
+      <div className="tiny dim" style={{ marginTop: 18, maxWidth: 300 }}>Location is used only on your phone, to show restaurants that deliver to you. 21+ · Drink responsibly.</div>
     </div>
   );
 }
 
-function CityPicker({ city, onPick, onClose }) {
+function CityPicker({ city, loc, locating, onPick, onClose, onLocate }) {
   return (
-    <Sheet title="📍 Choose your city" subtitle="Cities Livcheers publishes prices for" onClose={onClose}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 6 }}>
+    <Sheet title="Where's the party?" subtitle="Livcheers publishes prices for these cities" onClose={onClose}>
+      <button className="btn btn-gold btn-block" disabled={locating} onClick={onLocate} style={{ marginBottom: 14 }}>
+        <Icon.locate size={18} /> {loc ? `Update — ${loc.label || cityName(loc.citySlug)}` : "Use my current location"}
+      </button>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(128px, 1fr))", gap: 8 }}>
         {CITIES.map((c) => (
-          <button key={c.slug} className="chip" onClick={() => onPick(c.slug)}
-            style={{ justifyContent: "center", ...(c.slug === city ? { background: "var(--gold)", color: "#000", borderColor: "var(--gold)", fontWeight: 700 } : {}) }}>
+          <button key={c.slug} className={`chip ${c.slug === city ? "on" : ""}`} style={{ justifyContent: "center", padding: "11px 12px" }} onClick={() => onPick(c.slug)}>
             {c.name}
           </button>
         ))}

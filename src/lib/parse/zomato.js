@@ -17,9 +17,21 @@ const ZOMATO_CITY = {
 };
 export const zomatoCity = (citySlug) => ZOMATO_CITY[citySlug] || citySlug;
 
-export const dishUrl = (citySlug, path) => `${ZOMATO_BASE}/${zomatoCity(citySlug)}/${path}`;
-export const searchUrl = (citySlug, q) =>
-  `${ZOMATO_BASE}/${zomatoCity(citySlug)}/delivery?q=${encodeURIComponent(q)}`;
+// `zCity` (from GPS, see lib/location.js) wins over the Livcheers city mapping.
+export const dishUrl = (citySlug, path, zCity) => `${ZOMATO_BASE}/${zCity || zomatoCity(citySlug)}/${path}`;
+export const searchUrl = (citySlug, q, zCity) =>
+  `${ZOMATO_BASE}/${zCity || zomatoCity(citySlug)}/delivery?q=${encodeURIComponent(q)}`;
+
+// "1.1 km" / "904 m" → metres (for sorting by distance)
+export const parseDistance = (text) => {
+  const m = String(text || "").replace(/,/g, "").match(/([\d.]+)\s*(km|m)\b/i);
+  if (!m) return null;
+  return Math.round(parseFloat(m[1]) * (m[2].toLowerCase() === "km" ? 1000 : 1));
+};
+
+// Zomato image URLs accept resize params; ask for a small square thumbnail.
+export const thumb = (url, px = 240) =>
+  url ? `${url.split("?")[0]}?fit=around%7C${px}%3A${px}&crop=${px}%3A${px}%3B%2A%2C%2A` : null;
 
 export function parsePreloadedState(html) {
   const m = html.match(/window\.__PRELOADED_STATE__\s*=\s*JSON\.parse\(("(?:[^"\\]|\\.)*")\)/);
@@ -69,6 +81,7 @@ export function parseDishPage(html) {
       deliveryTime: card.order?.deliveryTime || "",
       serviceable: card.order?.isServiceable !== false && card.order?.hasOnlineOrdering !== false,
       distance: card.distance || "",
+      meters: parseDistance(card.distance),
       orderUrl: orderPath ? ZOMATO_BASE + orderPath.split("?")[0] : null,
       appLink: deeplinkFrom(card.cardAction?.clickActionDeeplink) || `zomato://order/${info.resId}`,
     });
@@ -80,5 +93,53 @@ export function parseDishPage(html) {
     appSearchLink: sec.SECTION_APP_DEEPLINK?.deeplink || null,
     restaurants,
     medianCostForOne: costs.length ? costs[Math.floor(costs.length / 2)] : null,
+  };
+}
+
+// ── Restaurant menu  (/{city}/{restaurant}/order) ─────────────────────────────
+// Items come with names, photos and veg tags. Zomato hides item prices from
+// logged-out visitors (order.price_login_blocker), so the planner prices dishes
+// with the restaurant's "cost for one" and Zomato shows the exact price at checkout.
+export function parseMenuPage(html) {
+  const state = parsePreloadedState(html);
+  const pages = state?.pages?.restaurant;
+  if (!pages) return null;
+  const key = Object.keys(pages).find((k) => pages[k]?.order?.menuList);
+  if (!key) return null;
+  const r = pages[key], sec = r.sections || {}, bi = sec.SECTION_BASIC_INFO || {};
+  const menus = [];
+  for (const m of r.order.menuList.menus || []) {
+    const items = [];
+    for (const c of m.menu?.categories || []) {
+      for (const w of c.category?.items || []) {
+        const it = w?.item;
+        if (!it?.id || !it.name) continue;
+        const tags = it.tag_slugs || [], diet = it.dietary_slugs || [];
+        items.push({
+          id: String(it.id),
+          name: String(it.name).trim(),
+          desc: it.desc || "",
+          img: it.item_image_url || it.media?.find((x) => x.mediaType === "image")?.image?.url?.split("?")[0] || null,
+          veg: diet.includes("veg") ? true : diet.includes("non-veg") ? false : null,
+          spicy: tags.includes("sf-spicy"),
+          top: tags.includes("rating_4"),
+        });
+      }
+    }
+    if (items.length) menus.push({ id: String(m.menu?.id || menus.length), name: m.menu?.name || "Menu", items });
+  }
+  const delivery = bi.rating_new?.ratings?.DELIVERY || {};
+  return {
+    resId: String(bi.res_id || key),
+    name: bi.name || "",
+    cuisines: bi.cuisine_string || "",
+    img: bi.res_thumb || null,
+    rating: parseFloat(delivery.rating) || null,
+    reviews: delivery.reviewCount || null,
+    timing: bi.timing?.timing_desc || "",
+    locality: sec.SECTION_RES_HEADER_DETAILS?.LOCALITY?.text || "",
+    closed: !!(bi.is_perm_closed || bi.is_temp_closed),
+    pricesHidden: !!r.order.price_login_blocker,
+    menus,
   };
 }

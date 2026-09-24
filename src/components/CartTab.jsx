@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { CATEGORIES, cityName } from "../lib/parse/livcheers.js";
 import { COURSES, GROUPS } from "../lib/food.js";
+import { thumb } from "../lib/parse/zomato.js";
 import { fmt } from "../lib/format.js";
-import { openBlinkitSearch, openZomatoRestaurant, openUrl, shareText, copyText, isInstalled, BLINKIT, ZOMATO } from "../lib/order.js";
+import {
+  openBlinkitSearch, openZomatoRestaurant, openBistro, openUrl, shareText, copyText, isInstalled, postChecklist,
+  CHECKLIST_IDS, zomatoChecklistId, BLINKIT, ZOMATO, BISTRO, buzz,
+} from "../lib/order.js";
+import { BottleStage } from "./ProductCard.jsx";
+import { Qty } from "./Sheet.jsx";
+import { Icon, VegMark } from "./Art.jsx";
 
 export default function CartTab({
   city, view, setView, liquorLines, liquorTotal, addItem, remItem, clearLiquor, batches, activeBatch,
@@ -10,23 +17,9 @@ export default function CartTab({
 }) {
   const [apps, setApps] = useState({});
   useEffect(() => {
-    Promise.all([isInstalled(ZOMATO), isInstalled(BLINKIT)]).then(([z, b]) => setApps({ zomato: z, blinkit: b }));
+    Promise.all([isInstalled(ZOMATO), isInstalled(BLINKIT), isInstalled(BISTRO)]).then(([z, b, s]) => setApps({ zomato: z, blinkit: b, bistro: s }));
   }, []);
 
-  // ── Liquor ──
-  const liquorText = () => {
-    const lines = [`🥃 Liquor Cabinet — ${cityName(city)}`, ""];
-    for (const c of CATEGORIES) {
-      const ls = liquorLines.filter((l) => l.cat === c.id);
-      if (!ls.length) continue;
-      lines.push(`${c.emoji} ${c.label}`);
-      ls.forEach((l) => lines.push(`  ${l.qty} × ${l.item.name} (${l.item.vol}) — ${fmt(l.item.price * l.qty)}`));
-    }
-    lines.push("", `Total: ${fmt(liquorTotal)} (Livcheers indicative prices)`);
-    return lines.join("\n");
-  };
-
-  // ── Food ──
   const zomatoGroups = useMemo(() => {
     const m = new Map();
     for (const l of foodCart.filter((x) => x.kind === "zomato")) {
@@ -36,192 +29,223 @@ export default function CartTab({
     }
     return [...m.values()];
   }, [foodCart]);
+  const bistroLines = foodCart.filter((x) => x.kind === "bistro");
   const blinkitLines = foodCart.filter((x) => x.kind === "blinkit");
+  const zomatoTotal = zomatoGroups.reduce((s, g) => s + g.lines.reduce((t, l) => t + l.unitPrice * l.qty, 0), 0);
   const blinkitTotal = blinkitLines.reduce((s, l) => s + l.product.price * l.qty, 0);
-  const zomatoTotal = foodCart.filter((x) => x.kind === "zomato").reduce((s, l) => s + l.unitPrice * l.servings, 0);
+  const liqCount = liquorLines.reduce((s, l) => s + l.qty, 0);
+  const foodCount = foodCart.length;
 
-  const blinkitText = () => [
-    `🛒 Party supplies — ${cityName(city)}`, "",
-    ...blinkitLines.map((l) => `☐ ${l.qty} × ${l.product.name} (${l.product.packText})`),
-    "", `≈ ${fmt(blinkitTotal)}`,
-  ].join("\n");
+  const setQty = (l, q) => (q <= 0 ? removeFood(l.key) : updateFood(l.key, { qty: q }));
+  const orderLines = (lines) => lines.map((l) => `${l.qty} × ${l.name}`);
+  const blinkitChecklist = (lines) => lines.map((l) => `${l.ordered ? "✅" : "⬜"} ${l.qty} × ${l.product.name} (${l.product.packText})`);
 
-  const zomatoText = () => [
-    `🍽️ Food order — ${cityName(city)}`, "",
-    ...zomatoGroups.flatMap((g) => [`${g.restaurant.name}:`, ...g.lines.map((l) => `  ${l.servings} × ${l.name}`)]),
-    "", `≈ ${fmt(zomatoTotal)}`,
-  ].join("\n");
-
-  const markGroup = (lines, ordered) => lines.forEach((l) => updateFood(l.key, { ordered }));
-
-  const orderZomato = async (g) => {
-    await copyText(g.lines.map((l) => `${l.servings} × ${l.name}`).join(", "));
-    toast(`Opening ${g.restaurant.name} on Zomato — order copied to clipboard`);
+  // ── Hand-offs ──
+  const sendZomato = async (g) => {
+    const lines = orderLines(g.lines);
+    await copyText(`${g.restaurant.name}\n${lines.join("\n")}`);
+    const pinned = await postChecklist(zomatoChecklistId(g.restaurant.resId), `Zomato · ${g.restaurant.name}`, lines, `${lines.length} dishes to add`);
+    buzz();
+    toast(pinned ? "Order pinned to your notifications & copied — opening Zomato" : "Order copied — opening Zomato");
+    g.lines.forEach((l) => updateFood(l.key, { ordered: true }));
     openZomatoRestaurant(g.restaurant);
   };
-
-  const share = async (title, text) => {
-    const r = await shareText(title, text);
-    if (r === "copied") toast("List copied to clipboard");
+  const sendBistro = async () => {
+    const lines = orderLines(bistroLines);
+    await copyText(`Bistro order\n${lines.join("\n")}`);
+    const pinned = await postChecklist(CHECKLIST_IDS.bistro, "Bistro order", lines, `${lines.length} items to add`);
+    buzz();
+    toast(pinned ? "Order pinned to your notifications & copied — opening Bistro" : "Order copied — opening Bistro");
+    bistroLines.forEach((l) => updateFood(l.key, { ordered: true }));
+    openBistro();
+  };
+  const findOnBlinkit = async (l) => {
+    const next = blinkitLines.map((x) => (x.key === l.key ? { ...x, ordered: true } : x));
+    updateFood(l.key, { ordered: true });
+    await postChecklist(CHECKLIST_IDS.blinkit, `Blinkit list · ${next.filter((x) => x.ordered).length}/${next.length} done`, blinkitChecklist(next), "Tap to come back for the next item");
+    openBlinkitSearch(l.query);
+  };
+  const nextBlinkit = () => {
+    const next = blinkitLines.find((l) => !l.ordered);
+    if (next) findOnBlinkit(next); else toast("Everything's ticked off 🎉");
   };
 
-  const liqCount = liquorLines.reduce((s, l) => s + l.qty, 0);
+  const share = async (title, text) => { if ((await shareText(title, text)) === "copied") toast("List copied to clipboard"); };
+  const liquorText = () => [
+    `🥃 Liquor Cabinet — ${cityName(city)}`, "",
+    ...CATEGORIES.flatMap((c) => {
+      const ls = liquorLines.filter((l) => l.cat === c.id);
+      return ls.length ? [`${c.emoji} ${c.label}`, ...ls.map((l) => `  ${l.qty} × ${l.item.name} (${l.item.vol}) — ${fmt(l.item.price * l.qty)}`)] : [];
+    }),
+    "", `Total: ${fmt(liquorTotal)} (Livcheers indicative prices)`,
+  ].join("\n");
+  const foodText = () => [
+    `🍽️ Party food — ${cityName(city)}`, "",
+    ...zomatoGroups.flatMap((g) => [`Zomato · ${g.restaurant.name}`, ...orderLines(g.lines).map((x) => `  ${x}`)]),
+    ...(bistroLines.length ? ["Bistro", ...orderLines(bistroLines).map((x) => `  ${x}`)] : []),
+    ...(blinkitLines.length ? ["Blinkit", ...blinkitLines.map((l) => `  ${l.qty} × ${l.product.name} (${l.product.packText})`)] : []),
+    "", `≈ ${fmt(zomatoTotal + blinkitTotal)}`,
+  ].join("\n");
 
   return (
     <div>
-      <div className="seg" style={{ marginBottom: 12 }}>
-        <button className={view === "liquor" ? "on" : ""} onClick={() => setView("liquor")}>🥃 Liquor · {liqCount}</button>
-        <button className={view === "food" ? "on" : ""} onClick={() => setView("food")}>🍽️ Food & supplies · {foodCart.length}</button>
+      <div className="section-head" style={{ marginTop: 14 }}>
+        <div><div className="kicker">Your order</div><div className="h1" style={{ fontSize: 28 }}>The <em>cart</em></div></div>
+      </div>
+      <div className="seg" style={{ marginBottom: 14 }}>
+        <button className={view === "liquor" ? "on" : ""} onClick={() => setView("liquor")}>🥃 Bottles · {liqCount}</button>
+        <button className={view === "food" ? "on" : ""} onClick={() => setView("food")}>🍽️ Food & supplies · {foodCount}</button>
       </div>
 
-      {view === "liquor" && (
-        liquorLines.length === 0 ? (
-          <div className="empty"><div className="big">🥃</div><div className="t">Your liquor cart is empty</div><div className="small">Add bottles from the Cabinet tab.</div></div>
-        ) : (
-          <>
-            {CATEGORIES.filter((c) => liquorLines.some((l) => l.cat === c.id)).map((c) => {
-              const ls = liquorLines.filter((l) => l.cat === c.id);
-              const tot = ls.reduce((s, l) => s + l.item.price * l.qty, 0);
-              return (
-                <div key={c.id} className="card" style={{ padding: "10px 12px" }}>
-                  <div className="between tiny" style={{ color: c.color, letterSpacing: 2, borderBottom: `1px solid ${c.color}25`, paddingBottom: 5, marginBottom: 4 }}>
-                    <span>{c.emoji} {c.label.toUpperCase()}</span><span>{fmt(tot)}</span>
+      {/* ── Liquor ── */}
+      {view === "liquor" && (liquorLines.length === 0 ? (
+        <div className="card empty"><div style={{ fontSize: 44 }}>🥃</div><div className="t">Your cabinet is empty</div><div className="small">Add bottles from the Cabinet tab.</div></div>
+      ) : (
+        <>
+          {CATEGORIES.filter((c) => liquorLines.some((l) => l.cat === c.id)).map((c) => {
+            const ls = liquorLines.filter((l) => l.cat === c.id);
+            return (
+              <div key={c.id} className="fade-up">
+                <div className="between" style={{ margin: "6px 4px 8px" }}>
+                  <span className="kicker" style={{ color: c.color }}>{c.emoji} {c.label}</span>
+                  <span className="small b">{fmt(ls.reduce((s, l) => s + l.item.price * l.qty, 0))}</span>
+                </div>
+                {ls.map((l) => (
+                  <div key={l.key} className="list-row">
+                    <BottleStage item={l.item} cat={l.cat} artHeight={64} />
+                    <div className="grow" onClick={() => openUrl(l.item.url)}>
+                      <div className="display b ellipsis" style={{ fontSize: 15 }}>{l.item.name}</div>
+                      <div className="tiny muted">{l.item.vol} · {fmt(l.item.price)} each{l.stale ? " · earlier price" : ""}</div>
+                      <b className="gold-text">{fmt(l.item.price * l.qty)}</b>
+                    </div>
+                    <Qty value={l.qty} onChange={(v) => (v > l.qty ? addItem(l.cat, l.item) : remItem(l.cat, l.item))} />
                   </div>
-                  {ls.map((l) => (
+                ))}
+              </div>
+            );
+          })}
+          <div className="card" style={{ marginTop: 10 }}>
+            <div className="between"><span className="muted">{liqCount} bottles</span><span className="h2 gold-text" style={{ fontFamily: "var(--ui)" }}>{fmt(liquorTotal)}</span></div>
+            <div className="tiny dim" style={{ marginTop: 6 }}>Livcheers indicative store prices for {cityName(city)}. Liquor isn't sold on Zomato, Bistro or Blinkit — share the list and pick it up from your local store.</div>
+            <div className="sep" />
+            <div className="between small"><span className="muted">Active batch</span><span>{batches[activeBatch]?.name} · {Object.values(batches[activeBatch]?.items || {}).reduce((s, q) => s + q, 0)} bottles</span></div>
+            <div className="row" style={{ marginTop: 14 }}>
+              <button className="btn btn-gold grow" onClick={() => share("Liquor list", liquorText())}><Icon.share size={17} /> Share list</button>
+              <button className="btn btn-ghost" onClick={() => { if (confirm("Clear the liquor cart?")) clearLiquor(); }}>Clear</button>
+            </div>
+          </div>
+        </>
+      ))}
+
+      {/* ── Food ── */}
+      {view === "food" && (foodCart.length === 0 ? (
+        <div className="card empty"><div style={{ fontSize: 44 }}>🍽️</div><div className="t">Nothing to order yet</div><div className="small">Plan food, mixers and ice in the Food tab.</div></div>
+      ) : (
+        <>
+          <div className="note note-info" style={{ marginBottom: 14 }}>
+            <b>How ordering works:</b> tap a Send button — Liquor Cabinet opens the restaurant or app, copies your list, and pins it to your notifications so every item and quantity is one swipe away while you add them.
+          </div>
+
+          {zomatoGroups.map((g) => {
+            const tot = g.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
+            const sent = g.lines.every((l) => l.ordered);
+            return (
+              <div key={g.restaurant.resId} className="card flush fade-up">
+                <div className="provider-head provider-z">
+                  <span className="logo logo-z">zomato</span>
+                  <span className="grow">
+                    <span className="h3 ellipsis" style={{ display: "block" }}>{g.restaurant.name}</span>
+                    <span className="tiny muted">{[g.restaurant.locality, g.restaurant.deliveryTime && `🛵 ${g.restaurant.deliveryTime}`].filter(Boolean).join(" · ")}</span>
+                  </span>
+                  {g.restaurant.rating && <span className="rating">{g.restaurant.rating} ★</span>}
+                </div>
+                <div className="provider-body">
+                  {g.lines.map((l) => (
                     <div key={l.key} className="line-item">
-                      {l.item.img ? <img className="thumb contain" src={l.item.img} alt="" loading="lazy" /> : <div className="emo">{c.emoji}</div>}
-                      <div className="grow" onClick={() => openUrl(l.item.url)}>
-                        <div className="small ellipsis" style={{ fontWeight: 700 }}>{l.item.name}</div>
-                        <div className="tiny muted">{l.item.vol} · {fmt(l.item.price)} {l.stale && <span className="gold">· price from earlier sync</span>}</div>
+                      {l.img ? <img className="thumb" src={thumb(l.img, 120)} alt="" loading="lazy" /> : <div className="emo">{l.emoji}</div>}
+                      <div className="grow">
+                        <div className="row" style={{ gap: 6 }}><VegMark veg={l.veg} /><span className="small b clamp2">{l.name}</span></div>
+                        <div className="tiny muted ellipsis">{l.section || COURSES[l.course]?.label} · ≈ {fmt(l.unitPrice)} each</div>
                       </div>
-                      <div className="qty">
-                        <button onClick={() => remItem(l.cat, l.item)}>−</button>
-                        <span className="n" style={{ color: c.color }}>{l.qty}</span>
-                        <button className="plus" style={{ background: c.color, borderColor: c.color }} onClick={() => addItem(l.cat, l.item)}>+</button>
-                      </div>
+                      <Qty value={l.qty} onChange={(v) => setQty(l, v)} color="#ff8a92" />
                     </div>
                   ))}
-                </div>
-              );
-            })}
-            <div className="card">
-              <div className="between"><span className="muted">Total ({liqCount} bottles)</span><span style={{ fontSize: 18, fontWeight: 700, color: "var(--gold2)" }}>{fmt(liquorTotal)}</span></div>
-              <div className="tiny dim" style={{ marginTop: 4 }}>Livcheers indicative store prices for {cityName(city)}. Liquor isn't sold on Blinkit/Zomato — buy at your local store.</div>
-              <div className="sep" />
-              <div className="between small"><span className="muted">Active batch</span><span>{batches[activeBatch]?.name} · {Object.values(batches[activeBatch]?.items || {}).reduce((s, q) => s + q, 0)} bottles</span></div>
-              <div className="row" style={{ marginTop: 12 }}>
-                <button className="btn btn-gold grow" onClick={() => share("Liquor list", liquorText())}>↗ Share list</button>
-                <button className="btn btn-ghost" onClick={() => { if (confirm("Clear the liquor cart?")) clearLiquor(); }}>Clear</button>
-              </div>
-            </div>
-          </>
-        )
-      )}
-
-      {view === "food" && (
-        foodCart.length === 0 ? (
-          <div className="empty"><div className="big">🍽️</div><div className="t">No food or supplies yet</div><div className="small">Use the Food tab to calculate what you need.</div></div>
-        ) : (
-          <>
-            {/* Zomato — one order per restaurant */}
-            {zomatoGroups.map((g) => {
-              const tot = g.lines.reduce((s, l) => s + l.unitPrice * l.servings, 0);
-              const allDone = g.lines.every((l) => l.ordered);
-              return (
-                <div key={g.restaurant.resId} className={`order-group ${allDone ? "done" : ""}`}>
-                  <div className="brandbar z">
-                    <span className="logo-z">zomato</span>
-                    <span className="grow ellipsis">{g.restaurant.name}</span>
-                    {g.restaurant.rating && <span className="rating">{g.restaurant.rating}★</span>}
-                  </div>
-                  <div className="body">
-                    <div className="tiny muted" style={{ marginTop: 6 }}>{[g.restaurant.locality, g.restaurant.deliveryTime && `🛵 ${g.restaurant.deliveryTime}`, g.restaurant.costText].filter(Boolean).join(" · ")}</div>
-                    {g.lines.map((l) => (
-                      <div key={l.key} className="line-item">
-                        <div className="emo">{l.emoji}</div>
-                        <div className="grow">
-                          <div className="small" style={{ fontWeight: 700 }}>{l.name}</div>
-                          <div className="tiny muted">{COURSES[l.course]?.label} · ≈ {fmt(l.unitPrice)} × {l.servings}</div>
-                        </div>
-                        <div className="qty">
-                          <button onClick={() => (l.servings <= 1 ? removeFood(l.key) : updateFood(l.key, { servings: l.servings - 1 }))}>−</button>
-                          <span className="n" style={{ color: "#f07080" }}>{l.servings}</span>
-                          <button className="plus" style={{ background: "var(--zomato)", borderColor: "var(--zomato)", color: "#fff" }} onClick={() => updateFood(l.key, { servings: l.servings + 1 })}>+</button>
-                        </div>
-                      </div>
-                    ))}
-                    <div className="between" style={{ marginTop: 8 }}>
-                      <span className="row small" onClick={() => markGroup(g.lines, !allDone)} style={{ cursor: "pointer" }}>
-                        <span className={`check ${allDone ? "on" : ""}`}>{allDone ? "✓" : ""}</span> Ordered
-                      </span>
-                      <span style={{ fontWeight: 700 }}>≈ {fmt(tot)}</span>
-                    </div>
-                    <button className="btn btn-zomato btn-block" style={{ marginTop: 10 }} onClick={() => orderZomato(g)}>
-                      Order on Zomato {apps.zomato ? "(app)" : ""} ↗
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Blinkit — one list */}
-            {blinkitLines.length > 0 && (
-              <div className="order-group">
-                <div className="brandbar b">
-                  <span className="logo-b">blinkit</span>
-                  <span className="grow">Party supplies</span>
-                  <span className="small">{blinkitLines.filter((l) => l.ordered).length}/{blinkitLines.length} done</span>
-                </div>
-                <div className="body">
-                  {Object.entries(GROUPS).map(([gid]) => blinkitLines.filter((l) => l.group === gid).map((l) => (
-                    <div key={l.key} className={`line-item ${l.ordered ? "done" : ""}`}>
-                      <span className={`check ${l.ordered ? "on" : ""}`} onClick={() => updateFood(l.key, { ordered: !l.ordered })}>{l.ordered ? "✓" : ""}</span>
-                      {l.product.img ? <img className="thumb contain" src={l.product.img} alt="" loading="lazy" /> : <div className="emo">{l.emoji}</div>}
-                      <div className="grow">
-                        <div className="small ellipsis" style={{ fontWeight: 700 }}>{l.product.name}</div>
-                        <div className="tiny muted">{l.product.packText} · {fmt(l.product.price)} × {l.qty} = {fmt(l.product.price * l.qty)}</div>
-                        <div className="row" style={{ marginTop: 5, gap: 6 }}>
-                          <div className="qty">
-                            <button style={{ width: 24, height: 24 }} onClick={() => (l.qty <= 1 ? removeFood(l.key) : updateFood(l.key, { qty: l.qty - 1 }))}>−</button>
-                            <span className="n small">{l.qty}</span>
-                            <button style={{ width: 24, height: 24 }} onClick={() => updateFood(l.key, { qty: l.qty + 1 })}>+</button>
-                          </div>
-                          <button className="btn btn-sm btn-blinkit" style={{ marginLeft: "auto" }} onClick={() => { updateFood(l.key, { ordered: true }); openBlinkitSearch(l.query); }}>
-                            Find on Blinkit ↗
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )))}
                   <div className="between" style={{ marginTop: 10 }}>
-                    <span className="muted small">Estimated total</span><span style={{ fontWeight: 700 }}>≈ {fmt(blinkitTotal)}</span>
+                    <span className="tiny muted">{sent ? "✓ Sent to Zomato" : `${g.lines.reduce((s, l) => s + l.qty, 0)} items`}</span>
+                    <b>≈ {fmt(tot)}</b>
                   </div>
-                  <div className="row" style={{ marginTop: 10 }}>
-                    <button className="btn btn-blinkit grow" onClick={() => { const next = blinkitLines.find((l) => !l.ordered); if (next) { updateFood(next.key, { ordered: true }); openBlinkitSearch(next.query); } else toast("Everything is marked as ordered"); }}>
-                      Next item on Blinkit ↗
-                    </button>
-                    <button className="btn btn-ghost" onClick={() => share("Party supplies", blinkitText())}>↗ Share</button>
-                  </div>
-                  <div className="tiny dim" style={{ marginTop: 8 }}>
-                    Blinkit has no public cart API, so each item opens as a search in the Blinkit {apps.blinkit ? "app" : "app / website"} — add it there, come back, tap the next one.
-                  </div>
+                  <button className="btn btn-zomato btn-block" style={{ marginTop: 12 }} onClick={() => sendZomato(g)}>
+                    {sent ? "Open again in Zomato" : "Send order to Zomato"} {apps.zomato ? "app" : ""} <Icon.external size={16} />
+                  </button>
                 </div>
               </div>
-            )}
+            );
+          })}
 
-            <div className="card">
-              <div className="between small"><span className="muted">Zomato food</span><span>{fmt(zomatoTotal)}</span></div>
-              <div className="between small" style={{ marginTop: 4 }}><span className="muted">Blinkit supplies</span><span>{fmt(blinkitTotal)}</span></div>
-              <div className="sep" />
-              <div className="between"><span className="muted">Food total</span><span style={{ fontSize: 18, fontWeight: 700, color: "var(--gold2)" }}>≈ {fmt(zomatoTotal + blinkitTotal)}</span></div>
-              <div className="row" style={{ marginTop: 12 }}>
-                {zomatoGroups.length > 0 && <button className="btn btn-ghost grow" onClick={() => share("Food order", zomatoText())}>↗ Share food order</button>}
-                <button className="btn btn-ghost" onClick={() => { if (confirm("Clear food & supplies?")) clearFood(); }}>Clear</button>
+          {bistroLines.length > 0 && (
+            <div className="card flush fade-up">
+              <div className="provider-head provider-s">
+                <span className="logo logo-s">bistro</span>
+                <span className="grow small muted">10-minute snacks & meals</span>
+              </div>
+              <div className="provider-body">
+                {bistroLines.map((l) => (
+                  <div key={l.key} className="line-item">
+                    <div className="emo" style={{ background: "rgba(255,122,26,.14)" }}>{l.emoji}</div>
+                    <div className="grow"><div className="row" style={{ gap: 6 }}><VegMark veg={l.veg === "both" ? null : l.veg} /><span className="small b">{l.name}</span></div><div className="tiny muted">Price in Bistro app</div></div>
+                    <Qty value={l.qty} onChange={(v) => setQty(l, v)} color="var(--bistro)" />
+                  </div>
+                ))}
+                <button className="btn btn-bistro btn-block" style={{ marginTop: 12 }} onClick={sendBistro}>
+                  Send order to Bistro {apps.bistro ? "app" : ""} <Icon.external size={16} />
+                </button>
               </div>
             </div>
-          </>
-        )
-      )}
+          )}
+
+          {blinkitLines.length > 0 && (
+            <div className="card flush fade-up">
+              <div className="provider-head provider-b">
+                <span className="logo logo-b">blinkit</span>
+                <span className="grow small muted">Party supplies</span>
+                <span className="pill" style={{ background: "rgba(52,217,143,.14)", color: "var(--green)" }}>{blinkitLines.filter((l) => l.ordered).length}/{blinkitLines.length} done</span>
+              </div>
+              <div className="provider-body">
+                {Object.keys(GROUPS).flatMap((gid) => blinkitLines.filter((l) => l.group === gid)).map((l) => (
+                  <div key={l.key} className={`line-item ${l.ordered ? "done" : ""}`}>
+                    <button className={`check ${l.ordered ? "on" : ""}`} onClick={() => updateFood(l.key, { ordered: !l.ordered })} aria-label="Done">{l.ordered && <Icon.check size={14} />}</button>
+                    <div className="emo" style={{ background: "rgba(248,203,70,.1)", width: 40, height: 40, fontSize: 19 }}>{l.emoji}</div>
+                    <div className="grow">
+                      <div className="small b ellipsis">{l.product.name}</div>
+                      <div className="tiny muted">{l.product.packText} · {fmt(l.product.price)} × {l.qty}</div>
+                      <div className="row" style={{ marginTop: 6, gap: 8 }}>
+                        <Qty value={l.qty} onChange={(v) => setQty(l, v)} />
+                        <button className="btn btn-xs btn-blinkit" style={{ marginLeft: "auto" }} onClick={() => findOnBlinkit(l)}>Find <Icon.external size={12} /></button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <div className="between" style={{ marginTop: 10 }}><span className="tiny muted">Estimated (MRP)</span><b>≈ {fmt(blinkitTotal)}</b></div>
+                <button className="btn btn-blinkit btn-block" style={{ marginTop: 12 }} onClick={nextBlinkit}>
+                  {blinkitLines.some((l) => l.ordered) ? "Next item on Blinkit" : "Start Blinkit run"} <Icon.external size={16} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="card">
+            <div className="between small"><span className="muted">Zomato food</span><span>{fmt(zomatoTotal)}</span></div>
+            {bistroLines.length > 0 && <div className="between small" style={{ marginTop: 4 }}><span className="muted">Bistro</span><span className="dim">priced in app</span></div>}
+            <div className="between small" style={{ marginTop: 4 }}><span className="muted">Blinkit supplies</span><span>{fmt(blinkitTotal)}</span></div>
+            <div className="sep" />
+            <div className="between"><span className="muted">Food total</span><span className="h2 gold-text" style={{ fontFamily: "var(--ui)" }}>≈ {fmt(zomatoTotal + blinkitTotal)}</span></div>
+            <div className="row" style={{ marginTop: 14 }}>
+              <button className="btn btn-ghost grow" onClick={() => share("Party food", foodText())}><Icon.share size={17} /> Share</button>
+              <button className="btn btn-ghost" onClick={() => { if (confirm("Clear food & supplies?")) clearFood(); }}>Clear</button>
+            </div>
+          </div>
+        </>
+      ))}
     </div>
   );
 }

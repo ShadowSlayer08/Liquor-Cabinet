@@ -18,7 +18,9 @@ const proxy = (target) => ({
   rewrite: (p) => p.replace(/^\/proxy\/[a-z]+/, ""),
   configure: (server) => {
     server.on("proxyReq", (req) => {
-      for (const h of req.getHeaderNames()) if (BROWSER_ONLY.test(h)) req.removeHeader(h);
+      const cookie = req.getHeader("x-proxy-cookie");
+      for (const h of req.getHeaderNames()) if (BROWSER_ONLY.test(h) || h === "x-proxy-cookie") req.removeHeader(h);
+      if (cookie) req.setHeader("Cookie", cookie);
     });
   },
 });

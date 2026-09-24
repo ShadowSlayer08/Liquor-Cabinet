@@ -6,10 +6,12 @@
 import { getText, HttpError } from "./http.js";
 import { store } from "./store.js";
 import { parseCategoryHtml, categoryUrl } from "./parse/livcheers.js";
-import { parseDishPage, dishUrl, searchUrl, zomatoCity } from "./parse/zomato.js";
+import { parseDishPage, parseMenuPage, dishUrl, searchUrl, zomatoCity } from "./parse/zomato.js";
+import { zomatoCookie } from "./location.js";
 
 export const STALE_MS = 7 * 86400 * 1000;
 const ZOMATO_TTL = 12 * 3600 * 1000;
+const MENU_TTL = 6 * 3600 * 1000;
 
 // ── Livcheers ────────────────────────────────────────────────────────────────
 export const priceKey = (city, catId) => `price:${city}:${catId}`;
@@ -55,24 +57,50 @@ export async function scrapeCategory(city, cat, onLog, force = false) {
 }
 
 // ── Zomato ───────────────────────────────────────────────────────────────────
-export async function fetchDish(city, dish, { force = false } = {}) {
-  const key = `zomato:${zomatoCity(city)}:${dish.id}`;
+// `loc` (lib/location.js) localises results to the user's delivery zone.
+export async function fetchDish(city, dish, { force = false, loc = null } = {}) {
+  const zCity = loc?.zomato?.city || zomatoCity(city);
+  const zone = loc?.zomato?.entityId || "city";
+  const key = `zomato:${zCity}:${zone}:${dish.id}`;
   if (!force) {
     const cached = await store.get(key);
     if (cached && Date.now() - cached.fetchedAt < ZOMATO_TTL) return { ...cached, fromCache: true };
   }
-  const webUrl = dishUrl(city, dish.path);
+  const webUrl = dishUrl(city, dish.path, zCity);
   let result;
   try {
-    const parsed = parseDishPage(await getText(webUrl, { timeout: 30000 }));
+    const parsed = parseDishPage(await getText(webUrl, { timeout: 30000, cookie: zomatoCookie(loc) }));
     if (!parsed) throw new Error("Zomato page format changed");
-    result = { ...parsed, webUrl, fetchedAt: Date.now() };
+    result = { ...parsed, webUrl, local: !!loc?.zomato, fetchedAt: Date.now() };
   } catch (e) {
     if (e instanceof HttpError && e.status === 404) {
       // Zomato has no page for this dish in this city — fall back to a search link.
-      result = { restaurants: [], medianCostForOne: null, notFound: true, webUrl: searchUrl(city, dish.name), fetchedAt: Date.now() };
+      result = { restaurants: [], medianCostForOne: null, notFound: true, webUrl: searchUrl(city, dish.name, zCity), fetchedAt: Date.now() };
     } else throw e;
   }
   await store.set(key, result);
+  // Remember a photo for the dish tile.
+  const photo = result.restaurants?.find((r) => r.img)?.img;
+  if (photo) store.set(`dishphoto:${dish.id}`, photo);
   return { ...result, fromCache: false };
+}
+
+export async function fetchMenu(restaurant, { force = false, loc = null } = {}) {
+  const key = `menu:${restaurant.resId}`;
+  if (!force) {
+    const cached = await store.get(key);
+    if (cached && Date.now() - cached.fetchedAt < MENU_TTL) return { ...cached, fromCache: true };
+  }
+  if (!restaurant.orderUrl) throw new Error("No Zomato menu link for this restaurant");
+  const menu = parseMenuPage(await getText(restaurant.orderUrl, { timeout: 30000, cookie: zomatoCookie(loc) }));
+  if (!menu || !menu.menus.length) throw new Error("Couldn't read this restaurant's menu");
+  const result = { ...menu, fetchedAt: Date.now() };
+  await store.set(key, result);
+  return { ...result, fromCache: false };
+}
+
+export async function dishPhotos(dishes) {
+  const out = {};
+  for (const d of dishes) { const p = await store.get(`dishphoto:${d.id}`); if (p) out[d.id] = p; }
+  return out;
 }

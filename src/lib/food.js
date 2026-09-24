@@ -295,3 +295,21 @@ export function suggestDishes(catIds, course) {
 
 // Blinkit search term for a chosen product.
 export const blinkitQuery = (grocery, product) => product?.blinkit || product?.name || grocery.name;
+
+// ── Bistro (Blinkit's 10-minute food app) ────────────────────────────────────
+// Canteen-style snacks & meals from micro-kitchens inside Blinkit stores. Bistro
+// doesn't publish a menu or prices online, so items are ideas you order in the
+// Bistro app; they're shown as "price in app" and left out of the budget.
+export const BISTRO_ITEMS = [
+  { id: "samosa",           name: "Samosa",              emoji: "🔺", veg: true },
+  { id: "vada-pav",         name: "Vada Pav",            emoji: "🍔", veg: true },
+  { id: "veg-sandwich",     name: "Veg Grilled Sandwich", emoji: "🥪", veg: true },
+  { id: "chicken-sandwich", name: "Chicken Sandwich",    emoji: "🥪", veg: false },
+  { id: "paneer-wrap",      name: "Paneer Tikka Wrap",   emoji: "🌯", veg: true },
+  { id: "chicken-wrap",     name: "Chicken Wrap",        emoji: "🌯", veg: false },
+  { id: "momos",            name: "Momos",               emoji: "🥟", veg: "both" },
+  { id: "rice-bowl",        name: "Rice Bowl",           emoji: "🍚", veg: "both" },
+  { id: "brownie",          name: "Brownie & Pastries",  emoji: "🍫", veg: true },
+  { id: "chai",             name: "Masala Chai",         emoji: "☕", veg: true },
+  { id: "cold-coffee",      name: "Cold Coffee",         emoji: "🧋", veg: true },
+];
