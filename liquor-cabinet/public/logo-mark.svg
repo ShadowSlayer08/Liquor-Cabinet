@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Liquor Cabinet mark: arched cabinet with open doors, three bottles and a rocks glass. -->
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f6cf6a"/>
+      <stop offset="1" stop-color="#c9731c"/>
+    </linearGradient>
+    <linearGradient id="inside" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a1608"/>
+      <stop offset="1" stop-color="#120904"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f7a73a"/>
+      <stop offset="1" stop-color="#a4520d"/>
+    </linearGradient>
+    <linearGradient id="wine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d9477f"/>
+      <stop offset="1" stop-color="#6a1235"/>
+    </linearGradient>
+    <linearGradient id="gin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5cf0b0"/>
+      <stop offset="1" stop-color="#138a5c"/>
+    </linearGradient>
+  </defs>
+
+  <!-- open doors -->
+  <path d="M142 204 L92 180 L92 430 L142 420 Z" fill="#1c0f06" stroke="url(#gold)" stroke-width="10" stroke-linejoin="round" opacity=".85"/>
+  <path d="M370 204 L420 180 L420 430 L370 420 Z" fill="#1c0f06" stroke="url(#gold)" stroke-width="10" stroke-linejoin="round" opacity=".85"/>
+  <circle cx="108" cy="306" r="6" fill="url(#gold)"/>
+  <circle cx="404" cy="306" r="6" fill="url(#gold)"/>
+
+  <!-- cabinet body -->
+  <path d="M142 428 V204 A114 114 0 0 1 370 204 V428 Z" fill="url(#inside)" stroke="url(#gold)" stroke-width="18" stroke-linejoin="round"/>
+
+  <!-- top shelf bottles -->
+  <g>
+    <!-- whisky -->
+    <rect x="200" y="124" width="16" height="14" rx="3" fill="url(#gold)"/>
+    <path d="M202 138 h12 v40 c0 8 22 12 22 30 v92 h-56 v-92 c0-18 22-22 22-30 z" fill="url(#amber)"/>
+    <rect x="186" y="236" width="44" height="30" rx="4" fill="#f3e2c0" opacity=".9"/>
+    <!-- wine -->
+    <rect x="250" y="112" width="14" height="14" rx="3" fill="url(#gold)"/>
+    <path d="M251 126 h12 v58 c0 10 22 16 22 36 v80 h-56 v-80 c0-20 22-26 22-36 z" fill="url(#wine)"/>
+    <!-- gin -->
+    <rect x="304" y="176" width="16" height="12" rx="3" fill="url(#gold)"/>
+    <path d="M305 188 h14 v18 c14 4 22 10 22 24 v70 h-58 v-70 c0-14 8-20 22-24 z" fill="url(#gin)"/>
+  </g>
+
+  <!-- shelf -->
+  <rect x="150" y="298" width="212" height="12" rx="3" fill="url(#gold)"/>
+
+  <!-- rocks glass -->
+  <path d="M224 372 L288 372 L283 414 L229 414 Z" fill="url(#amber)" opacity=".95"/>
+  <rect x="236" y="366" width="18" height="18" rx="3" fill="#fff4d8" opacity=".75" transform="rotate(-12 245 375)"/>
+  <path d="M216 332 L296 332 L286 418 L226 418 Z" fill="none" stroke="url(#gold)" stroke-width="8" stroke-linejoin="round"/>
+</svg>
