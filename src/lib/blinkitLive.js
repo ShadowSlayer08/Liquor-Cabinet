@@ -33,7 +33,15 @@ export const CARD_SCRIPT = String.raw`(function () {
     if (own.trim().toUpperCase() !== 'ADD') continue;
     var box = el.parentElement, up = 0;
     while (box && up < 8 && !PRICE.test(box.innerText || '')) { box = box.parentElement; up++; }
-    if (!box || up >= 8 || boxes.indexOf(box) >= 0) continue;
+    if (!box || up >= 8) continue;
+    // That's only the price row ("₹19 ₹20 ADD"): grow to the whole card — the largest
+    // ancestor that still holds just this one ADD button (and isn't the whole page).
+    for (var k = 0, p = box.parentElement; k < 8 && p; k++, p = p.parentElement) {
+      var pt = p.innerText || '';
+      if ((pt.match(/\bADD\b/g) || []).length !== 1 || pt.split('\n').length > 12) break;
+      box = p;
+    }
+    if (boxes.indexOf(box) >= 0) continue;
     boxes.push(box);
     var img = box.querySelector('img');
     cards.push({ text: box.innerText || '', img: img ? img.currentSrc || img.src || '' : '' });

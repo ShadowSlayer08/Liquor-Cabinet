@@ -113,3 +113,51 @@ test("page script: presses “Detect my location” once, then waits", () => {
   assert.equal(span.clicks, 1);
   assert.equal(run(h("body", null), {}), "");       // empty page
 });
+
+// Blinkit's real markup (checked in a browser, 25 Sep 2026) puts the price and ADD in one row:
+// the nearest ₹ ancestor is just "₹19 ₹20 ADD", so the script has to grow to the whole card.
+const realCard = (off, name, pack, ...prices) => h("div", null, h("div", null,
+  ...(off ? [h("div", null, off)] : []), h("div", null, "8 MINS"),
+  h("div", null, h("div", null, name), h("div", null, pack)),
+  h("div", null, h("div", null, ...prices.map((p) => h("div", null, p))), h("div", null, "ADD"))));
+
+test("page script: finds the whole card when price and ADD share a row", () => {
+  const list = h("div", null,
+    realCard("5% OFF", "Bisleri Soda Water", "750 ml", "₹19", "₹20"),
+    realCard(null, "Kinley Strong Soda Water", "750 ml", "₹20"));
+  const body = h("body", null, h("div", null, "Showing results for \"soda\""), list);
+  const win = {};
+  run(body, win);
+  const got = extractProducts(JSON.parse(run(body, win))).map((p) => [p.name, p.price, p.pack]);
+  assert.deepEqual(got, [["Bisleri Soda Water", 19, "750 ml"], ["Kinley Strong Soda Water", 20, "750 ml"]]);
+  // A lone result mustn't swallow the page header / location prompt.
+  const one = h("body", null, h("div", null, "Welcome to blinkit", "Please provide your delivery location to see products at nearby store",
+    "Detect my location", "OR", "My Cart", "Soda", "Club soda", "Showing results", "x", "y", "z", "w",
+    realCard(null, "Catch Club Soda Water", "750 ml", "₹25")));
+  const w2 = {};
+  run(one, w2);
+  assert.equal(extractProducts(JSON.parse(run(one, w2)))[0].name, "Catch Club Soda Water");
+});
+
+test("real Blinkit card texts (captured 25 Sep 2026)", () => {
+  const cards = [
+    "17% OFF\n8 MINS\nHado Guava Chilli Crafted Soda\n250 ml\n₹99\n₹120\nADD",
+    "5% OFF\n8 MINS\nBisleri Soda Water\n750 ml\n₹19\n₹20\nADD",
+    "16% OFF\n8 MINS\nAircloud Premium Club Soda Water\n12 x 180 ml\n₹299\n₹360\nADD",
+    "8 MINS\nSepoy & Co. Premium Soda Water\n200 ml\n₹58\n₹60\nADD",
+    "31% OFF\n8 MINS\nBallantines Non-Alcoholic Carbonated, Soda Water\n4 x 250 ml\n₹145\n₹212\nADD",
+    "8 MINS\nJayanti Banta Jeera Masala Soda\n24 pcs\n₹240\nADD",
+  ].map((text) => ({ text, img: "" }));
+  const got = extractProducts(cards);
+  assert.deepEqual(got.map((p) => [p.name, p.price, p.pack]), [
+    ["Hado Guava Chilli Crafted Soda", 99, "250 ml"],
+    ["Bisleri Soda Water", 19, "750 ml"],
+    ["Aircloud Premium Club Soda Water", 299, "12 x 180 ml"],
+    ["Sepoy & Co. Premium Soda Water", 58, "200 ml"],
+    ["Ballantines Non-Alcoholic Carbonated, Soda Water", 145, "4 x 250 ml"],
+    ["Jayanti Banta Jeera Masala Soda", 240, "24 pcs"],
+  ]);
+  assert.equal(liveOption(got[2], "ml").pack.amount, 2160);
+  assert.equal(liveOption(got[4], "ml").pack.amount, 1000);
+  assert.equal(got.every((p) => p.img === null), true);   // images lazy-load after the text
+});
