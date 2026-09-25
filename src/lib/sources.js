@@ -2,12 +2,14 @@
 //  SCRAPERS — the app's own code, no AI/API keys involved.
 //  • Checks the IndexedDB cache first (liquor 7 days, Zomato 12 h)
 //  • Only hits the network when stale/missing or on Force Refresh
+//  • Each fresh Livcheers scrape is diffed with the last one (lib/pricehist.js)
 // ═══════════════════════════════════════════════════════════════════════════════
 import { getText, HttpError } from "./http.js";
 import { store } from "./store.js";
 import { parseCategoryHtml, categoryUrl } from "./parse/livcheers.js";
 import { parseDishPage, parseMenuPage, dishUrl, searchUrl, zomatoCity } from "./parse/zomato.js";
 import { zomatoCookie } from "./location.js";
+import { applyPriceHistory, histKey } from "./pricehist.js";
 
 export const STALE_MS = 7 * 86400 * 1000;
 const ZOMATO_TTL = 12 * 3600 * 1000;
@@ -51,9 +53,14 @@ export async function scrapeCategory(city, cat, onLog, force = false) {
     return { items: [], fromCache: false, fetchedAt: Date.now() };
   }
   const fetchedAt = Date.now();
-  await store.set(key, { items, fetchedAt });
-  onLog(`✓ ${cat.label} — ${items.length} items (${Math.round(html.length / 1024)} KB, ${((fetchedAt - t0) / 1000).toFixed(1)}s)`, "ok");
-  return { items, fromCache: false, fetchedAt };
+  // Diff against the previous sync → price-drop badges + a short per-bottle history.
+  const hk = histKey(city, cat.id);
+  const diff = applyPriceHistory(items, await store.get(key), await store.get(hk), fetchedAt);
+  await store.set(key, { items: diff.items, fetchedAt });
+  await store.set(hk, diff.hist);
+  const moved = diff.items.filter((it) => it.priceChangedAt === fetchedAt).length;
+  onLog(`✓ ${cat.label} — ${items.length} items (${Math.round(html.length / 1024)} KB, ${((fetchedAt - t0) / 1000).toFixed(1)}s)${moved ? ` · ${moved} price change${moved > 1 ? "s" : ""}` : ""}`, "ok");
+  return { items: diff.items, fromCache: false, fetchedAt };
 }
 
 // ── Zomato ───────────────────────────────────────────────────────────────────

@@ -100,6 +100,22 @@ export function parseDishPage(html) {
 // Items come with names, photos and veg tags. Zomato hides item prices from
 // logged-out visitors (order.price_login_blocker), so the planner prices dishes
 // with the restaurant's "cost for one" and Zomato shows the exact price at checkout.
+// Signed in (Plan → Zomato account, beta) items should carry a price; which
+// field it lives in couldn't be checked, so the usual candidates are tried in turn.
+
+// 240 / "₹240" / "240.00" / "₹1,240" → 240 / 240 / 240 / 1240; 0, null or junk → null
+export const menuPrice = (v) => {
+  if (typeof v === "number") return Number.isFinite(v) && v > 0 ? v : null;
+  if (typeof v !== "string") return null;
+  const m = v.replace(/,/g, "").match(/\d+(?:\.\d+)?/);
+  const n = m ? parseFloat(m[0]) : 0;
+  return n > 0 ? n : null;
+};
+const itemPrice = (it) => [it.price, it.display_price, it.min_price, it.default_price].map(menuPrice).find((p) => p != null) ?? null;
+
+// A menu counts as exactly priced when Zomato didn't block prices and at least one item has one.
+export const hasExactPrices = (menu) => !!menu && !menu.pricesHidden && (menu.menus || []).some((s) => s.items.some((i) => i.price));
+
 export function parseMenuPage(html) {
   const state = parsePreloadedState(html);
   const pages = state?.pages?.restaurant;
@@ -123,6 +139,7 @@ export function parseMenuPage(html) {
           veg: diet.includes("veg") ? true : diet.includes("non-veg") ? false : null,
           spicy: tags.includes("sf-spicy"),
           top: tags.includes("rating_4"),
+          price: itemPrice(it),
         });
       }
     }
