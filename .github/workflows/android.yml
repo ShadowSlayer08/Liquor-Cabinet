@@ -1,0 +1,35 @@
+# Unit tests + an Android build on every push. Release signing needs the private keystore,
+# which never leaves the owner's machine, so CI builds the debug APK only.
+name: Android
+
+on:
+  push:
+    branches: [master, ios]
+    paths-ignore: ["**.md", "docs/**", "release/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Unit tests (live-site tests skipped on CI IPs)
+        run: npm test
+        env: { LC_SKIP_LIVE: "1" }
+      - run: npx vite build && npx cap sync android
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21, cache: gradle }
+      - name: Debug APK
+        run: node scripts/gradle.mjs assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LiquorCabinet-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk

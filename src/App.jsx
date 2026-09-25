@@ -124,6 +124,7 @@ export default function App() {
       const m = /^liquorcabinet:\/\/tab\/(cabinet|bar|food|cart|plan)(?:\?view=(liquor|food))?/.exec(url || "");
       if (!m) return;
       if (m[2]) setCartView(m[2]);
+      setOnboarded(true); // a link to a tab should show that tab, not the first-run welcome
       setTab(m[1]);
       window.scrollTo({ top: 0 });
     };

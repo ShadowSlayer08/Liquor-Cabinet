@@ -4,13 +4,15 @@ import assert from "node:assert/strict";
 import { parseCategoryHtml, CATEGORIES, categoryUrl, parseMl } from "../src/lib/parse/livcheers.js";
 import { parseDishPage, parseMenuPage, dishUrl } from "../src/lib/parse/zomato.js";
 
+// CI sets LC_SKIP_LIVE: GitHub's runners are datacenter IPs, which these sites may turn away.
+const LIVE = { skip: process.env.LC_SKIP_LIVE ? "LC_SKIP_LIVE is set" : false };
 const UA = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36";
 const get = async (url, cookie) => {
   const r = await fetch(url, { headers: { "User-Agent": UA, "Accept-Language": "en-IN,en;q=0.9", ...(cookie ? { Cookie: cookie } : {}) } });
   return { status: r.status, text: await r.text() };
 };
 
-test("livcheers: every category parses for Gurgaon", { timeout: 180000 }, async () => {
+test("livcheers: every category parses for Gurgaon", { ...LIVE, timeout: 180000 }, async () => {
   for (const cat of CATEGORIES) {
     const { status, text } = await get(categoryUrl("gurgaon", cat));
     assert.equal(status, 200, cat.slug);
@@ -24,7 +26,7 @@ test("livcheers: every category parses for Gurgaon", { timeout: 180000 }, async 
   }
 });
 
-test("livcheers: other cities", { timeout: 120000 }, async () => {
+test("livcheers: other cities", { ...LIVE, timeout: 120000 }, async () => {
   for (const city of ["mumbai", "bangalore", "pune"]) {
     const { text } = await get(categoryUrl(city, CATEGORIES.find((c) => c.id === "gin")));
     const items = parseCategoryHtml(text, city);
@@ -33,7 +35,7 @@ test("livcheers: other cities", { timeout: 120000 }, async () => {
   }
 });
 
-test("zomato: dish pages list restaurants with prices and deeplinks", { timeout: 150000 }, async () => {
+test("zomato: dish pages list restaurants with prices and deeplinks", { ...LIVE, timeout: 150000 }, async () => {
   for (const [city, path] of [["gurgaon", "delivery/dish-biryani"], ["mumbai", "delivery/dish-momos"], ["pune", "delivery/dish-pizza"], ["gurgaon", "restaurants/kebab"]]) {
     const { status, text } = await get(dishUrl(city, path));
     assert.equal(status, 200, path);
@@ -44,7 +46,7 @@ test("zomato: dish pages list restaurants with prices and deeplinks", { timeout:
   }
 });
 
-test("zomato: GPS zone localises restaurants and menus load", { timeout: 150000 }, async () => {
+test("zomato: GPS zone localises restaurants and menus load", { ...LIVE, timeout: 150000 }, async () => {
   // Sector 57, Gurugram → Zomato delivery subzone → ltv/lty cookies
   const zone = JSON.parse((await get("https://www.zomato.com/webroutes/location/get?lat=28.4595&lon=77.0266")).text).locationDetails;
   assert.ok(zone.entityId && zone.entityType, "zone");

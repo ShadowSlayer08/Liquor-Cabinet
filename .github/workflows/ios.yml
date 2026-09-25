@@ -1,0 +1,78 @@
+# iOS without a Mac: GitHub's macOS runners (free for public repos) build an unsigned IPA —
+# Sideloadly / AltStore sign it with your own Apple ID when you install it — and run the app
+# in the iOS Simulator, screenshotting every tab so the iOS version can be checked from anywhere.
+name: iOS
+
+on:
+  push:
+    branches: [master, ios]
+    paths-ignore: ["**.md", "docs/**", "release/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ipa:
+    name: Unsigned IPA
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx vite build && npx cap sync ios
+      - run: xcodebuild -version
+      - name: Archive (no code signing)
+        run: |
+          set -o pipefail
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" archive 2>&1 | tee "$RUNNER_TEMP/xcodebuild.log" | grep -E "error:|warning: .*\.swift|BUILD|ARCHIVE" || true
+          test -d "$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app"
+      - name: Package IPA
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          cp -R "$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app" "$RUNNER_TEMP/ipa/Payload/"
+          (cd "$RUNNER_TEMP/ipa" && zip -qry "$GITHUB_WORKSPACE/LiquorCabinet-$VERSION-unsigned.ipa" Payload)
+          ls -la LiquorCabinet-*-unsigned.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LiquorCabinet-unsigned-ipa
+          path: LiquorCabinet-*-unsigned.ipa
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with: { name: ipa-build-log, path: "${{ runner.temp }}/xcodebuild.log" }
+
+  simulator:
+    name: Simulator screenshots
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx vite build && npx cap sync ios
+      - name: Build for the simulator
+        run: |
+          set -o pipefail
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/dd" \
+            CODE_SIGNING_ALLOWED=NO build 2>&1 | tee "$RUNNER_TEMP/xcodebuild-sim.log" | grep -E "error:|BUILD" || true
+          test -d "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app"
+      - name: Run and screenshot every tab
+        run: bash scripts/ci/ios-screenshots.sh "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app" ios-screens
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-screens
+          path: |
+            ios-screens/
+            ${{ runner.temp }}/xcodebuild-sim.log
