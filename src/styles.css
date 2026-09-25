@@ -540,6 +540,21 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px;
 /* (end share) */
 
 /* ── v1.3 · Price drops & Zomato prices ──────────────────────────────────── */
+/* Price moves since the last Livcheers sync: tinted on dark panels, solid over the lit bottle stage. */
+.data-down, .data-on { background: rgba(52, 217, 143, .14); color: var(--green); }
+.data-up { background: rgba(255, 93, 98, .14); color: var(--red); }
+.data-beta { background: rgba(231, 168, 70, .14); color: var(--gold); }
+.pc .data-on-stage { position: absolute; top: 134px; left: 10px; z-index: 3; box-shadow: 0 4px 10px rgba(0, 0, 0, .3); }
+.pc .data-on-stage.data-down { background: #1f8a4c; color: #fff; }
+.pc .data-on-stage.data-up { background: #c8373d; color: #fff; }
+.chip.data-drops { color: var(--green); background: rgba(52, 217, 143, .08); border-color: rgba(52, 217, 143, .35); }
+.chip.data-drops.on { background: linear-gradient(135deg, #8af5c6 0%, #34d98f 50%, #1f8a4c 100%); color: #06170e; border-color: transparent; box-shadow: 0 6px 16px rgba(52, 217, 143, .25); }
+.data-steps { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: 14px; }
+
+/* Exact Zomato menu prices (beta) */
+.data-price { font-size: 13px; font-weight: 600; color: var(--soft); margin-top: 4px; }
+.data-hint { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--stroke-2); color: var(--muted); }
+.data-status { margin-top: 12px; }
 
 /* (end data) */
 

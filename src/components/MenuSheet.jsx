@@ -8,7 +8,9 @@ import { Icon, VegMark } from "./Art.jsx";
 
 // A restaurant's real Zomato menu. Picking items here puts the exact dishes in
 // the food cart, so the Zomato hand-off carries every item and quantity.
-export default function MenuSheet({ restaurant, loc, qtyOf, setQty, onClose, vegOnly: vegDefault = false }) {
+// Items carry a price only when Zomato shows one (signed in — Plan → Zomato
+// account, beta); everything else is estimated with the "cost for one".
+export default function MenuSheet({ restaurant, loc, qtyOf, setQty, onClose, vegOnly: vegDefault = false, zomatoExact = false }) {
   const [state, setState] = useState({ loading: true });
   const [vegOnly, setVegOnly] = useState(vegDefault);
   const [section, setSection] = useState(null);
@@ -16,14 +18,28 @@ export default function MenuSheet({ restaurant, loc, qtyOf, setQty, onClose, veg
 
   const load = (force = false) => {
     setState({ loading: true });
-    fetchMenu(restaurant, { force, loc }).then((m) => setState({ data: m })).catch((e) => setState({ error: e.message }));
+    fetchMenu(restaurant, { force, loc })
+      // A menu cached before signing in to Zomato still has prices hidden — fetch it again.
+      .then((m) => (m.fromCache && m.pricesHidden && zomatoExact ? fetchMenu(restaurant, { force: true, loc }).catch(() => m) : m))
+      .then((m) => setState({ data: m })).catch((e) => setState({ error: e.message }));
   };
   useEffect(() => { load(false); }, [restaurant.resId]);
 
   const m = state.data;
   const menus = useMemo(() => (m?.menus || []).map((s) => ({ ...s, items: vegOnly ? s.items.filter((i) => i.veg === true) : s.items })).filter((s) => s.items.length), [m, vegOnly]);
-  const count = (m?.menus || []).flatMap((s) => s.items).reduce((n, it, i, all) => (all.findIndex((x) => x.id === it.id) === i ? n + qtyOf(it.id) : n), 0);
   const unit = restaurant.costForOne || 0;
+  // Footer total: exact menu prices where Zomato gave them, the cost-for-one estimate otherwise.
+  let count = 0, total = 0, estimated = false;
+  const seen = new Set();
+  for (const s of m?.menus || []) for (const it of s.items) {
+    if (seen.has(it.id)) continue;
+    seen.add(it.id);
+    const q = qtyOf(it.id);
+    if (!q) continue;
+    count += q;
+    total += (it.price || unit) * q;
+    if (!it.price) estimated = true;
+  }
 
   return (
     <Sheet bare onClose={onClose}
@@ -31,7 +47,9 @@ export default function MenuSheet({ restaurant, loc, qtyOf, setQty, onClose, veg
         <div className="row" style={{ gap: 10 }}>
           <div className="grow">
             <div className="h3">{count ? `${count} item${count > 1 ? "s" : ""} in cart` : "Pick dishes"}</div>
-            <div className="tiny muted">{count && unit ? `≈ ${fmt(unit * count)} · exact price in Zomato` : "Tap ADD on anything you like"}</div>
+            <div className="tiny muted">
+              {!count ? "Tap ADD on anything you like" : !total ? "Price shown at checkout in Zomato" : estimated ? `≈ ${fmt(total)} · estimate` : `${fmt(total)} · Zomato menu prices`}
+            </div>
           </div>
           <button className="btn btn-ghost btn-sm" onClick={() => openZomatoRestaurant(restaurant)}>Zomato <Icon.external size={14} /></button>
           <button className="btn btn-zomato" onClick={onClose}>{count ? "Done" : "Close"}</button>
@@ -98,6 +116,7 @@ export default function MenuSheet({ restaurant, loc, qtyOf, setQty, onClose, veg
                         {it.spicy && <span className="tiny" title="Spicy">🌶️</span>}
                       </div>
                       <div className="h3" style={{ marginTop: 5, lineHeight: 1.25 }}>{it.name}</div>
+                      {it.price ? <div className="data-price">{fmt(it.price)}</div> : null}
                       {it.desc && <div className="tiny muted clamp2" style={{ marginTop: 5, lineHeight: 1.5 }}>{it.desc}</div>}
                     </div>
                     <div className="pic">
@@ -113,7 +132,16 @@ export default function MenuSheet({ restaurant, loc, qtyOf, setQty, onClose, veg
               })}
             </div>
           ))}
-          {m.pricesHidden && <div className="note note-info" style={{ marginTop: 16 }}>Zomato shows item prices only inside its app, so the planner estimates with this restaurant's "{restaurant.costText || "cost for one"}". You'll see exact prices when you check out.</div>}
+          {m.pricesHidden && (
+            <div className="note note-info" style={{ marginTop: 16 }}>
+              Zomato shows item prices only inside its app, so the planner estimates with this restaurant's "{restaurant.costText || "cost for one"}". You'll see exact prices when you check out.
+              <div className="data-hint">
+                {zomatoExact
+                  ? "Your Zomato sign-in seems to have expired — sign in again under Plan → Zomato account (beta)."
+                  : "Tip: sign in to Zomato in the Plan tab (beta) to see exact prices here."}
+              </div>
+            </div>
+          )}
         </>
       )}
     </Sheet>

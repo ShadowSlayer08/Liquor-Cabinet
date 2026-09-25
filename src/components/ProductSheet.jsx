@@ -1,9 +1,12 @@
+import { Fragment, useEffect, useState } from "react";
 import Sheet, { Qty } from "./Sheet.jsx";
-import { BottleStage, TierPill } from "./ProductCard.jsx";
+import { BottleStage, PriceMove, TierPill } from "./ProductCard.jsx";
 import { CAT } from "../lib/parse/livcheers.js";
 import { suggestDishes } from "../lib/food.js";
 import { fmt } from "../lib/format.js";
 import { openUrl } from "../lib/order.js";
+import { histDate, histKey } from "../lib/pricehist.js";
+import { store } from "../lib/store.js";
 import { Icon } from "./Art.jsx";
 
 function RatingBar({ label, value }) {
@@ -17,8 +20,38 @@ function RatingBar({ label, value }) {
   );
 }
 
+// Prices this bottle had on past syncs: "₹2,450 (10 Sep) → ₹2,250 (24 Sep)".
+function PriceHistory({ item, city, cat }) {
+  const key = `${city}:${cat}:${item.id}`;
+  const [loaded, setLoaded] = useState(null); // { key, entries }
+  useEffect(() => {
+    if (!city) return;
+    let live = true;
+    store.get(histKey(city, cat)).then((h) => { if (live) setLoaded({ key, entries: h?.[item.id] || [] }); });
+    return () => { live = false; };
+  }, [key]);
+  const hist = loaded?.key === key ? loaded.entries : [];
+  const steps = hist.length > 1 ? hist.slice(-4)
+    : item.prevPrice ? [[item.prevPriceAt, item.prevPrice], [item.priceChangedAt, item.price]] : null;
+  if (!steps) return null;
+  return (
+    <div className="card" style={{ marginTop: 14 }}>
+      <div className="card-title"><span className="kicker">Price history</span><PriceMove item={item} /></div>
+      <div className="data-steps">
+        {steps.map(([t, p], i) => (
+          <Fragment key={`${t}:${i}`}>
+            {i > 0 && <span className="dim">→</span>}
+            <span className={i === steps.length - 1 ? "b" : "muted"}>{fmt(p)}{t ? <span className="tiny dim"> ({histDate(t)})</span> : null}</span>
+          </Fragment>
+        ))}
+      </div>
+      <div className="tiny dim" style={{ marginTop: 8 }}>Livcheers shelf prices, as seen each time you synced.</div>
+    </div>
+  );
+}
+
 // Full bottle page: big lit display, ratings, tasting notes, food pairings.
-export default function ProductSheet({ item, cat, qty, onAdd, onRem, canAfford, onClose, onPairing }) {
+export default function ProductSheet({ item, cat, qty, onAdd, onRem, canAfford, onClose, onPairing, city }) {
   const c = CAT[cat];
   const pairs = suggestDishes([cat]).filter((d) => d.score > 0).slice(0, 6);
   return (
@@ -52,6 +85,8 @@ export default function ProductSheet({ item, cat, qty, onAdd, onRem, canAfford, 
         <div className="h1" style={{ fontSize: 26 }}>{item.name}</div>
         <div className="muted" style={{ marginTop: 4 }}>{item.brand}</div>
       </div>
+
+      <PriceHistory item={item} city={city} cat={cat} />
 
       <div className="card" style={{ marginTop: 14 }}>
         <div className="card-title">

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { CAT, TIER } from "../lib/parse/livcheers.js";
 import { fmt } from "../lib/format.js";
+import { priceMove } from "../lib/pricehist.js";
 import { CatBottle, Icon } from "./Art.jsx";
 
 // Bottle photo in a lit display case, falling back to drawn art while loading / on error.
@@ -25,6 +26,13 @@ export const TierPill = ({ tier }) => {
   return <span className="pill pill-glass">{t.icon} {t.label}</span>;
 };
 
+// "↓ ₹200" / "↑ ₹150" since the previous Livcheers sync, for two weeks (lib/pricehist.js).
+export function PriceMove({ item, className = "" }) {
+  const d = priceMove(item);
+  if (!d) return null;
+  return <span className={`pill ${d < 0 ? "data-down" : "data-up"} ${className}`} title={`Was ${fmt(item.prevPrice)}`}>{d < 0 ? "↓" : "↑"} {fmt(Math.abs(d))}</span>;
+}
+
 export default function ProductCard({ item, cat, qty, onAdd, onOpen, canAfford, index = 0 }) {
   const c = CAT[cat];
   const [bump, setBump] = useState(0);
@@ -36,6 +44,7 @@ export default function ProductCard({ item, cat, qty, onAdd, onOpen, canAfford, 
         <span className="pill pill-glass" title={item.origin}>{item.flag}</span>
       </div>
       <BottleStage item={item} cat={cat} />
+      <PriceMove item={item} className="data-on-stage" />
       {qty > 0 && <span key={bump} className="qty-badge pop">{qty}</span>}
       <div className="body">
         <div className="name clamp2">{item.name}</div>

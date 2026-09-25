@@ -18,7 +18,7 @@ import { Icon, Ring, VegMark } from "./Art.jsx";
 const DISH_TINT = { starter: ["#b8452a", "#3a130c"], main: ["#b07a1c", "#3a2608"], dessert: ["#b03a6e", "#3a0c22"] };
 const slimRest = (r) => ({ resId: r.resId, name: r.name, appLink: r.appLink, orderUrl: r.orderUrl, rating: r.rating, deliveryTime: r.deliveryTime, locality: r.locality, costText: r.costText, costForOne: r.costForOne, img: r.img, distance: r.distance, cuisines: r.cuisines });
 
-export default function FoodTab({ city, loc, locating, onLocate, party, setParty, plan, liquorCats, foodCart, upsertFood, removeFood, goToCart, toast, customDry }) {
+export default function FoodTab({ city, loc, locating, onLocate, party, setParty, plan, liquorCats, foodCart, upsertFood, removeFood, goToCart, toast, customDry, zomatoExact }) {
   const [provider, setProvider] = useState("zomato");
   const [course, setCourse] = useState("starter");
   const [dishOpen, setDishOpen] = useState(null);
@@ -52,9 +52,10 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
     const key = `z:${r.resId}:${item.id}`;
     if (qty <= 0) return removeFood(key);
     tap();
+    // Exact menu price when Zomato showed one (signed in, beta), else the restaurant's cost-for-one estimate.
     upsertFood({
       key, kind: "zomato", itemId: item.id, name: item.name, img: item.img, veg: item.veg, qty,
-      unitPrice: r.costForOne || 0, course: dish.course, section, dishId: dish.id, emoji: dish.emoji, restaurant: slimRest(r), ordered: false,
+      unitPrice: item.price || r.costForOne || 0, exact: !!item.price, course: dish.course, section, dishId: dish.id, emoji: dish.emoji, restaurant: slimRest(r), ordered: false,
     });
   };
   const quickAdd = (r, dish, servings) => {
@@ -310,7 +311,7 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
           onOpenMenu={(r) => setMenuOpen({ r, dish: dishOpen })} />
       )}
       {menuOpen && (
-        <MenuSheet restaurant={menuOpen.r} loc={loc} vegOnly={party.vegPct >= 100}
+        <MenuSheet restaurant={menuOpen.r} loc={loc} vegOnly={party.vegPct >= 100} zomatoExact={zomatoExact}
           qtyOf={(itemId) => lineOf(`z:${menuOpen.r.resId}:${itemId}`)?.qty || 0}
           setQty={(item, q, section) => setMenuQty(menuOpen.r, menuOpen.dish, item, q, section)}
           onClose={() => setMenuOpen(null)} />

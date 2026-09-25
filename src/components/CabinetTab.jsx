@@ -8,6 +8,7 @@ import DryDayBanner from "./DryDayBanner.jsx";
 import { MixableChip } from "./BarTab.jsx";
 import { Bottle, CatBottle, Icon } from "./Art.jsx";
 import { findLiquorStores } from "../lib/order.js";
+import { isPriceDrop } from "../lib/pricehist.js";
 
 const greeting = () => {
   const h = new Date().getHours();
@@ -30,8 +31,12 @@ export default function CabinetTab({
   const cm = CAT[activeCat] || CATEGORIES[0];
   const items = catalog[activeCat] || [];
 
+  // "↓ Price drops" — bottles cheaper than at the previous sync (only offered when there are some).
+  const [dropsOnly, setDropsOnly] = useState(false);
+  const drops = useMemo(() => items.filter((x) => isPriceDrop(x)).length, [items]);
   const filtered = useMemo(() => {
     let r = [...items];
+    if (dropsOnly && drops) r = r.filter((x) => isPriceDrop(x));
     if (tierF !== "All") r = r.filter((x) => x.tier === tierF);
     if (origF === "India") r = r.filter((x) => x.origin === "India");
     if (origF === "Intl") r = r.filter((x) => x.origin && x.origin !== "India");
@@ -43,7 +48,7 @@ export default function CabinetTab({
     if (sortF === "rating") r.sort((a, b) => b.rating - a.rating);
     if (sortF === "value") r.sort((a, b) => (b.ratings?.value || 0) - (a.ratings?.value || 0));
     return r;
-  }, [items, tierF, origF, search, sortF]);
+  }, [items, tierF, origF, search, sortF, dropsOnly, drops]);
 
   // Editor's picks across every synced category.
   const picks = useMemo(() => {
@@ -144,6 +149,9 @@ export default function CabinetTab({
             <button className="icon-btn" onClick={() => setView(view === "grid" ? "list" : "grid")} aria-label="Toggle view">{view === "grid" ? <Icon.list size={20} /> : <Icon.grid size={20} />}</button>
           </div>
           <div className="chips">
+            {drops > 0 && (
+              <button className={`chip data-drops ${dropsOnly ? "on" : ""}`} onClick={() => setDropsOnly(!dropsOnly)}>↓ Price drops <span className="count">{drops}</span></button>
+            )}
             {[["All", "All"], ["editors", "🏆 Editor's"], ["best", "★ Best"], ["good", "✓ Value"]].map(([k, l]) => (
               <button key={k} className={`chip ${tierF === k ? "on" : ""}`} onClick={() => setTierF(k)}>{l}</button>
             ))}
@@ -202,7 +210,7 @@ export default function CabinetTab({
       )}
 
       {open && (
-        <ProductSheet item={open.item} cat={open.cat} qty={qtyOf(open.cat, open.item)} canAfford={open.item.price <= budgetLeft}
+        <ProductSheet item={open.item} cat={open.cat} city={city} qty={qtyOf(open.cat, open.item)} canAfford={open.item.price <= budgetLeft}
           onAdd={() => addItem(open.cat, open.item)} onRem={() => remItem(open.cat, open.item)} onClose={() => setOpen(null)}
           onPairing={(d) => { setOpen(null); onPairing?.(d); }} />
       )}

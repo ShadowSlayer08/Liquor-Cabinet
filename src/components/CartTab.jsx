@@ -166,14 +166,14 @@ export default function CartTab({
                       {l.img ? <img className="thumb" src={thumb(l.img, 120)} alt="" loading="lazy" /> : <div className="emo">{l.emoji}</div>}
                       <div className="grow">
                         <div className="row" style={{ gap: 6 }}><VegMark veg={l.veg} /><span className="small b clamp2">{l.name}</span></div>
-                        <div className="tiny muted ellipsis">{l.section || COURSES[l.course]?.label} · ≈ {fmt(l.unitPrice)} each</div>
+                        <div className="tiny muted ellipsis">{l.section || COURSES[l.course]?.label} · {l.exact ? "" : "≈ "}{fmt(l.unitPrice)} each</div>
                       </div>
                       <Qty value={l.qty} onChange={(v) => setQty(l, v)} color="#ff8a92" />
                     </div>
                   ))}
                   <div className="between" style={{ marginTop: 10 }}>
                     <span className="tiny muted">{sent ? "✓ Sent to Zomato" : `${g.lines.reduce((s, l) => s + l.qty, 0)} items`}</span>
-                    <b>≈ {fmt(tot)}</b>
+                    <b>{g.lines.every((l) => l.exact) ? "" : "≈ "}{fmt(tot)}</b>
                   </div>
                   <button className="btn btn-zomato btn-block" style={{ marginTop: 12 }} onClick={() => sendZomato(g)}>
                     {sent ? "Open again in Zomato" : "Send order to Zomato"} {apps.zomato ? "app" : ""} <Icon.external size={16} />
