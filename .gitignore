@@ -5,3 +5,6 @@ dist/
 # signing material never goes in git
 android/keystore/
 android/keystore.properties
+
+# Local download bundles (sent to the user, not part of the source)
+release/*.zip
