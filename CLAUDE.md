@@ -1,67 +1,81 @@
 # Liquor Cabinet — guide for Claude Code
 
-Android party planner (React 19 + Vite 8 + Capacitor 8). Live liquor prices scraped from Livcheers, a party food/drinks calculator, and ordering hand-off to Zomato, Bistro and Blinkit. Started from `docs/original/cellar-planner.jsx` (a Claude-artifact prototype).
+Android party planner (React 19 + Vite 8 + Capacitor 8). Live liquor prices scraped from Livcheers, cocktails, a party food/drinks calculator, dry days, bill split, invites, reminders, and ordering hand-off to Zomato, Bistro and Blinkit. Started from `docs/original/cellar-planner.jsx` (a Claude-artifact prototype).
 
-**Start here when resuming:** read `docs/HANDOFF.md` (current status + the v1.3 build list with specs), then `docs/RESEARCH.md` (how each data source works and why).
+**Start here when resuming:** read `docs/HANDOFF.md` (current status, what's unverified on a real phone, ideas for next), then `docs/RESEARCH.md` (how each data source works and why).
 
 ## Commands
 
 ```bash
 npm install
-npm test            # node --test tests/ — calculator, cocktails, dry days, location (offline) + live Livcheers/Zomato parser tests
+npm test            # node --test "tests/*.test.mjs" — offline unit tests + live Livcheers/Zomato parser tests
 npm run dev         # browser preview; Vite proxies /proxy/livcheers|zomato to stand in for native HTTP
 npm run build       # vite build → dist/
 npm run icons       # regenerate launcher icons, adaptive layers, splash, notification icon from resources/logo-mark.svg
-npm run apk         # vite build + cap sync + gradlew assembleRelease
+npm run apk         # vite build + cap sync + Gradle assembleRelease (scripts/gradle.mjs, works on Windows too)
 npx cap sync android  # after adding/removing a Capacitor plugin or changing capacitor.config.json
 ```
 
 APK output: `android/app/build/outputs/apk/release/LiquorCabinet-<versionName>-release.apk`. Copy the one you ship to `release/LiquorCabinet-<version>.apk` (older ones are removed from `release/`).
 
-Requirements: Node 20+, JDK 21, Android SDK platform 36 (`ANDROID_HOME` set).
+Requirements: Node 20+, JDK 21 (`JAVA_HOME`), Android SDK platform 36 (`ANDROID_HOME` or `android/local.properties` with `sdk.dir=`). minSdk is 26 (Android 8.0) — `@capacitor/inappbrowser` requires it.
+On the maintainer's Windows PC: JDK at `%LOCALAPPDATA%\Programs\jdk-21`, SDK at `%LOCALAPPDATA%\Android\Sdk`.
 
 ## Release signing & versioning
 
 - `android/keystore.properties` + `android/keystore/liquor-cabinet.jks` sign release builds. Both are **git-ignored and must never be committed**. Without them, `assembleRelease` falls back to the debug key (such an APK won't install over the user's current one).
-- Bump **both** `versionCode` and `versionName` in `android/app/build.gradle`, plus `version` in `package.json`, and the "Liquor Cabinet vX" line in `src/components/PlanTab.jsx`, for every APK you hand over. Current: v1.2 = versionCode 3.
-- The user sideloads APKs (no Play Store — alcohol-app policies). Do not push to GitHub unless the user asks.
+- Bump **both** `versionCode` and `versionName` in `android/app/build.gradle`, plus `version` in `package.json`, and the "Liquor Cabinet vX" line in `src/components/PlanTab.jsx`, for every APK you hand over. Current: v1.3 = versionCode 4.
+- The user sideloads APKs (no Play Store — alcohol-app policies). GitHub: https://github.com/ShadowSlayer08/liquor-cabinet (public) — push only when the user asks.
 
 ## Architecture
 
 ```
 src/
-  App.jsx                 shell: topbar, 4 tabs, welcome screen, city picker, all persisted state (IndexedDB key "cfg")
-  styles.css              design system (tokens in :root) — "midnight speakeasy": Playfair Display + Outfit, gold gradient, glass cards
+  App.jsx                 shell: topbar, 5 tabs, welcome screen, city picker, all persisted state (IndexedDB key "cfg")
+  styles.css              design system (tokens in :root) — "midnight speakeasy"; v1.3 rules sit in per-feature blocks at the end
   components/
     Art.jsx               SVG bottle illustrations per category, line icons (Icon.*), Ring gauge, VegMark
-    CabinetTab.jsx        hero, category tiles, Editor's picks, product grid/list
-    ProductCard.jsx       bottle "display case" card (BottleStage: multiply-blended photo on warm backdrop)
-    ProductSheet.jsx      bottle detail: rating bars, tasting notes, pairings
+    CabinetTab.jsx        hero (cocktails chip, dry-day banner, store finder), category tiles, Editor's picks, product grid/list, price-drop filter
+    BarTab.jsx            cocktails you can make + party menu;  CocktailSheet.jsx = recipe + servings
+    ProductCard.jsx       bottle "display case" card (BottleStage) + price-move pill
+    ProductSheet.jsx      bottle detail: rating bars, price history, tasting notes, pairings
     ScraperPanel.jsx      Livcheers sync UI (terminal log)
-    FoodTab.jsx           location card, party inputs, drinks gauge, Zomato dishes / Bistro items, Blinkit supplies, mini-cart
+    FoodTab.jsx           location card, party card (name/date/time + DryDayBanner), drinks gauge, Zomato dishes / Bistro items, Blinkit supplies, mini-cart
     DishSheet.jsx         Zomato restaurants for a dish (GPS-localised, sortable)
-    MenuSheet.jsx         a restaurant's real Zomato menu → exact items into the cart
-    GrocerySheet.jsx      pick a Blinkit product option for a supply
-    CartTab.jsx           liquor list + food cart grouped by provider, "Send order" hand-offs
-    PlanTab.jsx           budget ring, spend donut, location, batches, price DB, data sources
+    MenuSheet.jsx         a restaurant's real Zomato menu → exact items into the cart (exact ₹ when signed in)
+    GrocerySheet.jsx      pick a Blinkit product option for a supply; live Blinkit price check (phone, beta)
+    CartTab.jsx           liquor list + store finder, food cart grouped by provider, "Send order" hand-offs (+ floating bubble)
+    PlanTab.jsx           budget ring, spend donut, then the plan/ cards, location, batches, price DB, data sources
+    plan/                 InviteCard, SplitCard, RemindersCard, DryDaysCard, ZomatoAccountCard, BubbleCard
+    RemindersWatcher.jsx  App-level: offers to move reminders when the party date/time changes
+    DryDayBanner.jsx      red/amber dry-day warning for a date
     Sheet.jsx             bottom sheet + Stepper/Qty/Spinner/Skeleton
   lib/
     parse/livcheers.js    pure parser: Next.js RSC flight → items; CATEGORIES (18), CITIES (30), TIER
-    parse/zomato.js       pure parser: __PRELOADED_STATE__ → dish restaurants + restaurant menus
-    sources.js            scrapers + IndexedDB caching (Livcheers 7 d, Zomato 12 h, menus 6 h)
+    parse/zomato.js       pure parser: __PRELOADED_STATE__ → dish restaurants + restaurant menus (+ item prices when present)
+    sources.js            scrapers + IndexedDB caching (Livcheers 7 d, Zomato 12 h, menus 6 h); price history on each sync
+    pricehist.js          pure: price-change badges (≤14 d) + last 8 prices per bottle (`hist:city:cat`)
     http.js               getText(): CapacitorHttp natively (no CORS), Vite proxy in browser; cookie handling
     location.js           GPS → nearest Livcheers city + Zomato delivery zone (ltv/lty cookies); Bistro areas
-    food.js               planParty() calculator, DISHES (Zomato), GROCERIES (Blinkit catalog, MRPs), BISTRO_ITEMS
-    order.js              hand-offs (Zomato/Bistro/Blinkit), checklist notification, share/clipboard, haptics
-    cocktails.js          [v1.3] COCKTAILS, makeable(), cocktailUses()
-    drydays.js            [v1.3] dry-day tiers per state, dryDayOn(), lastShoppingDay()
-    split.js              [v1.3] splitBill(), upiLink(), validVpa()
-    reminders.js          [v1.3] party-time reminders via local notifications
+    food.js               planParty() calculator (takes the cocktail menu), DISHES, GROCERIES (Blinkit catalog, MRPs), BISTRO_ITEMS
+    cocktails.js          COCKTAILS, makeable(), cocktailUses(), menu helpers
+    drydays.js            dry-day tiers per state, dryDayOn(), lastShoppingDay(), nextSaturday(), custom days
+    split.js              splitBill(), upiLink(), validVpa(), WhatsApp text
+    reminders.js          party-time reminders via local notifications (pure parts: reminderPlan.js, when.js)
+    canvas.js             shared canvas drawing for invite.js (invite card) and paycard.js (UPI QR payment card)
+    shareImage.js         canvas → Filesystem cache → Share sheet (download in the browser)
+    zomatoAccount.js      in-app Zomato sign-in (InAppBrowser, isIsolated: false) / sign-out / verification
+    blinkitLive.js        live Blinkit prices via WebRenderPlugin; CARD_SCRIPT + pure card-text parser
+    bubble.js             floating order checklist via OrderBubblePlugin
+    order.js              hand-offs (Zomato/Bistro/Blinkit/Maps), checklist notification, share/clipboard, haptics
     store.js / back.js / format.js
 android/app/src/main/java/com/shadowslayer/liquorcabinet/
-    MainActivity.java     registers ExternalAppPlugin
+    MainActivity.java     registers the three plugins below
     ExternalAppPlugin.java  open(url, pkg, fallback) / launch(pkg) / isInstalled(pkg)
+    WebRenderPlugin.java    extract({url, script, timeoutMs, pollMs}) — hidden WebView behind the app, polls a script
+    OrderBubblePlugin.java  canDraw / requestPermission / show({title, lines, done}) / hide — overlay bubble + checklist card
 scripts/make-icons.mjs    all raster icons from the SVG logo (sharp)
+scripts/gradle.mjs        runs the Gradle wrapper on any OS
 ```
 
 ## Conventions & gotchas
@@ -78,4 +92,5 @@ scripts/make-icons.mjs    all raster icons from the SVG logo (sharp)
 ## Testing
 
 - `npm test` — offline tests always; `tests/parsers.live.test.mjs` hits livcheers.com and zomato.com (needs internet; can be slow).
-- UI checks were done with Playwright (global install) against `npm run dev` in a Pixel 7 viewport with geolocation granted (Sector 57, Gurugram: 28.4595, 77.0266). Native-only paths (GPS permission, notifications, app hand-offs) must be checked on a real phone.
+- UI checks: `npm run dev` in a 375×812 / Pixel 7 viewport (v1.2 used Playwright with geolocation at Sector 57, Gurugram: 28.4595, 77.0266; v1.3 used the Claude desktop browser pane). Native-only paths (GPS permission, notifications, app hand-offs, image sharing, overlay bubble, hidden WebView, Zomato sign-in) must be checked on a real phone.
+- blinkit.com answers curl with a Cloudflare 403 but renders in a real browser — that's how `CARD_SCRIPT` in lib/blinkitLive.js was checked (see tests/blinkit.test.mjs for the captured card texts).

@@ -149,10 +149,11 @@ export default function PlanTab({
       <div className="card small soft" style={{ lineHeight: 1.65 }}>
         <div className="kicker" style={{ marginBottom: 8 }}>Where the data comes from</div>
         <div>🥃 <b className="gold">Livcheers</b> — liquor prices, ratings & tasting notes, read straight from livcheers.com.</div>
-        <div>🍽️ <b style={{ color: "#ff8a92" }}>Zomato</b> — restaurants delivering to your GPS location, their menus and "cost for one".</div>
+        <div>🍽️ <b style={{ color: "#ff8a92" }}>Zomato</b> — restaurants delivering to your GPS location, their menus and "cost for one" (exact prices once you sign in — beta).</div>
         <div>⚡ <b style={{ color: "var(--bistro)" }}>Bistro</b> — Blinkit's 10-minute kitchen; order opens in the Bistro app.</div>
-        <div>🛒 <b style={{ color: "var(--blinkit)" }}>Blinkit</b> — mixers, ice & munchies at usual MRP; each opens in Blinkit.</div>
-        <div className="tiny dim" style={{ marginTop: 10 }}>Liquor Cabinet v1.2 · Prices are indicative. Drink responsibly, and only where it's legal for you.</div>
+        <div>🛒 <b style={{ color: "var(--blinkit)" }}>Blinkit</b> — mixers, ice & munchies at usual MRP, or the live price read from Blinkit on your phone (beta); each opens in Blinkit.</div>
+        <div>🗓️ <b className="gold">Dry days</b> — national days are certain; festival and state days vary, so check your state's notice.</div>
+        <div className="tiny dim" style={{ marginTop: 10 }}>Liquor Cabinet v1.3 · Prices are indicative. Drink responsibly, and only where it's legal for you.</div>
       </div>
     </div>
   );
