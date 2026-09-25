@@ -7,13 +7,14 @@ import {
   openBlinkitSearch, openZomatoRestaurant, openBistro, openUrl, shareText, copyText, isInstalled, postChecklist,
   CHECKLIST_IDS, zomatoChecklistId, BLINKIT, ZOMATO, BISTRO, buzz,
 } from "../lib/order.js";
+import { showBubble } from "../lib/bubble.js";
 import { BottleStage } from "./ProductCard.jsx";
 import { Qty } from "./Sheet.jsx";
 import { Icon, VegMark } from "./Art.jsx";
 
 export default function CartTab({
   city, view, setView, liquorLines, liquorTotal, addItem, remItem, clearLiquor, batches, activeBatch,
-  foodCart, updateFood, removeFood, clearFood, toast,
+  foodCart, updateFood, removeFood, clearFood, toast, bubble,
 }) {
   const [apps, setApps] = useState({});
   useEffect(() => {
@@ -45,6 +46,7 @@ export default function CartTab({
     const lines = orderLines(g.lines);
     await copyText(`${g.restaurant.name}\n${lines.join("\n")}`);
     const pinned = await postChecklist(zomatoChecklistId(g.restaurant.resId), `Zomato · ${g.restaurant.name}`, lines, `${lines.length} dishes to add`);
+    if (bubble) await showBubble(`Zomato · ${g.restaurant.name}`, lines);
     buzz();
     toast(pinned ? "Order pinned to your notifications & copied — opening Zomato" : "Order copied — opening Zomato");
     g.lines.forEach((l) => updateFood(l.key, { ordered: true }));
@@ -54,6 +56,7 @@ export default function CartTab({
     const lines = orderLines(bistroLines);
     await copyText(`Bistro order\n${lines.join("\n")}`);
     const pinned = await postChecklist(CHECKLIST_IDS.bistro, "Bistro order", lines, `${lines.length} items to add`);
+    if (bubble) await showBubble("Bistro order", lines);
     buzz();
     toast(pinned ? "Order pinned to your notifications & copied — opening Bistro" : "Order copied — opening Bistro");
     bistroLines.forEach((l) => updateFood(l.key, { ordered: true }));
@@ -63,6 +66,7 @@ export default function CartTab({
     const next = blinkitLines.map((x) => (x.key === l.key ? { ...x, ordered: true } : x));
     updateFood(l.key, { ordered: true });
     await postChecklist(CHECKLIST_IDS.blinkit, `Blinkit list · ${next.filter((x) => x.ordered).length}/${next.length} done`, blinkitChecklist(next), "Tap to come back for the next item");
+    if (bubble) await showBubble("Blinkit list", blinkitChecklist(next)); // nextBlinkit() lands here too
     openBlinkitSearch(l.query);
   };
   const nextBlinkit = () => {

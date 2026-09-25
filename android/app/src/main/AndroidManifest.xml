@@ -43,6 +43,8 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- Order checklist notification while you shop in Zomato / Bistro / Blinkit. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Floating order checklist over Zomato / Bistro / Blinkit ("Display over other apps", opt-in from the Plan tab). -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <!-- Lets the app check whether Blinkit / Zomato / Bistro are installed and launch them (Android 11+ package visibility). -->
     <queries>
