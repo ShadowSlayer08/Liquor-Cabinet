@@ -33,7 +33,7 @@ export function Stepper({ value, onChange, min = 0, max = 999, step = 1 }) {
       <button onClick={() => set(value - step)} aria-label="Less"><Icon.minus size={18} /></button>
       <input inputMode="numeric" value={value}
         onChange={(e) => { const n = parseInt(e.target.value.replace(/\D/g, ""), 10); onChange(Number.isNaN(n) ? min : Math.min(max, n)); }}
-        onBlur={() => set(value)} />
+        onBlur={() => { const c = Math.min(max, Math.max(min, value)); if (c !== value) onChange(c); }} />
       <button onClick={() => set(value + step)} aria-label="More"><Icon.plus size={18} /></button>
     </div>
   );

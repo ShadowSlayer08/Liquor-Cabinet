@@ -121,7 +121,8 @@ public class WebRenderPlugin extends Plugin {
 
             @Override
             public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
-                // Handled, so a crashed page renderer doesn't take the whole app down with it.
+                // Ends this read cleanly. Note: all of the app's WebViews share one renderer process, so if
+                // it really crashed, Capacitor's own WebView goes down with it (and Android restarts the app).
                 finish(j, null, false, "The page stopped responding");
                 return true;
             }

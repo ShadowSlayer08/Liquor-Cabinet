@@ -7,7 +7,7 @@ import {
   openBlinkitSearch, openZomatoRestaurant, openBistro, openUrl, shareText, copyText, isInstalled, postChecklist,
   CHECKLIST_IDS, zomatoChecklistId, BLINKIT, ZOMATO, BISTRO, buzz, findLiquorStores,
 } from "../lib/order.js";
-import { showBubble } from "../lib/bubble.js";
+import { showBubble, hideBubble } from "../lib/bubble.js";
 import { BottleStage } from "./ProductCard.jsx";
 import { Qty } from "./Sheet.jsx";
 import { Icon, VegMark } from "./Art.jsx";
@@ -66,7 +66,7 @@ export default function CartTab({
     const next = blinkitLines.map((x) => (x.key === l.key ? { ...x, ordered: true } : x));
     updateFood(l.key, { ordered: true });
     await postChecklist(CHECKLIST_IDS.blinkit, `Blinkit list · ${next.filter((x) => x.ordered).length}/${next.length} done`, blinkitChecklist(next), "Tap to come back for the next item");
-    if (bubble) await showBubble("Blinkit list", blinkitChecklist(next)); // nextBlinkit() lands here too
+    if (bubble) await showBubble("Blinkit list", blinkitChecklist(next), next.map((x) => x.key)); // nextBlinkit() lands here too
     openBlinkitSearch(l.query);
   };
   const nextBlinkit = () => {
@@ -246,7 +246,7 @@ export default function CartTab({
             <div className="between"><span className="muted">Food total</span><span className="h2 gold-text" style={{ fontFamily: "var(--ui)" }}>≈ {fmt(zomatoTotal + blinkitTotal)}</span></div>
             <div className="row" style={{ marginTop: 14 }}>
               <button className="btn btn-ghost grow" onClick={() => share("Party food", foodText())}><Icon.share size={17} /> Share</button>
-              <button className="btn btn-ghost" onClick={() => { if (confirm("Clear food & supplies?")) clearFood(); }}>Clear</button>
+              <button className="btn btn-ghost" onClick={() => { if (confirm("Clear food & supplies?")) { clearFood(); if (bubble) hideBubble(); } }}>Clear</button>
             </div>
           </div>
         </>

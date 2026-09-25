@@ -9,6 +9,7 @@ import { locate } from "./lib/location.js";
 import { handleBack } from "./lib/back.js";
 import { isNative } from "./lib/http.js";
 import { onChecklistTap, tap } from "./lib/order.js";
+import { onBubbleToggle } from "./lib/bubble.js";
 import ScraperPanel from "./components/ScraperPanel.jsx";
 import CabinetTab from "./components/CabinetTab.jsx";
 import BarTab from "./components/BarTab.jsx";
@@ -110,6 +111,11 @@ export default function App() {
     });
     return () => { sub.then((s) => s.remove()); };
   }, [tab]);
+  // Ticking a Blinkit line in the floating bubble ticks it in the cart too (App stays mounted
+  // while you're in Blinkit; the Cart tab may not be).
+  useEffect(() => onBubbleToggle((key, done) => {
+    if (key.startsWith("b:")) setFood((p) => p.map((l) => (l.key === key ? { ...l, ordered: done } : l)));
+  }), []);
   // Order checklists open Cart → Food; reminders name their tab ({ tab, view }).
   useEffect(() => onChecklistTap((x) => {
     if (x?.tab === "food") setTab("food");

@@ -1,6 +1,6 @@
 # Handoff — where things stand
 
-_Written at the end of the original cloud session (25 Sep 2026) so a new local Claude Code session can continue exactly here._
+_Updated 25 Sep 2026, at the end of the v1.3 session (local Claude Code on the user's Windows PC)._
 
 ## Shipped
 
@@ -8,44 +8,48 @@ _Written at the end of the original cloud session (25 Sep 2026) so a new local C
 | --- | --- | --- |
 | v1.0 | (history) | JSX prototype → Capacitor Android app; own Livcheers scraper; food calculator; Blinkit/Zomato hand-off |
 | v1.1 | (history) | Repo revamped (Keybase proof removed, app at root); DMart price source removed → built-in Blinkit catalog (MRP) |
-| **v1.2** | `release/LiquorCabinet-1.2.apk` (versionCode 3) | GPS → Zomato delivery zone; real Zomato menus; Bistro; order-checklist notifications; full "wow" redesign |
+| v1.2 | (history) | GPS → Zomato delivery zone; real Zomato menus; Bistro; order-checklist notifications; full "wow" redesign |
+| **v1.3** | `release/LiquorCabinet-1.3.apk` (versionCode 4) | Bar tab + cocktails, dry days, price-drop badges, store finder, bill split + UPI QR card, invite card, reminders, exact Zomato prices (beta), live Blinkit prices (beta), floating order checklist (beta) |
 
-The user loved v1.2 ("chef kiss"). v1.2 was **never tested on a real phone** — only in a Pixel 7 browser viewport. Native-only paths still unverified: location permission, checklist notification, opening Zomato/Bistro/Blinkit apps, haptics.
+Repo: **https://github.com/ShadowSlayer08/liquor-cabinet** (public, pushed at the user's request). The signing key (`android/keystore/`, `android/keystore.properties`) is git-ignored and never committed; the v1.3 APK is signed with the same key as v1.2 (cert SHA-256 `a3d9f3e7…98abd9`), so it installs over it.
 
-Git: all work is committed locally on branch `claude/liquor-cabinet-apk-build-ng7dq6`. The user said **no GitHub** (the cloud push was blocked anyway). Don't push unless asked.
+## v1.3 — what was built (HANDOFF items 1–10)
 
-## In progress: v1.3 — "build all" (user asked for all ten)
+1. **Cocktails** — 5th tab **Bar** (`BarTab.jsx`, `CocktailSheet.jsx`): makeable first, recipe sheet with servings → `cocktailMenu` in cfg → `planParty(…, menu)`; supplies land under Blinkit "Cocktail extras". Cabinet hero chip "🍸 N cocktails you can make".
+2. **Dry days** — party name/date/time in the Food party card; `DryDayBanner` (national/custom red with "buy by", festival/state amber "check", plus a heads-up when the *day before* the party is a certain dry day) in Food and the Cabinet hero; Plan card "Dry days ahead" + add your own. National days are generated for any year; festival dates cover 2026–2027 (**update `OFTEN`/`STATE_DAYS` in `lib/drydays.js` each year**).
+3. **Price drops** — `lib/pricehist.js` (pure, tested) diffs each fresh scrape against the cache: `prevPrice/prevPriceAt/priceChangedAt` (badge ≤ 14 days) + `hist:city:cat` (last 8 prices). Card pill, "↓ Price drops" chip, ProductSheet history line.
+4. **Store finder** — `findLiquorStores()` → Google Maps "liquor store near me" (Cart liquor view + Cabinet hero).
+5. **Split the bill** — Plan card: include toggles, people/drinkers, Equal | Fair, host + UPI (`validVpa`); WhatsApp text via wa.me with UPI links; payment card image with a QR per share (`lib/paycard.js`). Amounts are labelled as planned prices.
+6. **Invite card** — `lib/invite.js` draws 1080×1350 in the app's style (`lib/canvas.js` shared helpers); `lib/shareImage.js` → Filesystem cache → Share (download in the browser).
+7. **Reminders** — Plan card with per-reminder toggles; `RemindersWatcher` asks (in-app prompt) to move reminders when the party date/time changes. The stock-the-bar reminder avoids dry days (party day *and* the day before). Notification taps route to the tab they name (App `onChecklistTap`).
+8. **Exact Zomato prices (beta)** — Plan card "Zomato account": `InAppBrowser.openInWebView` with `isIsolated: false`; after close, force-refetches a menu to verify (`lib/zomatoAccount.js`). `parseMenuPage` reads `price ?? display_price ?? min_price ?? default_price`; exact lines carry `exact: true` (no "≈"). Sign-out clears Zomato cookies (falls back to clearing all cookies if some survive) and cached menus.
+9. **Live Blinkit prices (beta)** — `WebRenderPlugin` (hidden WebView *underneath* the app's WebView, kept VISIBLE so Chromium doesn't throttle it) + `lib/blinkitLive.js` (`CARD_SCRIPT` + pure parser). The card-finding logic was checked against the live blinkit.com page in a real browser: price and ADD share a row, so the script grows to the largest ancestor holding one ADD. GrocerySheet "Check live price on Blinkit (beta)"; live picks stay live in the Food tab/cart and are labelled.
+10. **Floating order bubble (beta)** — `OrderBubblePlugin` (TYPE_APPLICATION_OVERLAY, draggable gold bubble → checklist card, "Back to Liquor Cabinet", hidden while the app itself is in front); `lib/bubble.js`; Plan toggle requests "display over other apps"; Cart hand-offs show it alongside the notification.
 
-### Done so far (committed in `6a430e4`, tests green)
-- `src/lib/cocktails.js` — 28 cocktails, `makeable(catIds)`, `cocktailUses(menu)`, `servingsByFamily(menu)`.
-- `src/lib/food.js` — `planParty(party, lines, menu)` now takes the cocktail menu: cocktail servings **replace** the default mixer for that spirit family (no double-counted tonic/soda); `groceryNeeds` adds cocktail ingredients (ice uses max, not sum). New `GROCERIES` group `cocktail` (mint, sugar, oranges, cucumber, ginger ale, orange/cranberry/pineapple juice, coconut milk, honey, salt, milk).
-- `src/lib/drydays.js` — tiers `national` (26 Jan/15 Aug/2 Oct, certain) · `often` (big festivals, "check your state") · `state` (e.g. Maharashtra Day) · `custom` (user-added, e.g. election bans). `CITY_STATE` maps the 30 cities. Helpers `dryDayOn`, `upcomingDryDays`, `lastShoppingDay`, `confirmUrl` (Google search link to verify).
-- `src/lib/split.js` — `splitBill()` equal / "fair" (liquor only among drinkers), `upiLink()`, `validVpa()`.
-- `src/lib/reminders.js` — `buildReminders(party, city, customDry)` (stock the bar / chill / Blinkit / starters / dinner), `scheduleReminders`, `cancelReminders` (ids 8100–8111).
-- `src/lib/http.js` — **bug fix**: natively, cookies (`ltv`/`lty` Zomato location) are written via `CapacitorCookies.setCookie` instead of a hand-written `Cookie` header (Capacitor's global cookie handler would otherwise add a second, clashing Cookie header). This also makes an in-app Zomato login carry over to native requests.
-- Packages installed: `@capacitor/inappbrowser@4`, `@capacitor/filesystem@8`, `qrcode@1.5`.
-- Tests: `tests/cocktails.test.mjs` (cocktails, mixer replacement, dry days).
+Also: minSdk 26 (Android 8.0 — `@capacitor/inappbrowser` needs it); `npm test` uses a glob and `npm run apk` runs Gradle via `scripts/gradle.mjs` (both broke on Windows before).
 
-### Still to build (specs)
+## How it was checked
 
-New party fields needed first (in `DEFAULT_PARTY` + Food tab party card): `date` (ISO, default next Saturday), `time` ("20:00"), `name` ("House party"), and in Plan: `host`, `upi`. `customDry: [{date, name}]` in App cfg.
+- `npm test` — 74 tests (offline units for every new pure module + live Livcheers/Zomato parser tests).
+- Browser walkthrough (375×812) with live Livcheers/Zomato data: all 5 tabs, cocktail menu → Blinkit list, dry-day banners, price drops (seeded an older cache), split maths, invite + payment card images rendered, a real Zomato menu, v1.2 → v1.3 cfg upgrade, no console errors.
+- Multi-agent code review (5 dimensions, each finding checked by two skeptics); confirmed findings fixed in `ea9db8f` and later commits.
+- `gradlew assembleRelease` compiles the three native plugins cleanly.
 
-1. **Cocktails UI** — add a 5th tab **Bar** (between Cabinet and Food; icon = cocktail glass). Grid of `makeable(liquorCats)` cards (makeable first; others dimmed with "needs Vodka"). Tap → recipe sheet: glass, spirit, ingredients (from `uses`), steps, servings stepper → "Add to party menu". Menu stored as `cocktailMenu: [{id, servings}]` in cfg and passed to `planParty(..., menu)`; supplies then show up automatically in the Food tab's Blinkit list (group "Cocktail extras"). Cabinet hero: chip "🍸 N cocktails you can make".
-2. **Dry days UI** — date/time inputs in the Food tab party card. If `dryDayOn(date, city, customDry)`: banner (national = red "shops closed, buy by {lastShoppingDay}"; often/state = amber "often a dry day in {state} — check" + confirm link). Same banner in Cabinet hero. Plan tab card "Dry days ahead" (`upcomingDryDays`) + "Add a dry day" (date + label).
-3. **Price-drop badges** — in `sources.scrapeCategory`, before saving, diff new items vs cached by `id`: set `prevPrice`/`priceChangedAt` (carry forward ≤14 days); keep `hist:${city}:${cat}` → `{id: [[t, price]…last 8]}`. Card pill "↓ ₹200" (green) / "↑ ₹150" (red); chip filter "↓ Price drops"; ProductSheet line "₹2,450 (10 Sep) → ₹2,250 (24 Sep)". Add a unit test for the diff.
-4. **Liquor store finder** — `openUrl("https://www.google.com/maps/search/?api=1&query=liquor+store+near+me")` via ExternalApp with pkg `com.google.android.apps.maps`. Buttons in Cart (liquor view) and Cabinet hero.
-5. **Split the bill** — Plan card: include toggles (liquor/food/supplies), people (default guests), drinkers (default plan.drinkers), mode seg Equal | Fair, host name + UPI ID (`validVpa`). Show per-drinker / per-non-drinker. "Share on WhatsApp" text with amounts + `upiLink`; "Share payment card" = canvas image with a QR (`qrcode` → data URL) of the UPI link.
-6. **Invite card** — canvas 1080×1350 in the app's style (dark bg, amber/wine glows, logo from `./logo-mark.svg`, Playfair title in gold): party name, date/time, venue (`loc.label`), "On the bar" (cocktail menu or top bottles), "Food" (dish names), host. `await document.fonts.load(...)` before drawing. Share via `Filesystem.writeFile({directory: Cache})` → `Share.share({ files: [uri] })` (FileProvider cache-path already configured); browser fallback = download.
-7. **Reminders UI** — Plan card listing `buildReminders(...)` with times + toggles → "Set reminders" (`scheduleReminders`). Persist enabled keys. Re-schedule when party date/time changes (ask first).
-8. **Exact Zomato prices (beta)** — Plan card "Zomato account": `InAppBrowser.openInWebView({ url: "https://www.zomato.com/", options: { ...DefaultWebViewOptions, showURL: false, closeButtonText: "Done", clearCache: false, clearSessionCache: false, android: { ...DefaultAndroidWebViewOptions, isIsolated: false } } })` — **`isIsolated: false` is essential** (default true runs in a separate process with a separate cookie store). After `browserClosed`, force-refetch a menu; if `pricesHidden === false` show "✓ exact prices on". In `parse/zomato.js parseMenuPage`, read `price ?? display_price ?? min_price ?? default_price` per item when present; MenuSheet shows exact ₹ and cart `unitPrice` uses it. Logout = `CapacitorCookies.clearCookies({ url: "https://www.zomato.com" })`. Unverified (no Zomato account in the sandbox) — label beta.
-9. **Live Blinkit prices (beta)** — native `WebRenderPlugin.extract({ url, script, timeoutMs, pollMs })`: offscreen WebView (INVISIBLE, attached to the activity root), JS + DOM storage on, `onGeolocationPermissionsShowPrompt` → grant, poll `evaluateJavascript(script)` until it returns non-empty JSON or timeout, then destroy. Script: click a "Detect my location" button once if present; collect product cards near "ADD" buttons (name = longest non-price line, price = min ₹ value, pack regex, img). JS wrapper `blinkitLive(query)`; GrocerySheet gets a "Check live price on Blinkit" button (phone only). Fallback: keep MRP. Blinkit blocks datacenter IPs (Cloudflare) so this can only be tested on a phone.
-10. **Floating order bubble** — native `OrderBubblePlugin`: `canDraw()`, `requestPermission()` (ACTION_MANAGE_OVERLAY_PERMISSION), `show({title, lines})`, `hide()`. WindowManager overlay (TYPE_APPLICATION_OVERLAY), draggable gold bubble with count → tap expands a checklist card (tap line toggles ☐/☑), "Back to Liquor Cabinet" + close. Manifest: `SYSTEM_ALERT_WINDOW`. Plan toggle "Floating checklist over other apps"; Cart "Send order" shows it in addition to the notification. Register in `MainActivity`.
+## Not verified — needs a real phone
 
-Then: bump to **v1.3 / versionCode 4**, update README + PlanTab version line, `npm test`, browser walkthrough, `npm run apk`, copy APK to `release/`.
+Nothing native has run on a device yet (same as v1.2). Check on the phone:
+- Location permission, notifications (checklist + reminders firing at the right time, tap routing), haptics, app hand-offs (Zomato/Bistro/Blinkit/Maps/WhatsApp wa.me), image sharing (invite/payment card via the Share sheet).
+- Zomato sign-in inside the in-app browser (OTP flow), whether `isIsolated: false` really shares the session with native requests, which price field signed-in menus use.
+- Live Blinkit: whether blinkit.com loads in the hidden WebView on mobile data/Wi-Fi, whether "Detect my location" gets a location, and whether the cards parse.
+- Floating bubble: overlay permission flow (Android 11+ opens the full app list), drag/tap, "Back to Liquor Cabinet" from the background.
+- UPI QR codes scanning in GPay / PhonePe / Paytm with the amount filled in.
 
-### Explicitly skipped (user agreed)
-Auto-adding to other apps' carts via accessibility tricks (ToS risk); Play Store publishing; GitHub releases.
+## Ideas for next
 
-## Starter prompt for the new local session
+- Sync ticks from the floating bubble back into the Blinkit checklist (the plugin can `notifyListeners("toggle")`).
+- A yearly refresh of festival dry days (or fetch the state excise lists).
+- Lazy-load `qrcode` (≈55 kB) with `import()` if bundle size matters.
 
-> Read CLAUDE.md, docs/HANDOFF.md and docs/RESEARCH.md. We're continuing Liquor Cabinet v1.3 from the "Still to build" list in HANDOFF.md — build items 1–10 in order, keep tests green, then bump to v1.3 (versionCode 4) and build the release APK with `npm run apk`. Don't push to GitHub. The signing key is in android/keystore (git-ignored).
+## Explicitly skipped (user agreed)
+
+Auto-adding to other apps' carts via accessibility tricks (ToS risk); Play Store publishing.

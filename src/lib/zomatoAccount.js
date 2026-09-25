@@ -77,12 +77,12 @@ export async function dropCachedMenus() {
 
 export async function signOutOfZomato() {
   if (isNative()) {
-    await CapacitorCookies.clearCookies({ url: ZOMATO_BASE });
-    // clearCookies only expires host cookies; a login set on ".zomato.com" survives it.
-    // The app keeps no other logins (Zomato's location cookies are rewritten on every
-    // request), so if anything is left, clear the whole jar.
-    const left = await CapacitorCookies.getCookies({ url: ZOMATO_BASE }).catch(() => ({}));
-    if (Object.values(left || {}).some(Boolean)) await CapacitorCookies.clearAllCookies();
+    // clearCookies only expires host cookies, so a login set on ".zomato.com" would survive it —
+    // and getCookies can't tell (it reads the app's own document.cookie, whatever the url).
+    // The app keeps no other logins (Zomato's location cookies are rewritten on every request;
+    // Blinkit just asks for your location again), so clear the whole jar.
+    await CapacitorCookies.clearCookies({ url: ZOMATO_BASE }).catch(() => {});
+    await CapacitorCookies.clearAllCookies();
   }
   await dropCachedMenus();
   await clearPending();

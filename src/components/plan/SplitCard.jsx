@@ -26,7 +26,8 @@ export default function SplitCard({ party, setParty, plan, split, setSplit, liqu
   const title = (party?.name || "").trim() || "House party";
 
   const toggle = (k) => { tap(); setSplit((cur) => ({ ...cur, include: { liquor: true, food: true, supplies: true, ...cur?.include, [k]: !(cur?.include?.[k] ?? true) } })); };
-  const setPeople = (v) => setSplit((cur) => ({ ...cur, people: v, drinkers: cur?.drinkers != null ? Math.min(cur.drinkers, v) : null }));
+  // resolveSplit() caps drinkers at people on every render, so a custom drinker count survives typing.
+  const setPeople = (v) => setSplit((cur) => ({ ...cur, people: v }));
   const setField = (k) => (e) => { const v = e.target.value; setParty((p) => ({ ...p, [k]: v })); };
   const message = () => splitMessage({ party, result, include: s.include, host, vpa: upi });
 

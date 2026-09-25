@@ -2,16 +2,19 @@ package com.shadowslayer.liquorcabinet;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.Application;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Insets;
 import android.graphics.PixelFormat;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
@@ -23,7 +26,9 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
+import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.view.WindowMetrics;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -34,6 +39,8 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * The order checklist as a floating bubble over Zomato / Bistro / Blinkit ("display over other apps"),
@@ -61,7 +68,11 @@ public class OrderBubblePlugin extends Plugin {
     private String[] lines = new String[0];
     private boolean[] done = new boolean[0];
     private boolean wanted;             // show() was called and the bubble hasn't been closed
-    private boolean appInFront = true;  // Liquor Cabinet itself is on screen → keep the bubble hidden
+    private boolean appInFront = true;  // one of Liquor Cabinet's screens is showing → keep the bubble hidden
+    // Started activities of this app — MainActivity, but also screens it opens on top of itself
+    // (e.g. the in-app browser for the Zomato sign-in), which would otherwise count as "another app".
+    private final Set<Activity> started = new HashSet<>();
+    private Application.ActivityLifecycleCallbacks lifecycle;
     private boolean expanded;
     private int bubbleX = -1, bubbleY = -1; // where the collapsed bubble sits (kept across show() calls)
 
@@ -144,16 +155,29 @@ public class OrderBubblePlugin extends Plugin {
         });
     }
 
-    // Hidden while Liquor Cabinet is visible, back as soon as another app takes over the screen.
+    // Hidden while any Liquor Cabinet screen is visible, back as soon as another app takes over.
     @Override
-    protected void handleOnStart() {
-        appInFront = true;
-        sync();
+    public void load() {
+        lifecycle = new Application.ActivityLifecycleCallbacks() {
+            @Override public void onActivityStarted(Activity a) { started.add(a); frontChanged(); }
+            @Override public void onActivityStopped(Activity a) { started.remove(a); frontChanged(); }
+            @Override public void onActivityDestroyed(Activity a) { started.remove(a); frontChanged(); }
+            @Override public void onActivityCreated(Activity a, Bundle b) {}
+            @Override public void onActivityResumed(Activity a) {}
+            @Override public void onActivityPaused(Activity a) {}
+            @Override public void onActivitySaveInstanceState(Activity a, Bundle b) {}
+        };
+        getActivity().getApplication().registerActivityLifecycleCallbacks(lifecycle);
     }
 
     @Override
-    protected void handleOnStop() {
-        appInFront = false;
+    protected void handleOnStart() { // covers a plugin loaded after MainActivity had already started
+        started.add(getActivity());
+        frontChanged();
+    }
+
+    private void frontChanged() {
+        appInFront = !started.isEmpty();
         sync();
     }
 
@@ -161,6 +185,9 @@ public class OrderBubblePlugin extends Plugin {
     protected void handleOnDestroy() {
         wanted = false;
         detach();
+        if (lifecycle != null) getActivity().getApplication().unregisterActivityLifecycleCallbacks(lifecycle);
+        lifecycle = null;
+        started.clear();
     }
 
     // ── Window ───────────────────────────────────────────────────────────────
@@ -190,13 +217,13 @@ public class OrderBubblePlugin extends Plugin {
             PixelFormat.TRANSLUCENT
         );
         params.gravity = Gravity.TOP | Gravity.START;
-        DisplayMetrics dm = ctx.getResources().getDisplayMetrics();
+        int[] f = frame();
         if (bubbleX < 0 || bubbleY < 0) {
-            bubbleX = dm.widthPixels - dp(BUBBLE_DP + PAD_DP * 2);
-            bubbleY = dm.heightPixels / 3;
+            bubbleX = f[0] - dp(BUBBLE_DP + PAD_DP * 2);
+            bubbleY = f[1] / 3;
         }
-        params.x = Math.max(0, Math.min(bubbleX, dm.widthPixels - dp(BUBBLE_DP + PAD_DP * 2)));
-        params.y = Math.max(0, Math.min(bubbleY, dm.heightPixels - dp(BUBBLE_DP + PAD_DP * 2)));
+        params.x = Math.max(0, Math.min(bubbleX, f[0] - dp(BUBBLE_DP + PAD_DP * 2)));
+        params.y = Math.max(0, Math.min(bubbleY, f[1] - dp(BUBBLE_DP + PAD_DP * 2)));
         expanded = false;
         showExpanded(false);
         render();
@@ -372,9 +399,8 @@ public class OrderBubblePlugin extends Plugin {
         if (on && !expanded) {
             bubbleX = params.x;
             bubbleY = params.y;
-            DisplayMetrics dm = root.getResources().getDisplayMetrics();
             int cardW = card.getLayoutParams().width + dp(PAD_DP * 2);
-            params.x = Math.max(0, Math.min(params.x, dm.widthPixels - cardW));
+            params.x = Math.max(0, Math.min(params.x, frame()[0] - cardW));
         } else if (!on && expanded) {
             params.x = bubbleX;
             params.y = bubbleY;
@@ -442,12 +468,29 @@ public class OrderBubblePlugin extends Plugin {
         }
     }
 
+    /**
+     * Width and height of the area Android lays the overlay out in: the screen minus the status and
+     * navigation bars (the window's default fitInsetsTypes). params.x/y are relative to it.
+     */
+    private int[] frame() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && wm != null) {
+            WindowMetrics m = wm.getCurrentWindowMetrics();
+            Insets i = m.getWindowInsets().getInsets(WindowInsets.Type.systemBars());
+            return new int[] { m.getBounds().width() - i.left - i.right, m.getBounds().height() - i.top - i.bottom };
+        }
+        // Before Android 11 the display metrics already leave out the navigation bar, not the status bar.
+        DisplayMetrics dm = getContext().getResources().getDisplayMetrics();
+        int id = getContext().getResources().getIdentifier("status_bar_height", "dimen", "android");
+        int status = id > 0 ? getContext().getResources().getDimensionPixelSize(id) : 0;
+        return new int[] { dm.widthPixels, dm.heightPixels - status };
+    }
+
     private int clampX(int x) {
-        return Math.max(0, Math.min(x, root.getResources().getDisplayMetrics().widthPixels - root.getWidth()));
+        return Math.max(0, Math.min(x, frame()[0] - root.getWidth()));
     }
 
     private int clampY(int y) {
-        return Math.max(0, Math.min(y, root.getResources().getDisplayMetrics().heightPixels - root.getHeight()));
+        return Math.max(0, Math.min(y, frame()[1] - root.getHeight()));
     }
 
     private void moveTo(int x, int y) {
@@ -462,9 +505,8 @@ public class OrderBubblePlugin extends Plugin {
 
     /** A dropped bubble settles against the nearer side of the screen. */
     private void snapToEdge() {
-        DisplayMetrics dm = root.getResources().getDisplayMetrics();
-        int w = root.getWidth();
-        moveTo(params.x + w / 2 < dm.widthPixels / 2 ? 0 : dm.widthPixels - w, params.y);
+        int w = root.getWidth(), fw = frame()[0];
+        moveTo(params.x + w / 2 < fw / 2 ? 0 : fw - w, params.y);
     }
 
     // ── Small view helpers ───────────────────────────────────────────────────

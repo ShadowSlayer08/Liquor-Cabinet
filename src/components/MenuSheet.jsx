@@ -10,7 +10,7 @@ import { Icon, VegMark } from "./Art.jsx";
 // the food cart, so the Zomato hand-off carries every item and quantity.
 // Items carry a price only when Zomato shows one (signed in — Plan → Zomato
 // account, beta); everything else is estimated with the "cost for one".
-export default function MenuSheet({ restaurant, loc, qtyOf, setQty, onClose, vegOnly: vegDefault = false, zomatoExact = false }) {
+export default function MenuSheet({ restaurant, loc, qtyOf, setQty, onClose, onPriced, vegOnly: vegDefault = false, zomatoExact = false }) {
   const [state, setState] = useState({ loading: true });
   const [vegOnly, setVegOnly] = useState(vegDefault);
   const [section, setSection] = useState(null);
@@ -26,6 +26,10 @@ export default function MenuSheet({ restaurant, loc, qtyOf, setQty, onClose, veg
   useEffect(() => { load(false); }, [restaurant.resId]);
 
   const m = state.data;
+  // A priced menu (signed in) → let the cart swap its estimates for the exact prices.
+  useEffect(() => {
+    if (m && !m.pricesHidden) onPriced?.(m.menus.flatMap((s) => s.items).filter((it) => it.price));
+  }, [m]);
   const menus = useMemo(() => (m?.menus || []).map((s) => ({ ...s, items: vegOnly ? s.items.filter((i) => i.veg === true) : s.items })).filter((s) => s.items.length), [m, vegOnly]);
   const unit = restaurant.costForOne || 0;
   // Footer total: exact menu prices where Zomato gave them, the cost-for-one estimate otherwise.

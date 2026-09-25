@@ -43,10 +43,15 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
     product: { id: p.id, name: p.name, packText: p.packText, price: p.price, pack: p.pack, ...(p.live ? { live: true, blinkit: p.blinkit } : {}) },
     qty, query: blinkitQuery(g, p), ordered: false,
   });
+  // Once supplies are in the cart, a changed plan (more guests, a cocktail on the menu) leaves
+  // some lines missing or short: only those get updated, so ticked-off lines stay ticked.
+  const suppliesInCart = neededGroceries.some((g) => lineOf(`b:${g.id}`));
+  const staleGroceries = neededGroceries.filter((g) => lineOf(`b:${g.id}`)?.qty !== packsFor(needs[g.id], chosen(g)));
   const fillGroceries = () => {
-    for (const g of neededGroceries) { const p = chosen(g); upsertFood(groceryLine(g, p, packsFor(needs[g.id], p))); }
+    const todo = suppliesInCart ? staleGroceries : neededGroceries;
+    for (const g of todo) { const p = chosen(g); upsertFood(groceryLine(g, p, packsFor(needs[g.id], p))); }
     tap();
-    toast(`Added ${neededGroceries.length} party supplies to your Blinkit list`);
+    toast(!todo.length ? "Your Blinkit list is up to date" : suppliesInCart ? `Updated ${todo.length} ${todo.length === 1 ? "supply" : "supplies"} on your Blinkit list` : `Added ${todo.length} party supplies to your Blinkit list`);
   };
   const groceryTotal = neededGroceries.reduce((s, g) => { const p = chosen(g); return s + p.price * packsFor(needs[g.id], p); }, 0);
 
@@ -283,7 +288,9 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
                       </div>
                       <div style={{ textAlign: "right", minWidth: 60 }}>
                         <div className="small b">{fmt(p.price * packs)}</div>
-                        <div className="tiny" style={{ color: added ? "var(--green)" : "var(--dim)" }}>{added ? "✓ in cart" : "change ›"}</div>
+                        {added && lineOf(`b:${g.id}`).qty !== packs
+                          ? <div className="tiny gold">×{lineOf(`b:${g.id}`).qty} in cart · update</div>
+                          : <div className="tiny" style={{ color: added ? "var(--green)" : "var(--dim)" }}>{added ? "✓ in cart" : "change ›"}</div>}
                       </div>
                     </div>
                   );
@@ -291,7 +298,7 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
               </div>
             );
           })}
-          <button className="btn btn-blinkit btn-block" style={{ marginTop: 14 }} onClick={fillGroceries}><Icon.plus size={16} /> Add all supplies to cart</button>
+          <button className="btn btn-blinkit btn-block" style={{ marginTop: 14 }} onClick={fillGroceries}>{!suppliesInCart ? <><Icon.plus size={16} /> Add all supplies to cart</> : staleGroceries.length ? <>Update cart · {staleGroceries.length} changed</> : <><Icon.check size={16} /> All supplies in your cart</>}</button>
           <div className="tiny dim" style={{ marginTop: 8, textAlign: "center" }}>
             {Object.keys(MIXERS).filter((k) => needs[k] > 0).map((k) => `${MIXERS[k].label} ${formatAmount(needs[k], "ml")}`).join(" · ") || "No mixers needed"} · prices ≈ MRP{neededGroceries.some((g) => chosen(g).live) ? ", live where marked" : ""}
           </div>
@@ -319,6 +326,12 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
         <MenuSheet restaurant={menuOpen.r} loc={loc} vegOnly={party.vegPct >= 100} zomatoExact={zomatoExact}
           qtyOf={(itemId) => lineOf(`z:${menuOpen.r.resId}:${itemId}`)?.qty || 0}
           setQty={(item, q, section) => setMenuQty(menuOpen.r, menuOpen.dish, item, q, section)}
+          onPriced={(items) => {
+            for (const it of items) {
+              const key = `z:${menuOpen.r.resId}:${it.id}`, l = lineOf(key);
+              if (l && (!l.exact || l.unitPrice !== it.price)) upsertFood({ key, unitPrice: it.price, exact: true });
+            }
+          }}
           onClose={() => setMenuOpen(null)} />
       )}
       {groceryOpen && (

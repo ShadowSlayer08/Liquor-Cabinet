@@ -538,6 +538,8 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px;
 .share-ask > svg { flex-shrink: 0; }
 .share-ask-actions { display: flex; justify-content: flex-end; gap: 8px; width: 100%; }
 
+/* A toast raised above the "move your reminders?" prompt instead of covering its buttons. */
+body:has(.share-ask) .toast { bottom: calc(var(--safe-bottom) + var(--nav-h) + 170px); }
 /* (end share) */
 
 /* ── v1.3 · Price drops & Zomato prices ──────────────────────────────────── */

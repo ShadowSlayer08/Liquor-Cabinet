@@ -36,10 +36,22 @@ export function bubbleLines(lines) {
   return out;
 }
 
+// Food-cart keys of the list on screen, so a tick in the bubble can find its line.
+let shownKeys = [];
+
 // Shows (or replaces) the floating checklist. It appears once you switch to another app.
-export async function showBubble(title, lines) {
+// `keys` (optional) are the cart line keys, one per line.
+export async function showBubble(title, lines, keys = []) {
   if (!isNative() || !lines?.length) return false;
+  shownKeys = keys;
   try { await OrderBubble.show({ title, ...bubbleLines(lines) }); return true; } catch (e) { console.warn("OrderBubble.show", e); return false; }
+}
+
+// A line ticked / unticked in the bubble → fn(key, done). Returns an unsubscribe function.
+export function onBubbleToggle(fn) {
+  if (!isNative()) return () => {};
+  const sub = OrderBubble.addListener("toggle", (e) => { const key = shownKeys[e?.index]; if (key) fn(key, !!e.done); });
+  return () => { sub.then((s) => s.remove()).catch(() => {}); };
 }
 
 export async function hideBubble() {
