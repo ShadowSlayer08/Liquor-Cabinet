@@ -4,7 +4,7 @@
 //    cross-origin sites like livcheers.com / zomato.com just work.
 //  • In a desktop browser (npm run dev) it goes through the Vite dev proxy.
 // ═══════════════════════════════════════════════════════════════════════════════
-import { Capacitor, CapacitorHttp } from "@capacitor/core";
+import { Capacitor, CapacitorHttp, CapacitorCookies } from "@capacitor/core";
 
 export const UA =
   "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36";
@@ -24,18 +24,30 @@ export class HttpError extends Error {
 
 export const isNative = () => Capacitor.isNativePlatform();
 
-// `cookie` is sent as a real Cookie header natively; browsers forbid setting
-// Cookie from JS, so in dev it travels as x-proxy-cookie and the Vite proxy
-// turns it back into a Cookie header.
+// `cookie` ("a=1; b=2") must reach the site as cookies.
+//  • Natively, Capacitor routes every request through the app's shared cookie
+//    store (the same one in-app web views use — that's how a Zomato login
+//    carries over). A hand-written Cookie header would clash with it, so the
+//    values are written into that store first.
+//  • Browsers forbid setting Cookie from JS, so in dev it travels as
+//    x-proxy-cookie and the Vite proxy turns it back into a Cookie header.
+async function storeCookies(url, cookie) {
+  const origin = new URL(url).origin;
+  for (const part of cookie.split(";")) {
+    const i = part.indexOf("=");
+    if (i > 0) await CapacitorCookies.setCookie({ url: origin, key: part.slice(0, i).trim(), value: part.slice(i + 1).trim(), path: "/" });
+  }
+}
+
 export async function getText(url, { timeout = 30000, headers = {}, cookie = null } = {}) {
   if (isNative()) {
+    if (cookie) await storeCookies(url, cookie);
     const res = await CapacitorHttp.get({
       url,
       headers: {
         "User-Agent": UA,
         Accept: "text/html,application/json;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-IN,en;q=0.9",
-        ...(cookie ? { Cookie: cookie } : {}),
         ...headers,
       },
       responseType: "text",

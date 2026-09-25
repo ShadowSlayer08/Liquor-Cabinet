@@ -13,6 +13,7 @@
 //    • mains: one "for one" Zomato serving per guest; 2–3 breads each
 // ═══════════════════════════════════════════════════════════════════════════════
 import { CAT } from "./parse/livcheers.js";
+import { cocktailUses, servingsByFamily, familyOfCat } from "./cocktails.js";
 
 export const MIXER_PER_DRINK = 150; // ml
 export const PIECES_PER_PLATE = 8;  // a typical Zomato starter plate
@@ -146,6 +147,22 @@ export const GROCERIES = [
   { id: "napkins", name: "Napkins", emoji: "🧻", group: "supplies", unit: "pc", options: [
     opt("tissue-napkins-100", "Tissue Paper Napkins", 100, "pc", "100 pcs", 50, "tissue napkins"),
   ] },
+  // Cocktail extras — only needed when cocktails are on the party menu.
+  { id: "mint", name: "Mint leaves", emoji: "🌱", group: "cocktail", unit: "g", options: [opt("mint-100", "Mint Leaves (Pudina)", 100, "g", "100 g", 20, "mint leaves")] },
+  { id: "sugar", name: "Sugar", emoji: "🧂", group: "cocktail", unit: "g", options: [opt("sugar-1kg", "Sugar", 1000, "g", "1 kg", 55, "sugar 1kg")] },
+  { id: "oranges", name: "Oranges", emoji: "🍊", group: "cocktail", unit: "pc", options: [opt("orange-4", "Orange (Santra)", 4, "pc", "4 pcs (~600 g)", 90, "orange")] },
+  { id: "cucumber", name: "Cucumber", emoji: "🥒", group: "cocktail", unit: "g", options: [opt("cucumber-500", "Cucumber (Kheera)", 500, "g", "500 g", 35, "cucumber")] },
+  { id: "gingerale", name: "Ginger ale", emoji: "🫚", group: "cocktail", unit: "ml", options: [
+    opt("schweppes-ginger-300", "Schweppes Ginger Ale Can", 300, "ml", "300 ml", 60),
+    opt("sepoy-ginger-200", "Sepoy & Co Ginger Ale", 200, "ml", "200 ml", 110),
+  ] },
+  { id: "orangejuice", name: "Orange juice", emoji: "🧃", group: "cocktail", unit: "ml", options: [opt("real-orange-1l", "Real Fruit Power Orange Juice", 1000, "ml", "1 L", 130)] },
+  { id: "cranberry", name: "Cranberry juice", emoji: "🍒", group: "cocktail", unit: "ml", options: [opt("real-cranberry-1l", "Real Fruit Power Cranberry Juice", 1000, "ml", "1 L", 140)] },
+  { id: "pineapple", name: "Pineapple juice", emoji: "🍍", group: "cocktail", unit: "ml", options: [opt("real-pineapple-1l", "Real Fruit Power Pineapple Juice", 1000, "ml", "1 L", 130)] },
+  { id: "coconutmilk", name: "Coconut milk", emoji: "🥥", group: "cocktail", unit: "ml", options: [opt("dabur-coconut-200", "Dabur Hommade Coconut Milk", 200, "ml", "200 ml", 80, "coconut milk")] },
+  { id: "honey", name: "Honey", emoji: "🍯", group: "cocktail", unit: "g", options: [opt("dabur-honey-250", "Dabur Honey", 250, "g", "250 g", 125)] },
+  { id: "salt", name: "Salt", emoji: "🧂", group: "cocktail", unit: "g", options: [opt("tata-salt-1kg", "Tata Salt", 1000, "g", "1 kg", 28)] },
+  { id: "milk", name: "Milk", emoji: "🥛", group: "cocktail", unit: "ml", options: [opt("amul-milk-500", "Amul Taaza Toned Milk", 500, "ml", "500 ml", 28, "amul milk")] },
 ];
 export const GROCERY = Object.fromEntries(GROCERIES.map((g) => [g.id, g]));
 
@@ -155,6 +172,7 @@ export const GROUPS = {
   garnish:  { label: "Garnish",        emoji: "🍋" },
   munchies: { label: "Munchies",       emoji: "🥜" },
   supplies: { label: "Party supplies", emoji: "🥛" },
+  cocktail: { label: "Cocktail extras", emoji: "🍸" },
 };
 
 // ── Drinks maths ─────────────────────────────────────────────────────────────
@@ -178,8 +196,9 @@ export function servingsInBottle(catId, ml, pegMl = 60) {
 /**
  * @param party        { guests, hours, drinkersPct, vegPct, appetite, dinner, pegMl }
  * @param liquorLines  [{ cat, ml, qty }] — the liquor cart
+ * @param menu         [{ id, servings }] — cocktails on the party menu (lib/cocktails.js)
  */
-export function planParty(party, liquorLines = []) {
+export function planParty(party, liquorLines = [], menu = []) {
   const p = { ...DEFAULT_PARTY, ...party };
   const guests = Math.max(1, Math.round(p.guests));
   const hours = clamp(p.hours, 1, 12);
@@ -197,23 +216,30 @@ export function planParty(party, liquorLines = []) {
   const poured = available ? Math.min(needed, available) : needed;
 
   // Mixers follow what will actually be poured, in proportion to what's stocked.
+  // Drinks served as cocktails take their mixers from the cocktail recipe
+  // instead of the default (e.g. no plain soda for a whisky that becomes a sour).
   // With an empty cart assume a typical Indian house party mix.
   const mixerMl = { soda: 0, tonic: 0, cola: 0, lemon: 0 };
+  const famLeft = { ...servingsByFamily(menu) };
+  const cocktailServings = Object.values(famLeft).reduce((s, n) => s + n, 0);
   let shots = 0, ginDrinks = 0;
   if (available) {
     for (const [id, n] of Object.entries(byCat)) {
-      const share = (poured * n) / available;
+      let share = (poured * n) / available;
+      const fam = familyOfCat(id);
+      if (fam && famLeft[fam] > 0) { const used = Math.min(share, famLeft[fam]); share -= used; famLeft[fam] -= used; }
       const mixer = CAT[id].serve.mixer;
       if (mixer) mixerMl[mixer] += share * MIXER_PER_DRINK;
       if (CAT[id].serve.kind === "shot") shots += share;
       if (id === "gin" || id === "vodka") ginDrinks += share;
     }
   } else {
-    mixerMl.soda = poured * 0.5 * MIXER_PER_DRINK;
-    mixerMl.cola = poured * 0.25 * MIXER_PER_DRINK;
-    mixerMl.tonic = poured * 0.15 * MIXER_PER_DRINK;
-    mixerMl.lemon = poured * 0.1 * MIXER_PER_DRINK;
-    ginDrinks = poured * 0.15;
+    const plain = Math.max(0, poured - cocktailServings);
+    mixerMl.soda = plain * 0.5 * MIXER_PER_DRINK;
+    mixerMl.cola = plain * 0.25 * MIXER_PER_DRINK;
+    mixerMl.tonic = plain * 0.15 * MIXER_PER_DRINK;
+    mixerMl.lemon = plain * 0.1 * MIXER_PER_DRINK;
+    ginDrinks = plain * 0.15;
   }
   for (const k of Object.keys(mixerMl)) mixerMl[k] = Math.round(mixerMl[k]);
 
@@ -259,17 +285,23 @@ export function planParty(party, liquorLines = []) {
     desserts,
     munchies, munchiesG,
     supplies: { cups, plates: paperPlates, napkins },
+    cocktailServings, cocktailUses: cocktailUses(menu),
   };
 }
 
 // What to buy on Blinkit: grocery id → amount in that grocery's unit.
+// Cocktail ingredients are added on top; ice is already sized for every drink.
 export function groceryNeeds(plan) {
-  return {
+  const needs = {
     soda: plan.mixerMl.soda, tonic: plan.mixerMl.tonic, cola: plan.mixerMl.cola, lemon: plan.mixerMl.lemon,
     water: plan.waterMl, ice: plan.iceKg * 1000, limes: plan.limes,
     ...plan.munchies,
     cups: plan.supplies.cups, plates: plan.supplies.plates, napkins: plan.supplies.napkins,
   };
+  for (const [id, amt] of Object.entries(plan.cocktailUses || {})) {
+    needs[id] = id === "ice" ? Math.max(needs.ice, amt) : (needs[id] || 0) + amt;
+  }
+  return needs;
 }
 
 export function packsFor(amount, product) {

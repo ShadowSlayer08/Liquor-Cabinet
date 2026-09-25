@@ -59,7 +59,7 @@ test("every Blinkit supply has usable product options", () => {
       assert.equal(o.pack.unit, g.unit, `${o.id} unit`);
       assert.ok(o.price > 0 && o.pack.amount > 0 && o.blinkit, o.id);
     }
-    assert.ok(g.id in needs, `calculator covers ${g.id}`);
+    if (g.group !== "cocktail") assert.ok(g.id in needs, `calculator covers ${g.id}`);
   }
   assert.equal(packsFor(needs.soda, GROCERY.soda.options[0]), Math.ceil(needs.soda / 750));
   assert.equal(blinkitQuery(GROCERY.limes, GROCERY.limes.options[0]), "lemon");
