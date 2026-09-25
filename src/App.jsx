@@ -4,20 +4,24 @@ import { CATEGORIES, CITIES, cityName } from "./lib/parse/livcheers.js";
 import { loadCachedCatalog, STALE_MS } from "./lib/sources.js";
 import { store } from "./lib/store.js";
 import { DEFAULT_PARTY, planParty } from "./lib/food.js";
+import { nextSaturday, todayISO } from "./lib/drydays.js";
 import { locate } from "./lib/location.js";
 import { handleBack } from "./lib/back.js";
 import { isNative } from "./lib/http.js";
 import { onChecklistTap, tap } from "./lib/order.js";
 import ScraperPanel from "./components/ScraperPanel.jsx";
 import CabinetTab from "./components/CabinetTab.jsx";
+import BarTab from "./components/BarTab.jsx";
 import FoodTab from "./components/FoodTab.jsx";
 import CartTab from "./components/CartTab.jsx";
 import PlanTab from "./components/PlanTab.jsx";
+import RemindersWatcher from "./components/RemindersWatcher.jsx";
 import Sheet from "./components/Sheet.jsx";
 import { Icon } from "./components/Art.jsx";
 
 const TABS = [
   { id: "cabinet", icon: Icon.cabinet, label: "Cabinet" },
+  { id: "bar", icon: Icon.cocktail, label: "Bar" },
   { id: "food", icon: Icon.food, label: "Food" },
   { id: "cart", icon: Icon.bag, label: "Cart" },
   { id: "plan", icon: Icon.chart, label: "Plan" },
@@ -25,6 +29,9 @@ const TABS = [
 
 // Only what the cart needs to survive a re-scrape or a city switch.
 const slim = (it) => ({ id: it.id, name: it.name, brand: it.brand, sub: it.sub, vol: it.vol, ml: it.ml, price: it.price, img: it.img, url: it.url, flag: it.flag });
+// A party date that has already passed rolls on to the coming Saturday.
+const withDate = (p) => ({ ...p, date: p.date && p.date >= todayISO() ? p.date : nextSaturday() });
+const DEFAULT_SPLIT = { include: { liquor: true, food: true, supplies: true }, people: null, drinkers: null, mode: "fair" };
 // v1.0/1.1 food lines used `servings`; everything is `qty` now.
 const migrateFood = (lines) => (lines || []).map((l) => (l.qty == null && l.servings != null ? { ...l, qty: l.servings, restaurant: l.restaurant && { ...l.restaurant, costForOne: l.restaurant.costForOne ?? l.unitPrice } } : l));
 
@@ -43,7 +50,13 @@ export default function App() {
   const [batches, setBatches] = useState([{ name: "Batch 1", items: {} }]);
   const [activeBatch, setActiveBatch] = useState(0);
   const [food, setFood] = useState([]);           // Zomato + Bistro + Blinkit lines
-  const [party, setParty] = useState(DEFAULT_PARTY);
+  const [party, setParty] = useState(() => withDate(DEFAULT_PARTY));
+  const [cocktailMenu, setCocktailMenu] = useState([]); // [{ id, servings }] — lib/cocktails.js
+  const [customDry, setCustomDry] = useState([]);       // [{ date, name }] — dry days the user adds
+  const [reminders, setReminders] = useState({ enabled: {}, scheduledFor: null }); // scheduledFor = "date time" last scheduled
+  const [split, setSplit] = useState(DEFAULT_SPLIT);    // bill split settings (people/drinkers null = from the plan)
+  const [bubble, setBubble] = useState(false);          // floating order checklist over other apps
+  const [zomatoExact, setZomatoExact] = useState(false); // signed in to Zomato in-app → exact menu prices
   const [syncIds, setSyncIds] = useState(CATEGORIES.filter((c) => c.sync).map((c) => c.id));
   const [showScraper, setShowScraper] = useState(false);
   const [showCity, setShowCity] = useState(false);
@@ -61,7 +74,13 @@ export default function App() {
       if (cfg.batches?.length) setBatches(cfg.batches);
       if (cfg.activeBatch != null) setActiveBatch(cfg.activeBatch);
       if (cfg.food) setFood(migrateFood(cfg.food));
-      if (cfg.party) setParty({ ...DEFAULT_PARTY, ...cfg.party });
+      if (cfg.party) setParty(withDate({ ...DEFAULT_PARTY, ...cfg.party }));
+      if (cfg.cocktailMenu) setCocktailMenu(cfg.cocktailMenu);
+      if (cfg.customDry) setCustomDry(cfg.customDry);
+      if (cfg.reminders) setReminders(cfg.reminders);
+      if (cfg.split) setSplit({ ...DEFAULT_SPLIT, ...cfg.split, include: { ...DEFAULT_SPLIT.include, ...cfg.split.include } });
+      if (cfg.bubble != null) setBubble(cfg.bubble);
+      if (cfg.zomatoExact != null) setZomatoExact(cfg.zomatoExact);
       if (cfg.syncIds) setSyncIds(cfg.syncIds);
       if (cfg.activeCat) setActiveCat(cfg.activeCat);
       if (cfg.loc) setLoc(cfg.loc);
@@ -74,8 +93,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (ready) store.set("cfg", { city, loc, budget, liquor, batches, activeBatch, food, party, syncIds, activeCat, onboarded });
-  }, [ready, city, loc, budget, liquor, batches, activeBatch, food, party, syncIds, activeCat, onboarded]);
+    if (ready) store.set("cfg", {
+      city, loc, budget, liquor, batches, activeBatch, food, party, syncIds, activeCat, onboarded,
+      cocktailMenu, customDry, reminders, split, bubble, zomatoExact,
+    });
+  }, [ready, city, loc, budget, liquor, batches, activeBatch, food, party, syncIds, activeCat, onboarded,
+    cocktailMenu, customDry, reminders, split, bubble, zomatoExact]);
 
   // ── Android back button + notification taps ──────────────────────────────
   useEffect(() => {
@@ -193,7 +216,7 @@ export default function App() {
   const zomatoTotal = food.filter((l) => l.kind === "zomato").reduce((s, l) => s + (l.unitPrice || 0) * (l.qty || 0), 0);
   const blinkitTotal = food.filter((l) => l.kind === "blinkit").reduce((s, l) => s + l.product.price * l.qty, 0);
 
-  const plan = useMemo(() => planParty(party, liquorLines.map((l) => ({ cat: l.cat, ml: l.item.ml, qty: l.qty }))), [party, liquorLines]);
+  const plan = useMemo(() => planParty(party, liquorLines.map((l) => ({ cat: l.cat, ml: l.item.ml, qty: l.qty })), cocktailMenu), [party, liquorLines, cocktailMenu]);
   const liquorCats = [...new Set(liquorLines.map((l) => l.cat))];
   const spent = liquorTotal + zomatoTotal + blinkitTotal;
   const left = budget - spent;
@@ -203,7 +226,7 @@ export default function App() {
 
   const addBatch = () => { setBatches((bs) => [...bs, { name: `Batch ${bs.length + 1}`, items: {} }]); setActiveBatch(batches.length); };
   const clearCache = async () => {
-    for (const prefix of ["price:", "zomato:", "menu:", "dishphoto:"]) for (const k of await store.list(prefix)) await store.del(k);
+    for (const prefix of ["price:", "hist:", "zomato:", "menu:", "dishphoto:"]) for (const k of await store.list(prefix)) await store.del(k);
     setCatalog({}); setAges({});
     toast("Cached data cleared");
   };
@@ -244,24 +267,35 @@ export default function App() {
           {tab === "cabinet" && (
             <CabinetTab city={city} loc={loc} catalog={catalog} ages={ages} activeCat={activeCat} setActiveCat={setActiveCat}
               qtyOf={qtyOf} addItem={addItem} remItem={remItem} budgetLeft={left} openScraper={() => setShowScraper(true)}
-              plan={plan} spent={spent} budget={budget} bottles={bottles} onPairing={() => goTab("food")} />
+              plan={plan} spent={spent} budget={budget} bottles={bottles} onPairing={() => goTab("food")}
+              party={party} liquorCats={liquorCats} cocktailMenu={cocktailMenu} customDry={customDry} onBar={() => goTab("bar")} toast={toast} />
+          )}
+          {tab === "bar" && (
+            <BarTab city={city} liquorCats={liquorCats} cocktailMenu={cocktailMenu} setCocktailMenu={setCocktailMenu} plan={plan} party={party}
+              toast={toast} goCabinet={() => goTab("cabinet")} goFood={() => goTab("food")} />
           )}
           {tab === "food" && (
             <FoodTab city={city} loc={loc} locating={locating} onLocate={detectLocation} party={party} setParty={setParty} plan={plan}
               liquorCats={liquorCats} foodCart={food} upsertFood={upsertFood} removeFood={removeFood} toast={toast}
-              goToCart={() => { setCartView("food"); goTab("cart"); }} />
+              goToCart={() => { setCartView("food"); goTab("cart"); }}
+              customDry={customDry} cocktailMenu={cocktailMenu} zomatoExact={zomatoExact} />
           )}
           {tab === "cart" && (
             <CartTab city={city} view={cartView} setView={setCartView}
               liquorLines={liquorLines} liquorTotal={liquorTotal} addItem={addItem} remItem={remItem} clearLiquor={clearLiquor}
               batches={batches} activeBatch={activeBatch}
-              foodCart={food} updateFood={updateFood} removeFood={removeFood} clearFood={() => setFood([])} toast={toast} />
+              foodCart={food} updateFood={updateFood} removeFood={removeFood} clearFood={() => setFood([])} toast={toast}
+              bubble={bubble} />
           )}
           {tab === "plan" && (
             <PlanTab city={city} loc={loc} locating={locating} onLocate={detectLocation} budget={budget} saveBudget={setBudget}
               spent={spent} catSpend={catSpend} zomatoTotal={zomatoTotal} blinkitTotal={blinkitTotal} plan={plan}
               batches={batches} activeBatch={activeBatch} setActiveBatch={setActiveBatch} addBatch={addBatch}
-              ages={ages} openScraper={() => setShowScraper(true)} clearCache={clearCache} openCity={() => setShowCity(true)} />
+              ages={ages} openScraper={() => setShowScraper(true)} clearCache={clearCache} openCity={() => setShowCity(true)}
+              party={party} setParty={setParty} customDry={customDry} setCustomDry={setCustomDry} cocktailMenu={cocktailMenu}
+              liquorLines={liquorLines} liquorTotal={liquorTotal} foodCart={food}
+              reminders={reminders} setReminders={setReminders} split={split} setSplit={setSplit}
+              bubble={bubble} setBubble={setBubble} zomatoExact={zomatoExact} setZomatoExact={setZomatoExact} toast={toast} />
           )}
         </main>
 
@@ -290,6 +324,7 @@ export default function App() {
           onLocate={async () => { setShowCity(false); await detectLocation(); }} />
       )}
       {showScraper && <ScraperPanel city={city} syncIds={syncIds} setSyncIds={setSyncIds} onData={handleScraperData} onClose={() => setShowScraper(false)} />}
+      <RemindersWatcher party={party} city={city} customDry={customDry} reminders={reminders} setReminders={setReminders} toast={toast} />
       {toastMsg && <div className="toast">{toastMsg}</div>}
     </>
   );

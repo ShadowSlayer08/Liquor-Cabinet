@@ -24,8 +24,11 @@ export const APPETITE = {
   hungry:  { label: "Hungry",  f: 1.25 },
 };
 
+// `name`, `date` (ISO, null = the coming Saturday — set by App), `time`, `host` and `upi`
+// describe the party itself: dry-day checks, reminders, the invite card and bill split.
 export const DEFAULT_PARTY = {
   guests: 10, hours: 4, drinkersPct: 80, vegPct: 40, appetite: "regular", dinner: true, pegMl: 60,
+  name: "House party", date: null, time: "20:00", host: "", upi: "",
 };
 
 export const MIXERS = {
@@ -194,7 +197,7 @@ export function servingsInBottle(catId, ml, pegMl = 60) {
 }
 
 /**
- * @param party        { guests, hours, drinkersPct, vegPct, appetite, dinner, pegMl }
+ * @param party        { guests, hours, drinkersPct, vegPct, appetite, dinner, pegMl } (+ name/date/time/host/upi, unused here)
  * @param liquorLines  [{ cat, ml, qty }] — the liquor cart
  * @param menu         [{ id, servings }] — cocktails on the party menu (lib/cocktails.js)
  */

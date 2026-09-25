@@ -73,6 +73,9 @@ export function addDays(iso, days) {
   return todayISO(d);
 }
 
+// Default party date: the coming Saturday (today, if it's Saturday).
+export const nextSaturday = (from = todayISO()) => addDays(from, (6 - new Date(`${from}T12:00:00`).getDay() + 7) % 7);
+
 export const prettyDate = (iso, opts = { weekday: "short", day: "numeric", month: "short" }) =>
   iso ? new Date(`${iso}T12:00:00`).toLocaleDateString("en-IN", opts) : "";
 

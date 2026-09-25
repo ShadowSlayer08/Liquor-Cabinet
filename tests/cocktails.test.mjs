@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { COCKTAILS, makeable, cocktailUses, familyOfCat } from "../src/lib/cocktails.js";
 import { planParty, groceryNeeds, GROCERY } from "../src/lib/food.js";
-import { dryDayOn, lastShoppingDay, upcomingDryDays, stateOf } from "../src/lib/drydays.js";
+import { dryDayOn, lastShoppingDay, upcomingDryDays, stateOf, nextSaturday } from "../src/lib/drydays.js";
 
 test("every cocktail uses known supplies and families", () => {
   for (const c of COCKTAILS) {
@@ -44,4 +44,7 @@ test("dry days", () => {
   assert.equal(lastShoppingDay("2026-10-02", "delhi"), "2026-10-01");
   assert.equal(stateOf("hubli-dharwad"), "Karnataka");
   assert.equal(upcomingDryDays("delhi", [], "2026-09-24", 2)[0].date, "2026-10-02");
+  assert.equal(nextSaturday("2026-09-25"), "2026-09-26");   // Friday → tomorrow
+  assert.equal(nextSaturday("2026-09-26"), "2026-09-26");   // Saturday → today
+  assert.equal(nextSaturday("2026-09-27"), "2026-10-03");
 });

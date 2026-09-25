@@ -3,6 +3,12 @@ import { CATEGORIES, cityName } from "../lib/parse/livcheers.js";
 import { STALE_MS } from "../lib/sources.js";
 import { fmt, fmtShort, ageStr } from "../lib/format.js";
 import { Icon, Ring } from "./Art.jsx";
+import InviteCard from "./plan/InviteCard.jsx";
+import SplitCard from "./plan/SplitCard.jsx";
+import RemindersCard from "./plan/RemindersCard.jsx";
+import DryDaysCard from "./plan/DryDaysCard.jsx";
+import ZomatoAccountCard from "./plan/ZomatoAccountCard.jsx";
+import BubbleCard from "./plan/BubbleCard.jsx";
 
 function Donut({ rows, size = 150, stroke = 20 }) {
   const total = rows.reduce((s, r) => s + r.v, 0) || 1;
@@ -30,6 +36,8 @@ function Donut({ rows, size = 150, stroke = 20 }) {
 export default function PlanTab({
   city, loc, locating, onLocate, budget, saveBudget, spent, catSpend, zomatoTotal, blinkitTotal, plan,
   batches, activeBatch, setActiveBatch, addBatch, ages, openScraper, clearCache, openCity,
+  party, setParty, customDry, setCustomDry, cocktailMenu, liquorLines, liquorTotal, foodCart,
+  reminders, setReminders, split, setSplit, bubble, setBubble, zomatoExact, setZomatoExact, toast,
 }) {
   const [draft, setDraft] = useState(String(budget));
   const [editing, setEditing] = useState(false);
@@ -86,6 +94,12 @@ export default function PlanTab({
         )}
       </div>
 
+      <InviteCard party={party} setParty={setParty} city={city} loc={loc} plan={plan} cocktailMenu={cocktailMenu} liquorLines={liquorLines} foodCart={foodCart} toast={toast} />
+      <SplitCard party={party} setParty={setParty} plan={plan} split={split} setSplit={setSplit}
+        liquorTotal={liquorTotal} zomatoTotal={zomatoTotal} blinkitTotal={blinkitTotal} toast={toast} />
+      <RemindersCard party={party} city={city} customDry={customDry} reminders={reminders} setReminders={setReminders} toast={toast} />
+      <DryDaysCard party={party} city={city} customDry={customDry} setCustomDry={setCustomDry} toast={toast} />
+
       <div className="card fade-up">
         <div className="card-title"><span className="kicker">Location</span></div>
         <div className="row" style={{ gap: 12 }}>
@@ -113,6 +127,9 @@ export default function PlanTab({
         <button className="btn btn-ghost btn-block btn-sm" style={{ marginTop: 6, borderStyle: "dashed" }} onClick={addBatch}><Icon.plus size={14} /> New batch</button>
         <div className="tiny dim" style={{ marginTop: 8 }}>Bottles you add go into the active batch — split one shopping run across stores or days.</div>
       </div>
+
+      <ZomatoAccountCard loc={loc} zomatoExact={zomatoExact} setZomatoExact={setZomatoExact} foodCart={foodCart} toast={toast} />
+      <BubbleCard bubble={bubble} setBubble={setBubble} toast={toast} />
 
       <div className="card fade-up">
         <div className="card-title"><span className="kicker">Price database · {cityName(city)}</span><button className="btn btn-xs btn-gold" onClick={openScraper}><Icon.bolt size={13} /> Sync</button></div>

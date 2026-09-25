@@ -432,3 +432,22 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px;
   .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .dish-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+
+/* ═══ v1.3 ═══════════════════════════════════════════════════════════════════
+   One block per feature track, so parallel work merges cleanly. */
+
+/* ── v1.3 · Bar, dry days & store finder ─────────────────────────────────── */
+
+/* (end bar) */
+
+/* ── v1.3 · Split, invite & reminders ────────────────────────────────────── */
+
+/* (end share) */
+
+/* ── v1.3 · Price drops & Zomato prices ──────────────────────────────────── */
+
+/* (end data) */
+
+/* ── v1.3 · Live Blinkit prices & floating checklist ─────────────────────── */
+
+/* (end native) */

@@ -8,3 +8,7 @@ android/keystore.properties
 
 # Local download bundles (sent to the user, not part of the source)
 release/*.zip
+
+# Local-only: raw session logs and the hand-off bundle's readme
+session-transcript/
+HOW-TO-BUILD.txt

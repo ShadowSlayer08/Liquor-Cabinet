@@ -108,6 +108,7 @@ export const Icon = {
   locate: (p) => <I {...p}><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2.5" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></I>,
   sparkle: (p) => <I {...p}><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" /><path d="M19 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z" /></I>,
   glass: (p) => <I {...p}><path d="M6 4h12l-1.5 7a4.5 4.5 0 0 1-9 0z" /><path d="M12 15.5V20M8.5 20h7" /></I>,
+  cocktail: (p) => <I {...p}><path d="M4 5h16l-8 8.5z" /><path d="M12 13.5V20M8.5 20h7" /><path d="M13.5 9.5L18 3.5" /><circle cx="15.2" cy="7.2" r="1.1" /></I>,
   clock: (p) => <I {...p}><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></I>,
   star: (p) => <svg width={p?.size || 12} height={p?.size || 12} viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.8l2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17.1l-5.7 3.2 1.2-6.4L2.8 9.5l6.4-.8z" /></svg>,
 };
