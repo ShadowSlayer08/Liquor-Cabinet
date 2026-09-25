@@ -437,6 +437,80 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px;
    One block per feature track, so parallel work merges cleanly. */
 
 /* ── v1.3 · Bar, dry days & store finder ─────────────────────────────────── */
+/* Cocktail cards: the drink's emoji floats on a soft glow of its colour. */
+.bar-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.bar-card {
+  --c: #e7a846; position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0;
+  padding: 12px 12px 13px; border-radius: 22px; text-align: left; border: 1px solid var(--stroke);
+  background: radial-gradient(90% 60% at 50% 0%, color-mix(in srgb, var(--c) 24%, transparent), transparent 75%), linear-gradient(180deg, #1d1417, #140d0f);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, .35); transition: transform .18s, border-color .25s, box-shadow .25s;
+}
+.bar-card > * { max-width: 100%; }
+.bar-card:active { transform: scale(.975); }
+.bar-card.in { border-color: color-mix(in srgb, var(--c) 65%, transparent); box-shadow: 0 12px 30px color-mix(in srgb, var(--c) 28%, transparent); }
+.bar-card.off > :not(.bar-needs) { opacity: .45; }
+.bar-card.off .bar-glow { filter: grayscale(.8); }
+.bar-glow {
+  align-self: center; width: 86px; height: 86px; margin: 4px 0 8px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--c) 60%, transparent), color-mix(in srgb, var(--c) 16%, transparent) 65%, transparent);
+}
+.bar-glow-lg { width: 132px; height: 132px; margin: 0 auto 12px; }
+.bar-emoji { font-size: 42px; line-height: 1; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .45)); }
+.bar-glow-lg .bar-emoji { font-size: 64px; }
+.bar-name { font-family: var(--display); font-size: 15.5px; font-weight: 700; line-height: 1.2; color: var(--text); }
+.bar-onmenu { position: absolute; top: 9px; right: 9px; z-index: 1; background: var(--grad-gold); color: #231404; }
+.bar-needs { margin-top: 6px; background: rgba(255, 93, 98, .12); color: #ffb3b5; border: 1px solid rgba(255, 93, 98, .25); }
+.bar-onmenu-pill { background: var(--grad-gold); color: #231404; }
+.bar-sheet-hero { --c: #e7a846; padding: 6px 0 16px; text-align: center; }
+
+/* Party menu rows */
+.bar-menu-row { width: 100%; text-align: left; }
+.bar-serv { font-weight: 800; font-size: 15px; color: var(--gold); white-space: nowrap; }
+
+/* Recipe steps, numbered in gold */
+.bar-steps { list-style: none; counter-reset: step; display: grid; gap: 10px; }
+.bar-steps li { counter-increment: step; display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; line-height: 1.5; color: var(--soft); }
+.bar-steps li::before {
+  content: counter(step); flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; margin-top: 1px;
+  background: var(--grad-gold); color: #231404; font-size: 11.5px; font-weight: 800;
+}
+
+/* Cabinet hero: cocktails + store finder chips */
+.bar-hero-row { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.bar-chip { background: rgba(0, 0, 0, .32); padding: 7px 12px; font-size: 12px; }
+.bar-chip svg { color: var(--gold); }
+
+/* Date & time inputs, dressed like .input for the dark theme */
+.bar-date { -webkit-appearance: none; appearance: none; min-height: 44px; text-align: left; font-variant-numeric: tabular-nums; }
+.bar-date::-webkit-date-and-time-value { text-align: left; }
+.bar-date::-webkit-calendar-picker-indicator { opacity: .7; cursor: pointer; }
+
+/* Dry-day banner: red when shops are certainly shut, amber (note-warn) when it varies */
+.bar-dry { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; }
+.bar-dry-icon { font-size: 18px; line-height: 1; flex-shrink: 0; }
+.bar-dry .btn { flex-shrink: 0; }
+.bar-note-danger { background: rgba(255, 93, 98, .1); border: 1px solid rgba(255, 93, 98, .38); color: #ffc9ca; }
+.bar-dry-compact { padding: 8px 11px; font-size: 11.5px; gap: 8px; }
+.bar-dry-compact .bar-dry-icon { font-size: 15px; }
+
+/* Plan: dry days ahead */
+.bar-dry-row { display: flex; align-items: center; gap: 12px; padding: 9px 10px; margin: 0 -10px; border-radius: 14px; border: 1px solid transparent; }
+.bar-dry-row + .bar-dry-row { margin-top: 2px; }
+.bar-dry-row.party { background: rgba(231, 168, 70, .1); border-color: rgba(231, 168, 70, .4); }
+.bar-dry-day { width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.05; background: var(--panel-2); border: 1px solid var(--stroke); }
+.bar-dry-day b { font-size: 16px; }
+.bar-dry-day span { font-size: 9.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.bar-pill-red { background: rgba(255, 93, 98, .14); color: #ff9a9d; }
+.bar-pill-amber { background: rgba(231, 168, 70, .14); color: var(--gold); }
+.bar-x { width: 26px; height: 26px; border-radius: 9px; display: grid; place-items: center; flex-shrink: 0; color: var(--muted); background: var(--panel-2); border: 1px solid var(--stroke); }
+.bar-dry-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.bar-dry-form .btn { grid-column: 1 / -1; }
+
+@media (min-width: 620px) {
+  .bar-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .bar-dry-form { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
+  .bar-dry-form .btn { grid-column: auto; }
+}
 
 /* (end bar) */
 

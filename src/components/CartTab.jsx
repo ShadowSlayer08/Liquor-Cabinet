@@ -5,7 +5,7 @@ import { thumb } from "../lib/parse/zomato.js";
 import { fmt } from "../lib/format.js";
 import {
   openBlinkitSearch, openZomatoRestaurant, openBistro, openUrl, shareText, copyText, isInstalled, postChecklist,
-  CHECKLIST_IDS, zomatoChecklistId, BLINKIT, ZOMATO, BISTRO, buzz,
+  CHECKLIST_IDS, zomatoChecklistId, BLINKIT, ZOMATO, BISTRO, buzz, findLiquorStores,
 } from "../lib/order.js";
 import { BottleStage } from "./ProductCard.jsx";
 import { Qty } from "./Sheet.jsx";
@@ -126,13 +126,14 @@ export default function CartTab({
           })}
           <div className="card" style={{ marginTop: 10 }}>
             <div className="between"><span className="muted">{liqCount} bottles</span><span className="h2 gold-text" style={{ fontFamily: "var(--ui)" }}>{fmt(liquorTotal)}</span></div>
-            <div className="tiny dim" style={{ marginTop: 6 }}>Livcheers indicative store prices for {cityName(city)}. Liquor isn't sold on Zomato, Bistro or Blinkit — share the list and pick it up from your local store.</div>
+            <div className="tiny dim" style={{ marginTop: 6 }}>Livcheers indicative store prices for {cityName(city)}. Liquor isn't sold on Zomato, Bistro or Blinkit — share the list and pick it up from a store near you.</div>
             <div className="sep" />
             <div className="between small"><span className="muted">Active batch</span><span>{batches[activeBatch]?.name} · {Object.values(batches[activeBatch]?.items || {}).reduce((s, q) => s + q, 0)} bottles</span></div>
             <div className="row" style={{ marginTop: 14 }}>
               <button className="btn btn-gold grow" onClick={() => share("Liquor list", liquorText())}><Icon.share size={17} /> Share list</button>
               <button className="btn btn-ghost" onClick={() => { if (confirm("Clear the liquor cart?")) clearLiquor(); }}>Clear</button>
             </div>
+            <button className="btn btn-ghost btn-block" style={{ marginTop: 8 }} onClick={findLiquorStores}><Icon.pin size={17} /> Find a liquor store near you</button>
           </div>
         </>
       ))}

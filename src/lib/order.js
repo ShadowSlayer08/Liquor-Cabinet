@@ -112,3 +112,10 @@ export async function copyText(text) {
 
 export const tap = () => { if (isNative()) Haptics.impact({ style: ImpactStyle.Light }).catch(() => {}); };
 export const buzz = () => { if (isNative()) Haptics.notification({ type: NotificationType.Success }).catch(() => {}); };
+
+// ── Liquor stores ────────────────────────────────────────────────────────────
+// Liquor isn't sold on Zomato, Bistro or Blinkit, so the bottles are bought at a
+// shop: this opens "liquor store near me" in the Google Maps app (browser if absent).
+export const MAPS = { name: "Google Maps", pkg: "com.google.android.apps.maps" };
+export const LIQUOR_STORES_URL = "https://www.google.com/maps/search/?api=1&query=liquor+store+near+me";
+export const findLiquorStores = () => open(LIQUOR_STORES_URL, MAPS.pkg, LIQUOR_STORES_URL);

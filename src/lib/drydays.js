@@ -46,7 +46,7 @@ export function dryDaysFor(citySlug, custom = []) {
     ...NATIONAL.map(([date, name]) => ({ date, name, level: "national" })),
     ...OFTEN.map(([date, name]) => ({ date, name, level: "often" })),
     ...STATE_DAYS.filter(([, , states]) => state && states.includes(state)).map(([date, name]) => ({ date, name, level: "state" })),
-    ...custom.map((c) => ({ date: c.date, name: c.name || "Dry day", level: "custom" })),
+    ...(custom || []).filter((c) => c?.date).map((c) => ({ date: c.date, name: c.name || "Dry day", level: "custom" })),
   ].sort((a, b) => a.date.localeCompare(b.date));
 }
 
@@ -88,3 +88,20 @@ export function lastShoppingDay(date, citySlug, custom = []) {
 
 export const confirmUrl = (date, citySlug) =>
   `https://www.google.com/search?q=${encodeURIComponent(`dry day ${prettyDate(date, { day: "numeric", month: "long", year: "numeric" })} ${stateOf(citySlug) || ""}`)}`;
+
+// The state's own list for the year (excise departments publish it, often quarterly).
+export const stateListUrl = (citySlug, year = new Date().getFullYear()) =>
+  `https://www.google.com/search?q=${encodeURIComponent(`${stateOf(citySlug) || "India"} dry days list ${year}`)}`;
+
+// ── Dry days you add yourself ────────────────────────────────────────────────
+// Returns the same array when there's nothing to add (no date, or already listed),
+// so the caller can tell a duplicate apart.
+export function addCustomDry(list = [], date, name) {
+  if (!date) return list;
+  const entry = { date, name: String(name || "").trim() || "Dry day" };
+  if ((list || []).some((d) => d?.date === entry.date && (d.name || "Dry day") === entry.name)) return list;
+  return [...(list || []), entry].filter((d) => d?.date).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export const removeCustomDry = (list = [], date, name) =>
+  (list || []).filter((d) => !(d?.date === date && (d.name || "Dry day") === name));

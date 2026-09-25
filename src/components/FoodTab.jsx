@@ -3,6 +3,8 @@ import { Stepper, Qty } from "./Sheet.jsx";
 import DishSheet from "./DishSheet.jsx";
 import MenuSheet from "./MenuSheet.jsx";
 import GrocerySheet from "./GrocerySheet.jsx";
+import DryDayBanner from "./DryDayBanner.jsx";
+import { todayISO } from "../lib/drydays.js";
 import {
   APPETITE, COURSES, GROCERIES, GROUPS, MIXERS, BISTRO_ITEMS, groceryNeeds, packsFor, formatAmount, suggestDishes, blinkitQuery,
 } from "../lib/food.js";
@@ -16,7 +18,7 @@ import { Icon, Ring, VegMark } from "./Art.jsx";
 const DISH_TINT = { starter: ["#b8452a", "#3a130c"], main: ["#b07a1c", "#3a2608"], dessert: ["#b03a6e", "#3a0c22"] };
 const slimRest = (r) => ({ resId: r.resId, name: r.name, appLink: r.appLink, orderUrl: r.orderUrl, rating: r.rating, deliveryTime: r.deliveryTime, locality: r.locality, costText: r.costText, costForOne: r.costForOne, img: r.img, distance: r.distance, cuisines: r.cuisines });
 
-export default function FoodTab({ city, loc, locating, onLocate, party, setParty, plan, liquorCats, foodCart, upsertFood, removeFood, goToCart, toast }) {
+export default function FoodTab({ city, loc, locating, onLocate, party, setParty, plan, liquorCats, foodCart, upsertFood, removeFood, goToCart, toast, customDry }) {
   const [provider, setProvider] = useState("zomato");
   const [course, setCourse] = useState("starter");
   const [dishOpen, setDishOpen] = useState(null);
@@ -113,7 +115,17 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
 
       {/* ── Party ── */}
       <div className="card fade-up">
-        <div className="card-title"><span className="kicker">Tonight's party</span><span className="tiny muted">{plan.drinkers} drinking · {Math.round(party.vegPct)}% veg</span></div>
+        <div className="card-title"><span className="kicker">{party.date === todayISO() ? "Tonight's party" : "The party"}</span><span className="tiny muted">{plan.drinkers} drinking · {Math.round(party.vegPct)}% veg</span></div>
+        <div className="field" style={{ marginBottom: 14 }}>
+          <label>Party name</label>
+          <input className="input" value={party.name || ""} maxLength={60} placeholder="House party" aria-label="Party name" onChange={(e) => set("name")(e.target.value)} />
+        </div>
+        <div className="form-grid" style={{ marginBottom: 14 }}>
+          {/* An emptied date/time is ignored: dry days, reminders and the invite all need one. */}
+          <div className="field"><label>Date</label><input type="date" className="input bar-date" aria-label="Party date" value={party.date || ""} min={todayISO()} onChange={(e) => e.target.value && set("date")(e.target.value)} /></div>
+          <div className="field"><label>Time</label><input type="time" className="input bar-date" aria-label="Party time" value={party.time || ""} onChange={(e) => e.target.value && set("time")(e.target.value)} /></div>
+        </div>
+        <DryDayBanner date={party.date} city={city} customDry={customDry} style={{ marginBottom: 14 }} />
         <div className="form-grid">
           <div className="field"><label>Guests</label><Stepper value={party.guests} onChange={set("guests")} min={1} max={500} /></div>
           <div className="field"><label>Hours</label><Stepper value={party.hours} onChange={set("hours")} min={1} max={12} /></div>
