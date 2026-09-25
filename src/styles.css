@@ -515,6 +515,27 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px;
 /* (end bar) */
 
 /* ── v1.3 · Split, invite & reminders ────────────────────────────────────── */
+/* Split the bill: one big share tile, or drinkers | non-drinkers side by side */
+.share-amounts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.share-amounts.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.share-amt { background: rgba(0, 0, 0, .3); border: 1px solid var(--stroke); border-radius: 18px; padding: 12px 12px 11px; text-align: center; min-width: 0; }
+.share-amt .kicker { letter-spacing: 1.6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.share-amt .v { font-family: var(--display); font-size: 32px; font-weight: 700; line-height: 1.2; margin: 4px 0 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.share-btn-wa { background: linear-gradient(135deg, #5be58c, #25d366 55%, #149a50); color: #062812; box-shadow: 0 10px 24px rgba(37, 211, 102, .25); }
+
+/* Invite preview (4:5, like the 1080×1350 image) */
+.share-invite { display: flex; justify-content: center; }
+.share-invite-img { width: 100%; max-width: 320px; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 18px; border: 1px solid var(--stroke-2); box-shadow: 0 16px 36px rgba(0, 0, 0, .45); }
+
+/* Reminders list */
+.share-rem-when { width: 72px; flex-shrink: 0; }
+.share-passed { background: var(--panel-2); color: var(--dim); }
+
+/* "Party moved — move your reminders?" — a .minicart-style card, raised above the Food tab's mini-cart */
+@keyframes share-rise { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.share-ask { bottom: calc(var(--safe-bottom) + var(--nav-h) + 92px); z-index: 56; flex-wrap: wrap; padding: 12px 12px 12px 16px; animation: share-rise .3s cubic-bezier(.2, .8, .2, 1) both; }
+.share-ask > svg { flex-shrink: 0; }
+.share-ask-actions { display: flex; justify-content: flex-end; gap: 8px; width: 100%; }
 
 /* (end share) */
 
