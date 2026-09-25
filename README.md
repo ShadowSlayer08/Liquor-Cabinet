@@ -67,6 +67,8 @@ src/
   lib/order.js            Zomato / Bistro / Blinkit hand-off, checklist notification, haptics
 android/                  Capacitor Android project (ExternalAppPlugin opens Zomato / Bistro / Blinkit)
 resources/logo-mark.svg   the logo; `npm run icons` renders every icon + splash from it
+docs/                     HANDOFF.md (status + v1.3 plan), RESEARCH.md (data sources), original JSX, screenshots
+CLAUDE.md                 guide for Claude Code sessions
 tests/                    calculator tests + live parser tests
 release/                  the built APK
 ```
