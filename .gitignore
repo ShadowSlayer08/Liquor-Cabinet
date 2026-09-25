@@ -12,3 +12,6 @@ release/*.zip
 # Local-only: raw session logs and the hand-off bundle's readme
 session-transcript/
 HOW-TO-BUILD.txt
+
+# Claude Code local state (worktrees, launch config)
+.claude/
