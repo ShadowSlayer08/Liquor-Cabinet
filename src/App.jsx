@@ -110,7 +110,12 @@ export default function App() {
     });
     return () => { sub.then((s) => s.remove()); };
   }, [tab]);
-  useEffect(() => onChecklistTap(() => { setCartView("food"); setTab("cart"); }), []);
+  // Order checklists open Cart → Food; reminders name their tab ({ tab, view }).
+  useEffect(() => onChecklistTap((x) => {
+    if (x?.tab === "food") setTab("food");
+    else { setCartView(x?.view || "food"); setTab("cart"); }
+    window.scrollTo({ top: 0 });
+  }), []);
 
   const toast = useCallback((msg) => {
     setToastMsg(msg);
