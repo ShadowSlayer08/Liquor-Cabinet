@@ -293,7 +293,7 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
           })}
           <button className="btn btn-blinkit btn-block" style={{ marginTop: 14 }} onClick={fillGroceries}><Icon.plus size={16} /> Add all supplies to cart</button>
           <div className="tiny dim" style={{ marginTop: 8, textAlign: "center" }}>
-            {Object.entries(plan.mixerMl).filter(([, v]) => v).map(([k, v]) => `${MIXERS[k].label} ${formatAmount(v, "ml")}`).join(" · ") || "No mixers needed"} · prices ≈ MRP{neededGroceries.some((g) => chosen(g).live) ? ", live where marked" : ""}
+            {Object.keys(MIXERS).filter((k) => needs[k] > 0).map((k) => `${MIXERS[k].label} ${formatAmount(needs[k], "ml")}`).join(" · ") || "No mixers needed"} · prices ≈ MRP{neededGroceries.some((g) => chosen(g).live) ? ", live where marked" : ""}
           </div>
         </div>
       </div>

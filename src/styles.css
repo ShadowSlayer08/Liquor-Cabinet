@@ -190,6 +190,7 @@ img { display: block; }
 
 .seg { display: flex; background: rgba(0, 0, 0, .28); border: 1px solid var(--stroke); border-radius: 14px; padding: 4px; gap: 4px; }
 .seg button { flex: 1; min-width: 0; padding: 9px 6px; border-radius: 10px; font-size: 12.5px; font-weight: 500; color: var(--muted); transition: all .2s; }
+.form-grid .seg button { flex: 1 1 auto; padding: 9px 1px; font-size: 12px; letter-spacing: -.2px; } /* 3 options in a half-width column (Appetite) */
 .seg button.on { background: var(--grad-gold); color: #231404; font-weight: 700; box-shadow: 0 4px 12px rgba(231, 168, 70, .25); }
 
 .pill { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; padding: 3px 8px; border-radius: 999px; font-weight: 600; white-space: nowrap; }
