@@ -23,6 +23,11 @@ export class HttpError extends Error {
 }
 
 export const isNative = () => Capacitor.isNativePlatform();
+// "android" | "ios" | "web". Some features exist on one phone OS only (e.g. the floating
+// checklist bubble — iOS doesn't let apps draw over other apps).
+export const platform = () => Capacitor.getPlatform();
+export const isAndroid = () => platform() === "android";
+export const isIOS = () => platform() === "ios";
 
 // `cookie` ("a=1; b=2") must reach the site as cookies.
 //  • Natively, Capacitor routes every request through the app's shared cookie

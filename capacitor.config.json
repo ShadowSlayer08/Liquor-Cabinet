@@ -5,6 +5,10 @@
   "android": {
     "backgroundColor": "#070504"
   },
+  "ios": {
+    "backgroundColor": "#070504",
+    "contentInset": "never"
+  },
   "plugins": {
     "CapacitorHttp": {
       "enabled": false
