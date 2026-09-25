@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:allowBackup="true"
@@ -45,6 +46,11 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Floating order checklist over Zomato / Bistro / Blinkit ("Display over other apps", opt-in from the Plan tab). -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- The in-app browser library (Zomato sign-in) asks for camera and microphone for web pages that
+         want them. Zomato's sign-in doesn't, and a party planner has no business holding them. -->
+    <uses-permission android:name="android.permission.CAMERA" tools:node="remove" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" tools:node="remove" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" tools:node="remove" />
 
     <!-- Lets the app check whether Blinkit / Zomato / Bistro are installed and launch them (Android 11+ package visibility). -->
     <queries>

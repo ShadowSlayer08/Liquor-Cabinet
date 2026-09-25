@@ -26,7 +26,7 @@ Repo: **https://github.com/ShadowSlayer08/liquor-cabinet** (public, pushed at th
 9. **Live Blinkit prices (beta)** — `WebRenderPlugin` (hidden WebView *underneath* the app's WebView, kept VISIBLE so Chromium doesn't throttle it) + `lib/blinkitLive.js` (`CARD_SCRIPT` + pure parser). The card-finding logic was checked against the live blinkit.com page in a real browser: price and ADD share a row, so the script grows to the largest ancestor holding one ADD. GrocerySheet "Check live price on Blinkit (beta)"; live picks stay live in the Food tab/cart and are labelled.
 10. **Floating order bubble (beta)** — `OrderBubblePlugin` (TYPE_APPLICATION_OVERLAY, draggable gold bubble → checklist card, "Back to Liquor Cabinet", hidden while the app itself is in front); `lib/bubble.js`; Plan toggle requests "display over other apps"; Cart hand-offs show it alongside the notification.
 
-Also: minSdk 26 (Android 8.0 — `@capacitor/inappbrowser` needs it); `npm test` uses a glob and `npm run apk` runs Gradle via `scripts/gradle.mjs` (both broke on Windows before).
+Also: minSdk 26 (Android 8.0 — `@capacitor/inappbrowser` needs it; its camera/microphone permissions are stripped in AndroidManifest.xml); `npm test` uses a glob and `npm run apk` runs Gradle via `scripts/gradle.mjs` (both broke on Windows before).
 
 ## How it was checked
 
