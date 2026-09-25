@@ -4,7 +4,10 @@ import { STALE_MS } from "../lib/sources.js";
 import { fmt, fmtShort, ageStr } from "../lib/format.js";
 import ProductCard, { BottleStage, TierPill } from "./ProductCard.jsx";
 import ProductSheet from "./ProductSheet.jsx";
+import DryDayBanner from "./DryDayBanner.jsx";
+import { MixableChip } from "./BarTab.jsx";
 import { Bottle, CatBottle, Icon } from "./Art.jsx";
+import { findLiquorStores } from "../lib/order.js";
 
 const greeting = () => {
   const h = new Date().getHours();
@@ -14,6 +17,7 @@ const greeting = () => {
 export default function CabinetTab({
   city, loc, catalog, ages, activeCat, setActiveCat, qtyOf, addItem, remItem, budgetLeft, openScraper,
   plan, spent, budget, bottles, onPairing,
+  party, liquorCats = [], customDry, onBar,
 }) {
   const [tierF, setTierF] = useState("All");
   const [origF, setOrigF] = useState("All");
@@ -75,6 +79,11 @@ export default function CabinetTab({
         <div className="progress" style={{ position: "relative", zIndex: 1, marginTop: 12 }}>
           <div style={{ width: `${pct * 100}%`, background: pct > 0.92 ? "var(--red)" : "var(--grad-gold)" }} />
         </div>
+        <div className="bar-hero-row">
+          <MixableChip liquorCats={liquorCats} onClick={onBar} />
+          <button className="chip bar-chip" onClick={findLiquorStores}><Icon.pin size={14} /> Find a store</button>
+        </div>
+        <DryDayBanner compact date={party?.date} city={city} customDry={customDry} style={{ marginTop: 10 }} />
       </section>
 
       {/* ── Categories ── */}

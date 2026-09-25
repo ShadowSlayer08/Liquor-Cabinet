@@ -107,3 +107,41 @@ export function servingsByFamily(menu = []) {
   for (const m of menu) { const c = COCKTAIL[m.id]; if (c) out[c.needs[0]] = (out[c.needs[0]] || 0) + (m.servings || 0); }
   return out;
 }
+
+// ── Bar tab ──────────────────────────────────────────────────────────────────
+// Filter chips: every tag in the order it first appears.
+export const TAGS = [...new Set(COCKTAILS.flatMap((c) => c.tags))];
+
+// The Bar grid: what you can make first (recipe order kept), then the rest.
+export function barList(catIds = [], tag = null) {
+  const all = makeable(catIds).filter((c) => !tag || c.tags.includes(tag));
+  return [...all.filter((c) => c.can), ...all.filter((c) => !c.can)];
+}
+
+// The party menu as cocktails. Old or unknown ids and empty entries are skipped;
+// a cocktail listed twice is counted once with both servings (as cocktailUses does).
+export function menuSummary(menu = []) {
+  const byId = new Map();
+  for (const m of menu || []) {
+    if (!m || !COCKTAIL[m.id] || !(m.servings > 0)) continue;
+    byId.set(m.id, (byId.get(m.id) || 0) + m.servings);
+  }
+  const items = [...byId].map(([id, servings]) => ({ ...COCKTAIL[id], servings }));
+  return { items, total: items.reduce((s, c) => s + c.servings, 0) };
+}
+
+// Sets a cocktail's servings on the menu; 0 takes it off. Other entries stay as they are.
+export function withServings(menu = [], id, servings) {
+  const list = (menu || []).filter(Boolean);
+  if (!(servings > 0)) return list.filter((m) => m.id !== id);
+  return list.some((m) => m.id === id) ? list.map((m) => (m.id === id ? { ...m, servings } : m)) : [...list, { id, servings }];
+}
+
+// One glass worth of a supply: "150 ml", "15 g", "¼ pc".
+const FRACTIONS = { 0.25: "¼", 0.5: "½", 0.75: "¾" };
+export function perServing(amount, unit) {
+  if (unit !== "pc") return `${amount} ${unit}`;
+  const whole = Math.floor(amount), frac = FRACTIONS[Math.round((amount - whole) * 100) / 100];
+  const n = frac ? `${whole || ""}${frac}` : String(Math.round(amount * 100) / 100);
+  return `${n} ${amount > 1 ? "pcs" : "pc"}`;
+}
