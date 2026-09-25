@@ -66,7 +66,7 @@ export function splitMessage({ party, result, include, host, vpa }) {
   const when = prettyWhen(party);
   const lines = [
     `🎉 *${name}*${when ? ` — ${when}` : ""}`,
-    `Splitting ${fmt(result.total)} (${includedLabel(include)}) between ${result.people} of us.`,
+    `Splitting about ${fmt(result.total)} (${includedLabel(include)}, at planned prices) between ${result.people} of us.`,
   ];
   if (rows.length > 1) lines.push("Drinks are split among the drinkers only.");
   lines.push("");
@@ -74,6 +74,8 @@ export function splitMessage({ party, result, include, host, vpa }) {
     lines.push(r.amount > 0 ? `${r.emoji} ${r.label} (${r.count}): *${fmt(r.amount)}* each` : `${r.emoji} ${r.label} (${r.count}): nothing to pay`);
     if (pay && r.amount > 0) lines.push(`Pay ${fmt(r.amount)}: ${upiLink({ vpa, name: who, amount: r.amount, note: name })}`);
   }
+  // Livcheers prices are indicative and Zomato/Blinkit add taxes & delivery, so the shares are an estimate.
+  lines.push("", "Based on planned prices — any difference gets settled after the party.");
   if (pay) lines.push("", `UPI ID: ${vpa.trim()}${who ? ` (${who})` : ""}`);
   else if (who) lines.push("", `Pay ${who} 🙏`);
   return lines.join("\n");

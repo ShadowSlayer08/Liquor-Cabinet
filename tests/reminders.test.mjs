@@ -21,7 +21,7 @@ test("party date & time helpers", () => {
 });
 
 test("reminders are timed off the party start", () => {
-  const list = buildReminders(party, "delhi", []);
+  const list = buildReminders(party, "delhi", [], new Date("2027-06-01T09:00:00").getTime());   // a fixed "now"
   assert.deepEqual(list.map((r) => r.key), ["stock", "chill", "blinkit", "starters", "dinner"]);
   assert.deepEqual(list.map((r) => r.id), [0, 1, 2, 3, 4].map((i) => BASE_ID + i));
   assert.equal(mins(list, "stock"), -24 * 60 - 120);
@@ -30,6 +30,7 @@ test("reminders are timed off the party start", () => {
   assert.equal(mins(list, "starters"), -40);
   assert.equal(mins(list, "dinner"), 90);        // max(90, 4 h / 2 − 45 min)
   assert.ok(list.every((r) => r.past === false));
+  assert.ok(buildReminders(party, "delhi", [], new Date("2027-06-12T19:00:00").getTime()).find((r) => r.key === "stock").past);
   assert.equal(buildReminders({ ...party, dinner: false }, "delhi").length, 4);
   assert.deepEqual(buildReminders({ ...party, date: null }, "delhi"), []);
 });
@@ -82,4 +83,27 @@ test("reminder state: scheduled, moved, dirty, ask once, expired", () => {
   assert.equal(reminderState(set, { ...party, date: "2027-06-19" }, null, "2027-06-13").scheduled, false);
   assert.equal(reminderState(set, { ...party, date: "2027-06-19" }, null, "2027-06-13").ask, false);
   assert.equal(reminderState(undefined, party).scheduled, false);
+});
+
+test("a dry day before the party moves the shopping reminder off it", () => {
+  const at = (p) => buildReminders(p, "delhi", []).find((r) => r.key === "stock");
+  // Sat 3 Oct 2026 at 8 pm: Fri 2 Oct is Gandhi Jayanti → shop on the party morning instead.
+  const eve = at({ ...party, date: "2026-10-03" });
+  assert.equal(eve.at.getTime(), new Date("2026-10-03T11:00:00").getTime());
+  assert.match(eve.body, /Gandhi Jayanti — liquor shops will be shut\. Pick up your bottles this morning/);
+  // A lunch party leaves no time that morning → the last open day before the dry day.
+  const lunch = at({ ...party, date: "2026-10-03", time: "12:30" });
+  assert.equal(lunch.at.getTime(), new Date("2026-10-01T12:00:00").getTime());
+  assert.match(lunch.body, /Buy your bottles today/);
+  // Your own dry day counts too.
+  const own = buildReminders({ ...party, date: "2027-06-12" }, "delhi", [{ date: "2027-06-11", name: "Election" }]).find((r) => r.key === "stock");
+  assert.equal(own.at.getTime(), new Date("2027-06-12T11:00:00").getTime());
+  assert.match(own.body, /a dry day \(Election\)/);
+});
+
+test("festival dry days are worded as 'often', not certain", () => {
+  const diwali = buildReminders({ ...party, date: "2026-11-08" }, "mumbai", []).find((r) => r.key === "stock");
+  assert.match(diwali.body, /Diwali — often a dry day in Maharashtra, so shops may be shut/);
+  const gj = buildReminders({ ...party, date: "2027-10-02" }, "delhi", []).find((r) => r.key === "stock");
+  assert.match(gj.body, /liquor shops will be shut/);
 });

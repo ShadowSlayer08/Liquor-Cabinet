@@ -32,7 +32,7 @@ export default function CocktailSheet({ cocktail: c, servings, suggested, plan, 
   );
 
   return (
-    <Sheet title={c.name} subtitle={`${c.glass} glass · ${c.spirit}`} onClose={onClose} footer={footer}>
+    <Sheet title={c.name} subtitle={`${/glass|mug/i.test(c.glass) ? c.glass : `${c.glass} glass`} · ${c.spirit}`} onClose={onClose} footer={footer}>
       <div className="bar-sheet-hero" style={{ "--c": c.color }}>
         <span className="bar-glow bar-glow-lg"><span className="bar-emoji">{c.emoji}</span></span>
         <div className="row wrap" style={{ gap: 6, justifyContent: "center" }}>
@@ -71,7 +71,7 @@ export default function CocktailSheet({ cocktail: c, servings, suggested, plan, 
       {c.can && (
         <div className="card">
           <div className="field"><label>Servings for the party</label><Stepper value={n} onChange={setN} min={1} max={500} /></div>
-          <div className="tiny muted" style={{ marginTop: 8 }}>{plan.drinkers} drinkers · {plan.needed} drinks planned over {plan.hours} h</div>
+          <div className="tiny muted" style={{ marginTop: 8 }}>{plan.drinkers} {plan.drinkers === 1 ? "drinker" : "drinkers"} · {plan.needed} {plan.needed === 1 ? "drink" : "drinks"} planned over {plan.hours} h</div>
           {totals.length > 0 && (
             <>
               <div className="kicker" style={{ margin: "14px 0 8px" }}>For {n} you'll need</div>

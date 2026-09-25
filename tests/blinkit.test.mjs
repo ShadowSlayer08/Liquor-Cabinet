@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { extractProducts, packAmount, liveOption, CARD_SCRIPT, PACK_RE } from "../src/lib/blinkitLive.js";
-import { packsFor } from "../src/lib/food.js";
+import { packsFor, GROCERY } from "../src/lib/food.js";
 
 // Card texts the way innerText reads Blinkit's search results (one element per line).
 const CARDS = [
@@ -52,7 +52,7 @@ test("pack sizes in the grocery's unit", () => {
 test("live results become grocery options", () => {
   const p = liveOption({ name: "Kinley Club Soda", price: 20, pack: "750 ml", img: null }, "ml");
   assert.deepEqual(p, {
-    id: "live-kinley-club-soda", name: "Kinley Club Soda", packText: "750 ml", price: 20,
+    id: "live-kinley-club-soda-750-ml", name: "Kinley Club Soda", packText: "750 ml", price: 20,
     pack: { count: 1, amount: 750, unit: "ml" }, blinkit: "Kinley Club Soda", img: null, live: true,
   });
   assert.equal(packsFor(3000, p), 4);
@@ -160,4 +160,28 @@ test("real Blinkit card texts (captured 25 Sep 2026)", () => {
   assert.equal(liveOption(got[2], "ml").pack.amount, 2160);
   assert.equal(liveOption(got[4], "ml").pack.amount, 1000);
   assert.equal(got.every((p) => p.img === null), true);   // images lazy-load after the text
+});
+
+test("sizes of one product stay separate; the pack line beats a size in the name", () => {
+  const cards = [
+    "8 MINS\nBisleri Packaged Drinking Water\n1 l\n₹20\nADD",
+    "8 MINS\nBisleri Packaged Drinking Water\n5 l\n₹80\nADD",
+    "8 MINS\nBisleri Packaged Drinking Water\n5 l\n₹80\nADD",          // an exact repeat still collapses
+    "8 MINS\nParty Cups 200 ml\n50 pcs\n₹99\nADD",
+  ].map((text) => ({ text }));
+  const got = extractProducts(cards);
+  assert.deepEqual(got.map((p) => [p.name, p.pack]), [
+    ["Bisleri Packaged Drinking Water", "1 l"], ["Bisleri Packaged Drinking Water", "5 l"], ["Party Cups 200 ml", "50 pcs"],
+  ]);
+  const ids = got.map((p) => liveOption(p, "ml").id);
+  assert.equal(new Set(ids).size, 3);
+  assert.equal(liveOption(got[2], "pc").pack.amount, 50);
+});
+
+test("packs sold by weight convert to the pieces the plan counts", () => {
+  const lemon = GROCERY.limes.options[0];                               // "250 g (~5 pcs)", 5 pcs
+  assert.equal(liveOption({ name: "Lemon (Nimbu)", price: 45, pack: "500 g" }, "pc", lemon).pack.amount, 10);
+  assert.equal(liveOption({ name: "Lemon (Nimbu)", price: 25, pack: "250 g" }, "pc", lemon).pack.amount, 5);
+  assert.equal(liveOption({ name: "Lemon (Nimbu)", price: 45, pack: "500 g" }, "pc").pack.amount, null);   // no reference → 1 pack
+  assert.equal(liveOption({ name: "Lemon", price: 10, pack: "3 pcs" }, "pc", lemon).pack.amount, 3);
 });

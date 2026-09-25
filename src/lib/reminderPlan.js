@@ -9,28 +9,51 @@
 //    scheduledSig   what was set (keys + fire times), to spot changes since
 //    keptFor        "date time" the user chose not to move reminders to (ask once)
 // ═══════════════════════════════════════════════════════════════════════════════
-import { dryDayOn, lastShoppingDay, prettyDate, todayISO } from "./drydays.js";
+import { dryDayOn, lastShoppingDay, prettyDate, stateOf, todayISO } from "./drydays.js";
 import { partyStart, partyWhen } from "./when.js";
 
 export const BASE_ID = 8100;
 
+// "Fri, 2 Oct is Gandhi Jayanti — liquor shops will be shut." Only national and
+// your own dry days are certain; festival/state days are "often" dry (lib/drydays.js).
+export function dryNote(dry, date, citySlug) {
+  const d = prettyDate(date);
+  if (dry.level === "national") return `${d} is ${dry.name} — liquor shops will be shut.`;
+  if (dry.level === "custom") return `${d} is a dry day${dry.name && dry.name !== "Dry day" ? ` (${dry.name})` : ""} — liquor shops will be shut.`;
+  return `${d} is ${dry.name} — often a dry day in ${stateOf(citySlug) || "many states"}, so shops may be shut.`;
+}
+
+// When to buy the bottles: the day before, unless the party day or the day before is dry.
+function stockReminder(party, citySlug, customDry, at) {
+  const dry = dryDayOn(party.date, citySlug, customDry);
+  if (dry) {
+    const day = lastShoppingDay(party.date, citySlug, customDry);
+    return { at: new Date(`${day}T12:00:00`), body: `${dryNote(dry, party.date, citySlug)} Buy your bottles today.` };
+  }
+  const eveAt = at(-24 * 60 - 120), eve = todayISO(eveAt);
+  const eveDry = eve !== party.date ? dryDayOn(eve, citySlug, customDry) : null;
+  if (!eveDry) return { at: eveAt, body: "Pick up the bottles on your Liquor Cabinet list." };
+  // Shops are shut the day before: buy on the party morning if there's time, else the last open day.
+  const morning = new Date(`${party.date}T11:00:00`);
+  if (morning <= at(-180)) return { at: morning, body: `${dryNote(eveDry, eve, citySlug)} Pick up your bottles this morning.` };
+  const day = lastShoppingDay(eve, citySlug, customDry);
+  return { at: new Date(`${day}T12:00:00`), body: `${dryNote(eveDry, eve, citySlug)} Buy your bottles today.` };
+}
+
 // Every reminder the party could use, with its fire time.
-export function buildReminders(party, citySlug, customDry = []) {
+export function buildReminders(party, citySlug, customDry = [], now = Date.now()) {
   const start = partyStart(party);
   if (!start) return [];
   const at = (mins) => new Date(start.getTime() + mins * 60000);
-  const dry = dryDayOn(party.date, citySlug, customDry);
-  const buyDay = dry ? lastShoppingDay(party.date, citySlug, customDry) : null;
-  const stockAt = buyDay ? new Date(`${buyDay}T12:00:00`) : at(-24 * 60 - 120);
+  const stock = stockReminder(party, citySlug, customDry, at);
   const list = [
-    { key: "stock", title: "🥃 Stock the bar today",
-      body: dry ? `${prettyDate(party.date)} is ${dry.name} — shops will be shut. Buy your bottles today.` : "Pick up the bottles on your Liquor Cabinet list.", at: stockAt },
+    { key: "stock", title: "🥃 Stock the bar today", body: stock.body, at: stock.at },
     { key: "chill", title: "🧊 Chill the beer & wine", body: "Into the fridge now so they're cold by party time.", at: at(-180) },
     { key: "blinkit", title: "🛒 Order mixers, ice & munchies", body: "Your Blinkit list is ready in Liquor Cabinet.", at: at(-75) },
     { key: "starters", title: "🍢 Order the starters", body: "Send your Zomato / Bistro order so it lands as guests arrive.", at: at(-40) },
   ];
   if (party.dinner) list.push({ key: "dinner", title: "🍛 Time to order dinner", body: "Mains take ~45 min — order now from your Zomato cart.", at: at(Math.max(90, (party.hours * 60) / 2 - 45)) });
-  return list.map((r, i) => ({ ...r, id: BASE_ID + i, past: r.at.getTime() < Date.now() }));
+  return list.map((r, i) => ({ ...r, id: BASE_ID + i, past: r.at.getTime() < now }));
 }
 
 export const isOn = (enabled, key) => (enabled || {})[key] !== false;

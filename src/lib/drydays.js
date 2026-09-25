@@ -7,7 +7,8 @@
 //    often    — big festivals many states notify as dry (check your state)
 //    state    — fixed state days (e.g. Maharashtra Day)
 //    custom   — days you add yourself (e.g. an announced election ban)
-//  Festival dates from the Hindu panchang / public calendars (2026–2027).
+//  National days repeat every year; festival dates (Hindu panchang / public
+//  calendars) move, so OFTEN / STATE_DAYS cover 2026–2027 and need a yearly update.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const CITY_STATE = {
@@ -20,11 +21,8 @@ export const CITY_STATE = {
   warangal: "Telangana",
 };
 
-const NATIONAL = [
-  ["2026-01-26", "Republic Day"], ["2026-08-15", "Independence Day"], ["2026-10-02", "Gandhi Jayanti"],
-  ["2027-01-26", "Republic Day"], ["2027-08-15", "Independence Day"], ["2027-10-02", "Gandhi Jayanti"],
-  ["2028-01-26", "Republic Day"],
-];
+const NATIONAL = [["01-26", "Republic Day"], ["08-15", "Independence Day"], ["10-02", "Gandhi Jayanti"]];
+const yearOf = (iso) => Number(String(iso).slice(0, 4));
 
 const OFTEN = [
   ["2026-10-20", "Dussehra"], ["2026-11-08", "Diwali"], ["2026-11-24", "Guru Nanak Jayanti"],
@@ -40,10 +38,12 @@ const STATE_DAYS = [
 
 export const stateOf = (citySlug) => CITY_STATE[citySlug] || null;
 
-export function dryDaysFor(citySlug, custom = []) {
+// Every known dry day for the city; national days for `years` (default: last year to two years out).
+export function dryDaysFor(citySlug, custom = [], years = null) {
   const state = stateOf(citySlug);
+  const y = yearOf(todayISO());
   return [
-    ...NATIONAL.map(([date, name]) => ({ date, name, level: "national" })),
+    ...(years || [y - 1, y, y + 1, y + 2]).flatMap((yr) => NATIONAL.map(([md, name]) => ({ date: `${yr}-${md}`, name, level: "national" }))),
     ...OFTEN.map(([date, name]) => ({ date, name, level: "often" })),
     ...STATE_DAYS.filter(([, , states]) => state && states.includes(state)).map(([date, name]) => ({ date, name, level: "state" })),
     ...(custom || []).filter((c) => c?.date).map((c) => ({ date: c.date, name: c.name || "Dry day", level: "custom" })),
@@ -54,12 +54,13 @@ export function dryDaysFor(citySlug, custom = []) {
 const RANK = { national: 0, custom: 1, state: 2, often: 3 };
 export function dryDayOn(date, citySlug, custom = []) {
   if (!date) return null;
-  const hits = dryDaysFor(citySlug, custom).filter((d) => d.date === date);
+  const hits = dryDaysFor(citySlug, custom, [yearOf(date)]).filter((d) => d.date === date);
   return hits.sort((a, b) => RANK[a.level] - RANK[b.level])[0] || null;
 }
 
 export function upcomingDryDays(citySlug, custom = [], fromDate = todayISO(), n = 6) {
-  return dryDaysFor(citySlug, custom).filter((d) => d.date >= fromDate).slice(0, n);
+  const y = yearOf(fromDate);
+  return dryDaysFor(citySlug, custom, [y, y + 1, y + 2]).filter((d) => d.date >= fromDate).slice(0, n);
 }
 
 export function todayISO(d = new Date()) {

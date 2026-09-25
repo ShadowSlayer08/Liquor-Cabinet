@@ -87,3 +87,10 @@ test("state dry-day list link names the state", () => {
   assert.ok(decodeURIComponent(stateListUrl("pune", 2026)).includes("Maharashtra dry days list 2026"));
   assert.ok(decodeURIComponent(stateListUrl("nowhere", 2027)).includes("India dry days list 2027"));
 });
+
+test("national dry days repeat every year", async () => {
+  const { dryDayOn, upcomingDryDays } = await import("../src/lib/drydays.js");
+  assert.equal(dryDayOn("2031-08-15", "pune").level, "national");
+  assert.equal(dryDayOn("2029-01-26", "kolkata").name, "Republic Day");
+  assert.equal(upcomingDryDays("delhi", [], "2030-09-01", 1)[0].date, "2030-10-02");
+});

@@ -69,7 +69,8 @@ test("split message", () => {
   const msg = splitMessage({ party, result, include, host: "Rish", vpa: "rish@okhdfc" });
   assert.match(msg, /\*Diwali bash\*/);
   assert.match(msg, /8:30 pm/);
-  assert.match(msg, /Splitting ₹12,000 \(liquor, food & supplies\) between 10 of us/);
+  assert.match(msg, /Splitting about ₹12,000 \(liquor, food & supplies, at planned prices\) between 10 of us/);
+  assert.match(msg, /Based on planned prices/);
   assert.match(msg, /Drinkers \(8\): \*₹1,400\* each/);
   assert.match(msg, /Non-drinkers \(2\): \*₹400\* each/);
   assert.match(msg, /Pay ₹1,400: upi:\/\/pay\?pa=rish%40okhdfc&pn=Rish&am=1400\.00/);
@@ -82,7 +83,7 @@ test("split message", () => {
   const onlyLiquor = splitBill({ ...totals, people: 4, drinkers: 2, mode: "fair", include: { food: false, supplies: false } });
   const m2 = splitMessage({ party: { name: " " }, result: onlyLiquor, include: { food: false, supplies: false }, host: "", vpa: "rish@okhdfc" });
   assert.match(m2, /\*House party\*/);
-  assert.match(m2, /\(liquor\)/);
+  assert.match(m2, /\(liquor, at planned prices\)/);
   assert.match(m2, /Non-drinkers \(2\): nothing to pay/);
   assert.equal((m2.match(/upi:\/\//g) || []).length, 1);
 });

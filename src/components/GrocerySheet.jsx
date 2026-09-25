@@ -23,7 +23,7 @@ export default function GrocerySheet({ grocery, need, selectedId, onPick, onClos
     setLive("loading");
     try {
       const items = await blinkitLive(query);
-      if (id === run.current) setLive({ options: items.map((it) => liveOption(it, grocery.unit)), at: Date.now() });
+      if (id === run.current) setLive({ options: items.map((it) => liveOption(it, grocery.unit, grocery.options[0])), at: Date.now() });
     } catch (e) {
       console.warn("blinkitLive", e);
       if (id === run.current) setLive("failed");

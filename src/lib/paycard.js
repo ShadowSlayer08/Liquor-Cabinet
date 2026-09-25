@@ -83,7 +83,7 @@ export async function drawPayCard({ title, when, host, vpa, rows, result, includ
     } });
 
     blocks.push({ h: 50, draw: (y) => { font(ctx, 600, 34); ctx.fillStyle = INK.text; ctx.textAlign = "center"; ctx.fillText(ellipsize(ctx, `UPI · ${vpa.trim()}`, CW), cx, y); } });
-    const note = `Total ${fmt(result.total)} for ${includedLabel(include)} · ${result.people} ${result.people === 1 ? "person" : "people"}${two ? " · drinks split among drinkers" : ""}`;
+    const note = `About ${fmt(result.total)} for ${includedLabel(include)} at planned prices · ${result.people} ${result.people === 1 ? "person" : "people"}${two ? " · drinks split among drinkers" : ""}`;
     font(ctx, 400, 26);
     const nl = wrapLines(ctx, note, CW, 2);
     blocks.push({ h: nl.length * 36, draw: (y) => { font(ctx, 400, 26); ctx.fillStyle = INK.muted; ctx.textAlign = "center"; nl.forEach((l, i) => ctx.fillText(l, cx, y + i * 36)); } });

@@ -92,7 +92,8 @@ export function packAmount(text, unit) {
   return null;
 }
 
-// Raw cards from CARD_SCRIPT → [{ name, price, pack, img }], deduped by name.
+// Raw cards from CARD_SCRIPT → [{ name, price, pack, img }], deduped by name + pack
+// (Blinkit keeps the size off the name, so "Bisleri … 1 L" and "… 5 L" are different options).
 // name = the card's longest line that isn't a price, "ADD", delivery time or discount;
 // price = the lowest ₹ amount on the card (the selling price — the struck-out MRP is higher).
 export function extractProducts(cards, max = 12) {
@@ -105,22 +106,37 @@ export function extractProducts(cards, max = 12) {
       .filter((n) => n > 0);
     const name = lines.filter((l) => l.length > 1 && !NOISE.some((re) => re.test(l)))
       .reduce((a, b) => (b.length > a.length ? b : a), "");
-    const key = name.toLowerCase().replace(/[^a-z0-9]+/g, "") || name; // "Coca-Cola" = "Coca Cola"
+    // The card's own pack line wins over a size mentioned in the name.
+    const pack = lines.filter((l) => l !== name).join("\n").match(PACK_RE)?.[0] || name.match(PACK_RE)?.[0] || null;
+    const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9.]+/g, ""); // "Coca-Cola" = "Coca Cola"
+    const key = `${norm(name) || name}|${norm(pack)}`;
     if (!name || !prices.length || seen.has(key)) continue;
     seen.add(key);
-    out.push({ name, price: Math.min(...prices), pack: text.match(PACK_RE)?.[0] || null, img: /^https?:\/\//.test(c?.img || "") ? c.img : null });
+    out.push({ name, price: Math.min(...prices), pack, img: /^https?:\/\//.test(c?.img || "") ? c.img : null });
     if (out.length >= max) break;
   }
   return out;
 }
 
 // A live result shaped like a GROCERIES option (lib/food.js), so the Food tab and cart treat it the same.
+// `ref` (the catalog option) converts packs sold in another unit — lemons are counted in
+// pieces but sold by weight: catalog "250 g (~5 pcs)" makes a live "500 g" about 10 pcs.
 // An unreadable pack size leaves amount null → packsFor() orders one pack.
-export function liveOption(item, unit) {
-  const slug = item.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+export function liveAmount(item, unit, ref) {
+  const own = packAmount(item.pack, unit) ?? packAmount(item.name, unit);
+  if (own != null || !ref?.pack?.amount) return own;
+  for (const u of ["g", "ml"]) {
+    const live = packAmount(item.pack, u) ?? packAmount(item.name, u), cat = packAmount(ref.packText, u) ?? packAmount(ref.name, u);
+    if (live && cat) return Math.max(1, Math.round((ref.pack.amount * live) / cat));
+  }
+  return null;
+}
+
+export function liveOption(item, unit, ref = null) {
+  const slug = `${item.name} ${item.pack || ""}`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   return {
     id: `live-${slug || encodeURIComponent(item.name)}`, name: item.name, packText: item.pack || "as on Blinkit", price: item.price,
-    pack: { count: 1, amount: packAmount(item.pack, unit) ?? packAmount(item.name, unit), unit },
+    pack: { count: 1, amount: liveAmount(item, unit, ref), unit },
     blinkit: item.name, img: item.img, live: true,
   };
 }

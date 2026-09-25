@@ -94,7 +94,7 @@ export default function BarTab({ liquorCats = [], cocktailMenu, setCocktailMenu,
           </div>
           <div className="tiny muted" style={{ marginTop: 6 }}>
             {!plan.needed ? "No drinkers in the plan yet — set guests and drinkers in the Food tab."
-              : menu.total > plan.needed ? `That's ${menu.total - plan.needed} more than the ${plan.needed} drinks planned for ${plan.drinkers} drinkers.`
+              : menu.total > plan.needed ? `That's ${menu.total - plan.needed} more than the ${plan.needed} drinks planned for ${plan.drinkers} ${plan.drinkers === 1 ? "drinker" : "drinkers"}.`
                 : `${menu.total} of the ${plan.needed} drinks planned will be cocktails — the rest get the usual mixer.`}
           </div>
           <button className="btn btn-ghost btn-sm btn-block" style={{ marginTop: 12 }} onClick={goFood}>
