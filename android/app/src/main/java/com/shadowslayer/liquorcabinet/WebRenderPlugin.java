@@ -30,7 +30,7 @@ import org.json.JSONObject;
 
 /**
  * Reads data off a web page that only answers a real browser. extract({ url, script, timeoutMs, pollMs })
- * loads `url` in an invisible, phone-sized WebView behind the app — the user's own connection, cookies
+ * loads `url` in a phone-sized WebView hidden behind the app — the user's own connection, cookies
  * and (when the app has location permission) location — then runs `script` every `pollMs` until it
  * returns something non-empty, and resolves { result: string | null, timedOut, url }.
  * Used for live Blinkit prices: blinkit.com sits behind Cloudflare, which turns plain HTTP requests away.
@@ -159,11 +159,14 @@ public class WebRenderPlugin extends Plugin {
             }
         });
 
-        // Lay the page out like a phone screen, behind the app and never drawn.
+        // Lay the page out like a phone screen, underneath the app's own (opaque) WebView. It stays
+        // VISIBLE on purpose: Chromium treats an INVISIBLE WebView as a hidden tab and throttles its
+        // timers and rendering, so a script-rendered page like Blinkit's search may never fill in.
         DisplayMetrics dm = activity.getResources().getDisplayMetrics();
         int w = root.getWidth() > 0 ? root.getWidth() : dm.widthPixels;
         int h = root.getHeight() > 0 ? root.getHeight() : dm.heightPixels;
-        web.setVisibility(View.INVISIBLE);
+        web.setVisibility(View.VISIBLE);
+        web.setClickable(false);
         web.setFocusable(false);
         web.setFocusableInTouchMode(false);
         web.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);

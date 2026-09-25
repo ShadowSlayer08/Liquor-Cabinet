@@ -33,10 +33,15 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
   const needs = useMemo(() => groceryNeeds(plan), [plan]);
   const neededGroceries = GROCERIES.filter((g) => needs[g.id] > 0);
   const lineOf = (key) => foodCart.find((l) => l.key === key);
-  const chosen = (g) => g.options.find((o) => o.id === lineOf(`b:${g.id}`)?.product.id) || g.options[0];
+  // A live Blinkit pick (GrocerySheet) isn't one of g.options, so the cart line's product is the choice.
+  const chosen = (g) => {
+    const cur = lineOf(`b:${g.id}`)?.product;
+    return g.options.find((o) => o.id === cur?.id) || (cur?.live ? cur : g.options[0]);
+  };
   const groceryLine = (g, p, qty) => ({
     key: `b:${g.id}`, kind: "blinkit", groceryId: g.id, name: g.name, emoji: g.emoji, group: g.group,
-    product: { id: p.id, name: p.name, packText: p.packText, price: p.price }, qty, query: blinkitQuery(g, p), ordered: false,
+    product: { id: p.id, name: p.name, packText: p.packText, price: p.price, pack: p.pack, ...(p.live ? { live: true, blinkit: p.blinkit } : {}) },
+    qty, query: blinkitQuery(g, p), ordered: false,
   });
   const fillGroceries = () => {
     for (const g of neededGroceries) { const p = chosen(g); upsertFood(groceryLine(g, p, packsFor(needs[g.id], p))); }
@@ -274,7 +279,7 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
                       <div className="emo" style={{ background: "rgba(248,203,70,.1)" }}>{g.emoji}</div>
                       <div className="grow">
                         <div className="between"><span className="h3">{g.name}</span><span className="small gold">{formatAmount(needs[g.id], g.unit)}</span></div>
-                        <div className="tiny muted ellipsis">{p.name} · {p.packText} × {packs}</div>
+                        <div className="tiny muted ellipsis">{p.live && <span className="nat-live">live · </span>}{p.name} · {p.packText} × {packs}</div>
                       </div>
                       <div style={{ textAlign: "right", minWidth: 60 }}>
                         <div className="small b">{fmt(p.price * packs)}</div>
@@ -288,7 +293,7 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
           })}
           <button className="btn btn-blinkit btn-block" style={{ marginTop: 14 }} onClick={fillGroceries}><Icon.plus size={16} /> Add all supplies to cart</button>
           <div className="tiny dim" style={{ marginTop: 8, textAlign: "center" }}>
-            {Object.entries(plan.mixerMl).filter(([, v]) => v).map(([k, v]) => `${MIXERS[k].label} ${formatAmount(v, "ml")}`).join(" · ") || "No mixers needed"} · prices ≈ MRP
+            {Object.entries(plan.mixerMl).filter(([, v]) => v).map(([k, v]) => `${MIXERS[k].label} ${formatAmount(v, "ml")}`).join(" · ") || "No mixers needed"} · prices ≈ MRP{neededGroceries.some((g) => chosen(g).live) ? ", live where marked" : ""}
           </div>
         </div>
       </div>

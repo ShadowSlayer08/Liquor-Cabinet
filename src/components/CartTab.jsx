@@ -222,7 +222,7 @@ export default function CartTab({
                     <div className="emo" style={{ background: "rgba(248,203,70,.1)", width: 40, height: 40, fontSize: 19 }}>{l.emoji}</div>
                     <div className="grow">
                       <div className="small b ellipsis">{l.product.name}</div>
-                      <div className="tiny muted">{l.product.packText} · {fmt(l.product.price)} × {l.qty}</div>
+                      <div className="tiny muted">{l.product.live && <span className="nat-live">live · </span>}{l.product.packText} · {fmt(l.product.price)} × {l.qty}</div>
                       <div className="row" style={{ marginTop: 6, gap: 8 }}>
                         <Qty value={l.qty} onChange={(v) => setQty(l, v)} />
                         <button className="btn btn-xs btn-blinkit" style={{ marginLeft: "auto" }} onClick={() => findOnBlinkit(l)}>Find <Icon.external size={12} /></button>
@@ -230,7 +230,7 @@ export default function CartTab({
                     </div>
                   </div>
                 ))}
-                <div className="between" style={{ marginTop: 10 }}><span className="tiny muted">Estimated (MRP)</span><b>≈ {fmt(blinkitTotal)}</b></div>
+                <div className="between" style={{ marginTop: 10 }}><span className="tiny muted">{blinkitLines.every((l) => l.product.live) ? "Live Blinkit prices" : blinkitLines.some((l) => l.product.live) ? "MRP · live where marked" : "Estimated (MRP)"}</span><b>≈ {fmt(blinkitTotal)}</b></div>
                 <button className="btn btn-blinkit btn-block" style={{ marginTop: 12 }} onClick={nextBlinkit}>
                   {blinkitLines.some((l) => l.ordered) ? "Next item on Blinkit" : "Start Blinkit run"} <Icon.external size={16} />
                 </button>

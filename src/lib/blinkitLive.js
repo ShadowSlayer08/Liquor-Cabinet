@@ -2,7 +2,7 @@
 //  LIVE BLINKIT PRICES (beta)
 //  Blinkit has no public price feed, and blinkit.com turns away anything that
 //  isn't a real browser on a home or mobile connection (Cloudflare 403). So on
-//  the phone the app opens Blinkit's search page in an invisible WebView
+//  the phone the app opens Blinkit's search page in a WebView hidden behind the app
 //  (android/…/WebRenderPlugin.java) — your own connection, cookies and location —
 //  and a small script copies the text of each product card off the page.
 //  The card text is parsed here, in pure functions (tests/blinkit.test.mjs), so a
