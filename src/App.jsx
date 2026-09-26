@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { App as CapApp } from "@capacitor/app";
 import { CATEGORIES, CITIES, cityName } from "./lib/parse/livcheers.js";
 import { loadCachedCatalog, STALE_MS } from "./lib/sources.js";
@@ -39,6 +39,7 @@ const migrateFood = (lines) => (lines || []).map((l) => (l.qty == null && l.serv
 export default function App() {
   const [ready, setReady] = useState(false);
   const [onboarded, setOnboarded] = useState(true);
+  const linked = useRef(false); // opened via a liquorcabinet:// link — skip the welcome screen
   const [tab, setTab] = useState("cabinet");
   const [city, setCity] = useState("gurgaon");
   const [loc, setLoc] = useState(null);           // GPS + Zomato delivery zone (lib/location.js)
@@ -89,7 +90,8 @@ export default function App() {
       const { catalog, ages } = await loadCachedCatalog(c, CATEGORIES);
       setCatalog(catalog); setAges(ages);
       // First launch (or upgrading from a version without onboarding) → welcome screen.
-      setOnboarded(!!cfg.onboarded || (!!Object.keys(catalog).length && !!cfg.loc));
+      // (a launch link may have landed while this was loading — it wins)
+      setOnboarded(linked.current || !!cfg.onboarded || (!!Object.keys(catalog).length && !!cfg.loc));
       setReady(true);
     })();
   }, []);
@@ -123,10 +125,11 @@ export default function App() {
   useEffect(() => {
     if (!isNative()) return;
     const open = (url) => {
-      if (/^liquorcabinet:\/\/sync/.test(url || "")) { setOnboarded(true); setAutoSync(true); setShowScraper(true); return; }
+      if (/^liquorcabinet:\/\/sync/.test(url || "")) { linked.current = true; setOnboarded(true); setAutoSync(true); setShowScraper(true); return; }
       const m = /^liquorcabinet:\/\/tab\/(cabinet|bar|food|cart|plan)(?:\?view=(liquor|food))?/.exec(url || "");
       if (!m) return;
       if (m[2]) setCartView(m[2]);
+      linked.current = true;
       setOnboarded(true); // a link to a tab should show that tab, not the first-run welcome
       setTab(m[1]);
       window.scrollTo({ top: 0 });

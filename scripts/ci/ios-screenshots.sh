@@ -34,7 +34,7 @@ launch() { # [url] — (re)start the app, optionally opening a liquorcabinet:// 
 }
 shot() { xcrun simctl io "$UDID" screenshot "$OUT/$1.png" >/dev/null; echo "shot $1"; }
 
-launch; sleep 20; shot 0-welcome
+launch; sleep 30; shot 0-welcome
 launch "liquorcabinet://sync"; sleep 60; shot 1-sync
 i=2
 for tab in cabinet bar food "cart?view=liquor" "cart?view=food" plan; do
