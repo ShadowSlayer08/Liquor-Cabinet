@@ -68,7 +68,8 @@ export default function ScraperPanel({ city, syncIds, setSyncIds, onData, onClos
     addLog(`Done! ${products} products · fetched:${net} cache:${cache} errors:${errors}`, errors ? "warn" : "ok");
     setRunning(false); setDone(true);
   };
-  useEffect(() => { if (autoStart) run(false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const started = useRef(false); // once per open, even when React mounts twice in dev
+  useEffect(() => { if (autoStart && !started.current) { started.current = true; run(false); } }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pct = total ? phase / total : 0;
   const logColor = { ok: "#22c97a", error: "#e84040", warn: "#e8c030", pending: "#8a8a8a", info: "#6a6055" };

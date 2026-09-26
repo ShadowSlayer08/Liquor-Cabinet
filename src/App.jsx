@@ -123,9 +123,9 @@ export default function App() {
   // Smart Sync — for links from outside the app (and CI, which uses them to load prices and
   // screenshot every tab in the iOS Simulator).
   useEffect(() => {
-    if (!isNative()) return;
+    if (!isNative() && !import.meta.env.DEV) return;
     const open = (url) => {
-      if (/^liquorcabinet:\/\/sync/.test(url || "")) { linked.current = true; setOnboarded(true); setAutoSync(true); setShowScraper(true); return; }
+      if (/^liquorcabinet:\/\/sync(?:$|[/?#])/.test(url || "")) { linked.current = true; setOnboarded(true); setAutoSync(true); setShowScraper(true); return; }
       const m = /^liquorcabinet:\/\/tab\/(cabinet|bar|food|cart|plan)(?:\?view=(liquor|food))?/.exec(url || "");
       if (!m) return;
       if (m[2]) setCartView(m[2]);
@@ -134,6 +134,7 @@ export default function App() {
       setTab(m[1]);
       window.scrollTo({ top: 0 });
     };
+    if (import.meta.env.DEV) window.__lcOpenLink = open; // try links from the browser console
     CapApp.getLaunchUrl().then((r) => open(r?.url)).catch(() => {});
     const sub = CapApp.addListener("appUrlOpen", (e) => open(e.url));
     return () => { sub.then((s) => s.remove()); };
