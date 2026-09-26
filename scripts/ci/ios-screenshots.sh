@@ -35,10 +35,10 @@ launch() { # [url] — (re)start the app, optionally opening a liquorcabinet:// 
 shot() { xcrun simctl io "$UDID" screenshot "$OUT/$1.png" >/dev/null; echo "shot $1"; }
 
 launch; sleep 30; shot 0-welcome
-launch "liquorcabinet://sync"; sleep 60; shot 1-sync
+launch "liquorcabinet://sync"; sleep 60; shot 1-sync; sleep 10
 i=2
 for tab in cabinet bar food "cart?view=liquor" "cart?view=food" plan; do
-  launch "liquorcabinet://tab/$tab"; sleep 8; shot "$i-${tab//[?=]/-}"
+  launch "liquorcabinet://tab/$tab"; sleep 15; shot "$i-${tab//[?=]/-}"
   i=$((i + 1))
 done
 xcrun simctl terminate "$UDID" "$BUNDLE" >/dev/null 2>&1 || true

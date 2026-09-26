@@ -154,7 +154,7 @@ export default function PlanTab({
         <div>🛒 <b style={{ color: "var(--blinkit)" }}>Blinkit</b> — mixers, ice & munchies at usual MRP, or the live price read from Blinkit on your phone (beta); each opens in Blinkit.</div>
         <div>🗓️ <b className="gold">Dry days</b> — national days are certain; festival and state days vary, so check your state's notice.</div>
         <div className="tiny dim" style={{ marginTop: 10 }}>Not affiliated with or endorsed by Livcheers, Zomato, Blinkit or Bistro.</div>
-        <div className="tiny dim" style={{ marginTop: 4 }}>Liquor Cabinet v1.3 · Prices are indicative. Drink responsibly, and only where it's legal for you.</div>
+        <div className="tiny dim" style={{ marginTop: 4 }}>Liquor Cabinet v1.4 · Prices are indicative. Drink responsibly, and only where it's legal for you.</div>
       </div>
     </div>
   );

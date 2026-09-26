@@ -1,6 +1,6 @@
 # Handoff — where things stand
 
-_Updated 25 Sep 2026, at the end of the v1.3 session (local Claude Code on the user's Windows PC)._
+_Updated 26 Sep 2026, v1.4 (iOS) — local Claude Code on the user's Windows PC._
 
 ## Shipped
 
@@ -9,9 +9,10 @@ _Updated 25 Sep 2026, at the end of the v1.3 session (local Claude Code on the u
 | v1.0 | (history) | JSX prototype → Capacitor Android app; own Livcheers scraper; food calculator; Blinkit/Zomato hand-off |
 | v1.1 | (history) | Repo revamped (Keybase proof removed, app at root); DMart price source removed → built-in Blinkit catalog (MRP) |
 | v1.2 | (history) | GPS → Zomato delivery zone; real Zomato menus; Bistro; order-checklist notifications; full "wow" redesign |
-| **v1.3** | `release/LiquorCabinet-1.3.apk` (versionCode 4) | Bar tab + cocktails, dry days, price-drop badges, store finder, bill split + UPI QR card, invite card, reminders, exact Zomato prices (beta), live Blinkit prices (beta), floating order checklist (beta) |
+| v1.3 | (history) | Bar tab + cocktails, dry days, price-drop badges, store finder, bill split + UPI QR card, invite card, reminders, exact Zomato prices (beta), live Blinkit prices (beta), floating order checklist (beta) |
+| **v1.4** | `release/LiquorCabinet-1.4.apk` (versionCode 5) + `release/LiquorCabinet-1.4-unsigned.ipa` (iOS build 5) | iPhone (Capacitor iOS, Swift plugins, CI-built unsigned IPA), no upi:// links (NPCI), honest location copy, cfg in native storage, liquorcabinet:// links |
 
-Repo: **https://github.com/ShadowSlayer08/liquor-cabinet** (public, pushed at the user's request). The signing key (`android/keystore/`, `android/keystore.properties`) is git-ignored and never committed; the v1.3 APK is signed with the same key as v1.2 (cert SHA-256 `a3d9f3e7…98abd9`), so it installs over it.
+Repo: **https://github.com/ShadowSlayer08/liquor-cabinet** (public, pushed at the user's request). The signing key (`android/keystore/`, `android/keystore.properties`) is git-ignored and never committed; every APK since v1.2 is signed with the same key (cert SHA-256 `a3d9f3e7…98abd9`), so it installs over it.
 
 ## v1.3 — what was built (HANDOFF items 1–10)
 
@@ -35,9 +36,9 @@ Also: minSdk 26 (Android 8.0 — `@capacitor/inappbrowser` needs it; its camera/
 - Multi-agent code review (5 dimensions, each finding checked by two skeptics); confirmed findings fixed in `ea9db8f` and later commits.
 - `gradlew assembleRelease` compiles the three native plugins cleanly.
 
-## iOS — in progress on branch `ios`
+## iOS (v1.4)
 
-Capacitor iOS added (SPM) with Swift ports of ExternalApp and WebRender, a new CookieBridge plugin (iOS keeps WebKit and URLSession cookies apart — needed for the Zomato sign-in), MainViewController registration (via SceneDelegate), Info.plist, iOS icon/splash (`npm run icons ios`), and iPhone-aware JS (no bubble; full checklist in the notification body; Safari UA; cfg in Preferences; no input zoom). CI (`ios.yml`) builds an unsigned IPA and screenshots every tab in the Simulator. Plan and options: `docs/ROADMAP.md` Phase 4. Nothing has run on a real iPhone yet.
+Capacitor iOS added (SPM) with Swift ports of ExternalApp and WebRender, a new CookieBridge plugin (iOS keeps WebKit and URLSession cookies apart — needed for the Zomato sign-in), MainViewController registration (via SceneDelegate), Info.plist, iOS icon/splash (`npm run icons ios`), and iPhone-aware JS (no bubble; full checklist in the notification body; Safari UA; cfg in Preferences; no input zoom). CI (`ios.yml`) builds an unsigned IPA and screenshots every tab in the Simulator. Every tab, a live Livcheers sync (1,407 products), the invite canvas, native storage and the Swift hand-off plugin were checked in the iOS Simulator (CI screenshots). Plan and options: `docs/ROADMAP.md` Phase 4. Nothing has run on a real iPhone yet.
 
 ## Not verified — needs a real phone
 

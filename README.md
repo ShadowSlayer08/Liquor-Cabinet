@@ -10,31 +10,39 @@
 </p>
 
 <p align="center">
-  <a href="release/LiquorCabinet-1.3.apk"><b>⬇ Download the APK (v1.3)</b></a>
+  <a href="release/LiquorCabinet-1.4.apk"><b>⬇ Android APK (v1.4)</b></a> &nbsp;·&nbsp; <a href="release/LiquorCabinet-1.4-unsigned.ipa"><b>⬇ iPhone IPA (v1.4, beta)</b></a>
 </p>
 
 ---
 
 ## Install
 
-1. On your Android phone, download [`release/LiquorCabinet-1.3.apk`](release/LiquorCabinet-1.3.apk).
+1. On your Android phone, download [`release/LiquorCabinet-1.4.apk`](release/LiquorCabinet-1.4.apk).
 2. Open it. When Android asks, allow installs from that source.
 3. Launch **Liquor Cabinet**, tap **Use my location**, then **⚡ Smart Sync** to pull today's prices.
 
-It needs **Android 8.0 or newer** and an internet connection. v1.3 installs over v1.0–v1.2 and keeps your carts.
+It needs **Android 8.0 or newer** and an internet connection. v1.4 installs over v1.0–v1.3 and keeps your carts.
 It asks for **location** (restaurants that deliver to you), **notifications** (order checklist and party reminders) and, only if you turn on the floating checklist, **display over other apps**. All are optional.
 
 ### iPhone (beta, sideload)
 
 The same app runs on iPhone (iOS 15+). There's no App Store listing, and an iPhone won't install an app file the way Android does — it has to be signed with an Apple ID when you install it:
 
-1. Download `LiquorCabinet-<version>-unsigned.ipa` from the latest successful run of the [iOS workflow](https://github.com/ShadowSlayer08/liquor-cabinet/actions/workflows/ios.yml) (Artifacts).
+1. Download [`release/LiquorCabinet-1.4-unsigned.ipa`](release/LiquorCabinet-1.4-unsigned.ipa) (every push also builds one: [iOS workflow](https://github.com/ShadowSlayer08/liquor-cabinet/actions/workflows/ios.yml) → Artifacts).
 2. Install it with [Sideloadly](https://sideloadly.io/) (Windows / Mac) or [AltStore](https://altstore.io/), signing in with your own Apple ID.
 3. On the iPhone: Settings → General → VPN & Device Management → trust your Apple ID; on iOS 16+ also turn on Settings → Privacy & Security → **Developer Mode**.
 
 With a free Apple ID the app runs for 7 days before it must be re-signed (AltStore can refresh it automatically), and you can have at most 3 sideloaded apps. A paid Apple Developer account (US$99/year) gives 1-year installs for up to 100 iPhones, or TestFlight. _At the time of writing._
 
 Different on iPhone: there's no floating checklist bubble — iOS doesn't let apps draw over other apps — so the order checklist arrives as a notification. Everything else is the same app; the beta features (Zomato sign-in, live Blinkit prices) are as untested on iPhone as on Android.
+
+## What's new in v1.4
+
+- **iPhone** (beta): the same app on iOS 15+, installed by sideloading the IPA (see above). Built and tested in the iOS Simulator on GitHub's macOS runners — not yet on a real iPhone.
+- **Paying your share**: the WhatsApp split message no longer contains `upi://pay` links (UPI has blocked person-to-person payments started from links since 2024) — it gives the UPI ID, and the payment card's QR codes still work.
+- **Privacy**: the welcome screen now says plainly that your location goes to Zomato to find restaurants that deliver to you (and it's sent rounded to ~10 m).
+- **Safer storage**: your party plan and carts are kept in the phone's own storage, not just the web view's.
+- **Links**: `liquorcabinet://tab/bar`, `…/tab/cart?view=food`, `liquorcabinet://sync` open the app where you want it.
 
 ## What's new in v1.3
 
