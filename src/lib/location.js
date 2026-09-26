@@ -61,7 +61,8 @@ export async function getPosition() {
 }
 
 export async function zomatoZone(lat, lon) {
-  const json = JSON.parse(await getText(`https://www.zomato.com/webroutes/location/get?lat=${lat.toFixed(5)}&lon=${lon.toFixed(5)}`, { timeout: 20000 }));
+  // ~11 m precision is plenty for a delivery zone; no need to send Zomato your exact spot.
+  const json = JSON.parse(await getText(`https://www.zomato.com/webroutes/location/get?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`, { timeout: 20000 }));
   const d = json?.locationDetails;
   if (!d?.entityId) throw new Error("Zomato doesn't recognise this location");
   return {

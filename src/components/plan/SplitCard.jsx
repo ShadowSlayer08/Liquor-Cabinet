@@ -95,7 +95,7 @@ export default function SplitCard({ party, setParty, plan, split, setSplit, liqu
         </div>
       </div>
       <div className={`tiny ${!upi.trim() ? "dim" : upiOk ? "green" : "red"}`} style={{ marginTop: 6 }}>
-        {!upi.trim() ? "Add your UPI ID to put pay links and QR codes on the split." : upiOk ? "✓ Pay links on" : "That doesn't look like a UPI ID, e.g. name@okhdfc"}
+        {!upi.trim() ? "Add your UPI ID so guests can pay you, with QR codes on the payment card." : upiOk ? "✓ UPI ID added" : "That doesn't look like a UPI ID, e.g. name@okhdfc"}
       </div>
 
       <div className="sep" />

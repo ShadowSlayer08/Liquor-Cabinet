@@ -57,7 +57,9 @@ export function includedLabel(include) {
   return parts.length > 1 ? `${parts.slice(0, -1).join(", ")} & ${parts[parts.length - 1]}` : parts[0] || "";
 }
 
-// Plain-text split for WhatsApp & co. Pay links only when the UPI ID looks valid.
+// Plain-text split for WhatsApp & co. No upi://pay links: NPCI has disallowed P2P payments
+// started from such links since April 2024 (circular OC/76A), so guests pay the UPI ID —
+// or scan the payment card's QR code (lib/paycard.js), which is still allowed.
 export function splitMessage({ party, result, include, host, vpa }) {
   const rows = shareRows(result);
   const pay = validVpa(vpa);
@@ -72,11 +74,10 @@ export function splitMessage({ party, result, include, host, vpa }) {
   lines.push("");
   for (const r of rows) {
     lines.push(r.amount > 0 ? `${r.emoji} ${r.label} (${r.count}): *${fmt(r.amount)}* each` : `${r.emoji} ${r.label} (${r.count}): nothing to pay`);
-    if (pay && r.amount > 0) lines.push(`Pay ${fmt(r.amount)}: ${upiLink({ vpa, name: who, amount: r.amount, note: name })}`);
   }
   // Livcheers prices are indicative and Zomato/Blinkit add taxes & delivery, so the shares are an estimate.
   lines.push("", "Based on planned prices — any difference gets settled after the party.");
-  if (pay) lines.push("", `UPI ID: ${vpa.trim()}${who ? ` (${who})` : ""}`);
+  if (pay) lines.push("", `Pay by UPI to ${vpa.trim()}${who ? ` (${who})` : ""} — or scan the QR on the payment card.`);
   else if (who) lines.push("", `Pay ${who} 🙏`);
   return lines.join("\n");
 }

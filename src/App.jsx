@@ -376,7 +376,7 @@ function Welcome({ locating, onLocate, onManual }) {
         </button>
         <button className="btn btn-ghost btn-block" onClick={onManual}>Choose my city</button>
       </div>
-      <div className="tiny dim" style={{ marginTop: 18, maxWidth: 300 }}>Location is used only on your phone, to show restaurants that deliver to you. 21+ · Drink responsibly.</div>
+      <div className="tiny dim" style={{ marginTop: 18, maxWidth: 300 }}>Your location goes to Zomato only, to find restaurants that deliver to you — nothing is sent to us. 21+ · Drink responsibly.</div>
     </div>
   );
 }

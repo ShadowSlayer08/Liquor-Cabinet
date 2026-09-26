@@ -73,8 +73,8 @@ test("split message", () => {
   assert.match(msg, /Based on planned prices/);
   assert.match(msg, /Drinkers \(8\): \*₹1,400\* each/);
   assert.match(msg, /Non-drinkers \(2\): \*₹400\* each/);
-  assert.match(msg, /Pay ₹1,400: upi:\/\/pay\?pa=rish%40okhdfc&pn=Rish&am=1400\.00/);
-  assert.match(msg, /UPI ID: rish@okhdfc \(Rish\)/);
+  assert.doesNotMatch(msg, /upi:\/\//);                     // NPCI: no P2P intent links
+  assert.match(msg, /Pay by UPI to rish@okhdfc \(Rish\)/);
   // No valid UPI → amounts only, no pay links
   const bare = splitMessage({ party, result, include, host: "Rish", vpa: "rish" });
   assert.doesNotMatch(bare, /upi:\/\//);
@@ -85,7 +85,7 @@ test("split message", () => {
   assert.match(m2, /\*House party\*/);
   assert.match(m2, /\(liquor, at planned prices\)/);
   assert.match(m2, /Non-drinkers \(2\): nothing to pay/);
-  assert.equal((m2.match(/upi:\/\//g) || []).length, 1);
+  assert.doesNotMatch(m2, /upi:\/\//);
 });
 
 test("labels & WhatsApp link", () => {
