@@ -35,6 +35,10 @@ Also: minSdk 26 (Android 8.0 — `@capacitor/inappbrowser` needs it; its camera/
 - Multi-agent code review (5 dimensions, each finding checked by two skeptics); confirmed findings fixed in `ea9db8f` and later commits.
 - `gradlew assembleRelease` compiles the three native plugins cleanly.
 
+## iOS — in progress on branch `ios`
+
+Capacitor iOS added (SPM) with Swift ports of ExternalApp and WebRender, a new CookieBridge plugin (iOS keeps WebKit and URLSession cookies apart — needed for the Zomato sign-in), MainViewController registration (via SceneDelegate), Info.plist, iOS icon/splash (`npm run icons ios`), and iPhone-aware JS (no bubble; full checklist in the notification body; Safari UA; cfg in Preferences; no input zoom). CI (`ios.yml`) builds an unsigned IPA and screenshots every tab in the Simulator. Plan and options: `docs/ROADMAP.md` Phase 4. Nothing has run on a real iPhone yet.
+
 ## Not verified — needs a real phone
 
 Nothing native has run on a device yet (same as v1.2). Check on the phone:

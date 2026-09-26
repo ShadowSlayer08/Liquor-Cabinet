@@ -13,8 +13,11 @@ npm run dev         # browser preview; Vite proxies /proxy/livcheers|zomato to s
 npm run build       # vite build → dist/
 npm run icons       # regenerate launcher icons, adaptive layers, splash, notification icon from resources/logo-mark.svg
 npm run apk         # vite build + cap sync + Gradle assembleRelease (scripts/gradle.mjs, works on Windows too)
-npx cap sync android  # after adding/removing a Capacitor plugin or changing capacitor.config.json
+npx cap sync          # after adding/removing a Capacitor plugin or changing capacitor.config.json (android + ios)
+LC_SKIP_LIVE=1 npm test   # offline tests only (what CI runs)
 ```
+
+CI (`.github/workflows/`): `android.yml` = offline tests + debug APK on every push; `ios.yml` = unsigned IPA (artifact) + a Simulator run that syncs prices and screenshots every tab (`scripts/ci/ios-screenshots.sh`; artifact `ios-simulator-screens`). **There's no Mac here — Swift only compiles in CI**: push, then `gh run watch`, `gh run download <id> -n ios-simulator-screens`. Swift gotcha: `/*` inside a `/** … */` comment opens a nested comment.
 
 APK output: `android/app/build/outputs/apk/release/LiquorCabinet-<versionName>-release.apk`. Copy the one you ship to `release/LiquorCabinet-<version>.apk` (older ones are removed from `release/`).
 
@@ -24,7 +27,7 @@ On the maintainer's Windows PC: JDK at `%LOCALAPPDATA%\Programs\jdk-21`, SDK at 
 ## Release signing & versioning
 
 - `android/keystore.properties` + `android/keystore/liquor-cabinet.jks` sign release builds. Both are **git-ignored and must never be committed**. Without them, `assembleRelease` falls back to the debug key (such an APK won't install over the user's current one).
-- Bump **both** `versionCode` and `versionName` in `android/app/build.gradle`, plus `version` in `package.json`, and the "Liquor Cabinet vX" line in `src/components/PlanTab.jsx`, for every APK you hand over. Current: v1.3 = versionCode 4.
+- Bump **both** `versionCode` and `versionName` in `android/app/build.gradle`, plus `version` in `package.json`, `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `ios/App/App.xcodeproj/project.pbxproj`, and the "Liquor Cabinet vX" line in `src/components/PlanTab.jsx`, for every APK you hand over. Current: v1.3 = versionCode 4.
 - The user sideloads APKs (no Play Store — alcohol-app policies). GitHub: https://github.com/ShadowSlayer08/liquor-cabinet (public) — push only when the user asks.
 
 ## Architecture
@@ -76,10 +79,21 @@ android/app/src/main/java/com/shadowslayer/liquorcabinet/
     OrderBubblePlugin.java  canDraw / requestPermission / show({title, lines, done}) / hide — overlay bubble + checklist card
 scripts/make-icons.mjs    all raster icons from the SVG logo (sharp)
 scripts/gradle.mjs        runs the Gradle wrapper on any OS
+ios/App/App/              (Capacitor iOS, SPM — CapApp-SPM/Package.swift is CLI-managed)
+    SceneDelegate.swift   creates MainViewController (the template's Main.storyboard is not used)
+    MainViewController.swift  registers the Swift plugins; Debug builds open LC_OPEN_URL (CI)
+    ExternalAppPlugin.swift   same JS contract as the Java one; maps Android package names to zomato:// / comgooglemaps:// / universal links
+    WebRenderPlugin.swift     hidden WKWebView behind the app's web view; injects lat/lon as navigator.geolocation
+    CookieBridgePlugin.swift  iOS-only: copies/clears a site's WebKit cookies <-> HTTPCookieStorage (Zomato sign-in)
+    Info.plist            location + Photos-add usage strings, LSApplicationQueriesSchemes, liquorcabinet:// scheme
 ```
 
 ## Conventions & gotchas
 
+- Native plugins exist twice (Java + Swift) with **identical JS contracts**; OrderBubble is Android-only (`bubbleAvailable()` = `isAndroid()`). Gate platform differences with `isAndroid()` / `isIOS()` from `lib/http.js`.
+- `cfg` (plan + carts) is stored with `@capacitor/preferences` on the phone (iOS can purge IndexedDB); everything else in IndexedDB is re-fetchable cache.
+- Deep links: `liquorcabinet://tab/<cabinet|bar|food|cart|plan>[?view=liquor|food]` and `liquorcabinet://sync` (both platforms).
+- The split's WhatsApp text has no `upi://pay` links (NPCI disallowed P2P intent payments in 2024); the payment card's QR codes are the way to pay.
 - Parsers in `src/lib/parse/*` stay **pure** (no Capacitor imports) so `node --test` can run them.
 - Every network call goes through `lib/http.js getText()`. Natively, Capacitor installs a global cookie handler backed by the WebView cookie store, so **never send a hand-written `Cookie` header** — pass `{ cookie }` and `getText` writes it into the store (`CapacitorCookies.setCookie`). In the browser it travels as `x-proxy-cookie` and `vite.config.js` converts it.
 - The Vite proxy strips browser-only headers (`sec-*`, cookie, referer, origin); headless Chrome's `sec-ch-ua: HeadlessChrome` makes Zomato return 503.

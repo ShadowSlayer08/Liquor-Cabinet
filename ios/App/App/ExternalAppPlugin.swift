@@ -10,7 +10,7 @@ import Capacitor
  *   isInstalled({ pkg })         → { installed }
  * iOS has no package names, so the Android ones order.js passes are mapped to what iOS offers:
  * Zomato's zomato:// scheme, Google Maps' comgooglemaps://, and universal links — https links an
- * installed app claims (blinkit.com/s/*, bistro.blinkit.com, google.com/maps/search/*, wa.me).
+ * installed app claims (blinkit.com search pages, bistro.blinkit.com, Google Maps searches, wa.me).
  * Opening with .universalLinksOnly tells us whether an app took the link; if none did, the
  * link opens in Safari instead.
  */

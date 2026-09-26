@@ -24,6 +24,18 @@
 It needs **Android 8.0 or newer** and an internet connection. v1.3 installs over v1.0–v1.2 and keeps your carts.
 It asks for **location** (restaurants that deliver to you), **notifications** (order checklist and party reminders) and, only if you turn on the floating checklist, **display over other apps**. All are optional.
 
+### iPhone (beta, sideload)
+
+The same app runs on iPhone (iOS 15+). There's no App Store listing, and an iPhone won't install an app file the way Android does — it has to be signed with an Apple ID when you install it:
+
+1. Download `LiquorCabinet-<version>-unsigned.ipa` from the latest successful run of the [iOS workflow](https://github.com/ShadowSlayer08/liquor-cabinet/actions/workflows/ios.yml) (Artifacts).
+2. Install it with [Sideloadly](https://sideloadly.io/) (Windows / Mac) or [AltStore](https://altstore.io/), signing in with your own Apple ID.
+3. On the iPhone: Settings → General → VPN & Device Management → trust your Apple ID; on iOS 16+ also turn on Settings → Privacy & Security → **Developer Mode**.
+
+With a free Apple ID the app runs for 7 days before it must be re-signed (AltStore can refresh it automatically), and you can have at most 3 sideloaded apps. A paid Apple Developer account (US$99/year) gives 1-year installs for up to 100 iPhones, or TestFlight. _At the time of writing._
+
+Different on iPhone: there's no floating checklist bubble — iOS doesn't let apps draw over other apps — so the order checklist arrives as a notification. Everything else is the same app; the beta features (Zomato sign-in, live Blinkit prices) are as untested on iPhone as on Android.
+
 ## What's new in v1.3
 
 - **🍸 Bar tab** — 28 cocktails; the ones you can make with the bottles in your cabinet come first. Put a few on the party menu and their extras (mint, juices, ginger ale…) land on your Blinkit list, replacing the default mixer so nothing is counted twice.
@@ -88,8 +100,11 @@ src/
   lib/order.js            Zomato / Bistro / Blinkit / Maps hand-off, checklist notification, haptics
 android/                  Capacitor Android project; native plugins in app/src/main/java/…/liquorcabinet:
                           ExternalAppPlugin (open other apps), WebRenderPlugin (hidden page reader), OrderBubblePlugin (overlay)
+ios/                      Capacitor iOS project (Swift Package Manager); ios/App/App has the Swift plugins:
+                          ExternalAppPlugin, WebRenderPlugin, CookieBridgePlugin (Zomato sign-in cookies)
+.github/workflows/        android.yml (tests + debug APK), ios.yml (unsigned IPA + Simulator screenshots)
 resources/logo-mark.svg   the logo; `npm run icons` renders every icon + splash from it
-docs/                     HANDOFF.md (status), RESEARCH.md (data sources), original JSX, screenshots
+docs/                     HANDOFF.md (status), ROADMAP.md (what's next), RESEARCH.md (data sources), original JSX, screenshots
 CLAUDE.md                 guide for Claude Code sessions
 tests/                    calculator, cocktails, dry days, split, reminders, invite, price history, Blinkit, Zomato menu + live parser tests
 release/                  the built APK
@@ -109,6 +124,8 @@ npm run apk       # → android/app/build/outputs/apk/release/LiquorCabinet-<ver
 
 `npm run apk` works on Windows, macOS and Linux (it runs the Gradle wrapper through `scripts/gradle.mjs`).
 
+**iOS** builds need Xcode on a Mac: `npx vite build && npx cap sync ios`, then open `ios/App/App.xcodeproj`. Without a Mac, push to GitHub — the iOS workflow builds the unsigned IPA on GitHub's macOS runners (free for public repos).
+
 To sign a release, create `android/keystore.properties` (git-ignored). Without it, release builds are signed with the debug key.
 
 ```
@@ -123,4 +140,5 @@ keyPassword=…
 - Prices are indicative. In some states (e.g. Haryana) there is no MRP on liquor and shops set their own prices. Zomato's "for one" is an average; exact menu prices show in Zomato (or in the app once you sign in).
 - The beta features (Zomato sign-in, live Blinkit prices, floating checklist) depend on those sites and on Android behaviour that could only be fully checked on a real phone. If one doesn't work, the app falls back to the estimates.
 - If Livcheers or Zomato changes its pages, the scraper log says so ("page loaded but no products found") instead of failing silently.
+- Not affiliated with or endorsed by Livcheers, Zomato, Blinkit or Bistro.
 - Drink responsibly, and only where it's legal for you.
