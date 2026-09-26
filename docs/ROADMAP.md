@@ -28,10 +28,9 @@ The single most valuable next step: every later phase inherits these native path
 
 | Item | Why | Effort |
 | --- | --- | --- |
-| **Signed releases on GitHub Releases** (tag → CI builds the APK with the keystore from encrypted secrets, attaches APK + unsigned IPA + SHA-256; stop committing APKs to git) | One stable download page; the repo stops growing ~12 MB per release | M |
+| **Release automation** — v1.4 is on the GitHub Releases page (APK + IPA, published by hand); next: a tag builds and attaches both in CI (keystore from encrypted secrets) and APKs stop being committed to git | One-command releases; the repo stops growing ~12 MB per release | M |
 | **In-app "update available"** (checks the GitHub Releases API on launch, links the new APK) | Sideloaded users never hear about updates otherwise | S |
 | **Single-source version** (package.json → Gradle + Xcode + Plan tab; CI refuses a lower versionCode) | The 4-place manual bump is error-prone | S |
-| **LICENSE** — decision needed (Apache-2.0 recommended: patent grant, no trademark rights for forks; or MIT) | Without one, nobody may legally reuse the code | S |
 | **Android developer verification** — register the package + signing key before Google's 2027 global rollout for sideloaded apps; back the keystore up offline | Otherwise installs need an "advanced flow" or ADB | S |
 | **Error screen + opt-in error report** (React error boundary; copy details to share) | A render exception currently blanks the app | S |
 | **APK diet** (R8, drop unused plugin assets) — 12 MB → ~5 MB | Faster to share over WhatsApp | S |
@@ -59,7 +58,6 @@ The single most valuable next step: every later phase inherits these native path
 | **Prohibition states + legal drinking age** — red banner and no store finder in Bihar, Gujarat, Nagaland, Mizoram, Lakshadweep (and Manipur districts); a one-time "I'm of legal drinking age in my state" instead of a flat "21+" | Don't cheerfully plan purchases where alcohol is illegal | M |
 | **Remote data pack** — dry days (incl. election bans), grocery MRPs as a JSON file in the repo the app fetches | Festival dry days in `lib/drydays.js` only cover 2026–2027 | M |
 | **Scraper resilience** — keep last-known prices with an honest note when a page changes; a weekly CI canary that tells the owner | Livcheers/Zomato page changes shouldn't mean empty screens | M |
-| **Ask Livcheers for permission** (contact@livcheers.com: on-device fetching, 7-day cache, links back, no redistribution) | The core data source; permission de-risks everything else | S |
 
 ## Phase 4 — iOS (in progress, branch `ios`)
 
@@ -78,17 +76,13 @@ The single most valuable next step: every later phase inherits these native path
 1. Real-iPhone test (Phase 0 column).
 2. **Distribution** — iPhones can't install an IPA like an APK; it must be signed:
    - *Free Apple ID* (Sideloadly / AltStore): the app runs 7 days, then re-sign; max 3 apps. Fine for your own phone.
-   - *Apple Developer Program* (US$99/yr): Ad Hoc builds for up to 100 registered iPhones for a year, or TestFlight (up to 10,000 testers, 90-day builds, first build of each version reviewed). Needed for friends. CI can sign with the certificate in encrypted secrets.
+   - *Apple Developer Program* (US$99/yr): Ad Hoc builds for up to 100 registered iPhones for a year, or TestFlight. Not planned (owner's decision) — everyone sideloads the unsigned IPA with their own Apple ID.
    - App Store: not planned (scraped third-party data would likely be rejected under guideline 5.2.2).
 3. *Optional* **Live Activity** as the iPhone version of the floating checklist (Lock Screen / Dynamic Island, ActivityKit) — M/L, needs a widget extension.
 
-## Decisions needed from you
+## Decided (26 Sep 2026)
 
-1. **LICENSE**: Apache-2.0 (recommended) or MIT?
-2. **iPhone distribution**: free Apple ID for yourself only, or the US$99/yr Apple Developer account for friends (Ad Hoc / TestFlight)?
-3. **Livcheers**: OK to email them for permission? Their data is the heart of the app.
-4. **Beta scrapers**: Blinkit's and Zomato's terms forbid automated access. Keep live Blinkit prices and the Zomato sign-in as opt-in betas with a warning, or remove them?
-5. **Commit email**: your commits show a personal Gmail address; switch to GitHub's noreply address for future commits?
+The owner declined all five open questions, so things stay as they are: no LICENSE file, no paid Apple Developer account (iPhone = sideloaded unsigned IPA), no request to Livcheers, the Blinkit/Zomato beta features stay as they are, and commits keep the current email. Instead, the README carries a "Data sources & legal notice" section: free, non-profit, personal use; data fetched on-device only; not affiliated; takedown requests via issues.
 
 ## Parked
 

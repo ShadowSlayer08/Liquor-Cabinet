@@ -5,19 +5,22 @@
 <h1 align="center">Liquor Cabinet</h1>
 
 <p align="center">
-  An Android party planner. Stock the bar with live <b>Livcheers</b> prices, mix cocktails from what you bought,<br>
+  A party planner for <b>Android</b> and <b>iPhone</b>. Stock the bar with live <b>Livcheers</b> prices, mix cocktails from what you bought,<br>
   work out the food with the calculator, then order from restaurants near you on <b>Zomato</b>, 10-minute snacks on <b>Bistro</b> and supplies on <b>Blinkit</b>.
 </p>
 
 <p align="center">
-  <a href="release/LiquorCabinet-1.4.apk"><b>⬇ Android APK (v1.4)</b></a> &nbsp;·&nbsp; <a href="release/LiquorCabinet-1.4-unsigned.ipa"><b>⬇ iPhone IPA (v1.4, beta)</b></a>
+  <a href="https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest"><b>⬇ Download v1.4 — Android APK &amp; iPhone IPA</b></a><br>
+  <sub>or straight from the repo: <a href="release/LiquorCabinet-1.4.apk">APK</a> · <a href="release/LiquorCabinet-1.4-unsigned.ipa">IPA</a> · free, non-commercial, personal use — see <a href="#data-sources--legal-notice">legal notice</a></sub>
 </p>
 
 ---
 
 ## Install
 
-1. On your Android phone, download [`release/LiquorCabinet-1.4.apk`](release/LiquorCabinet-1.4.apk).
+### Android
+
+1. On your Android phone, download `LiquorCabinet-1.4.apk` from the [latest release](https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest) (or [`release/`](release/LiquorCabinet-1.4.apk) in the repo).
 2. Open it. When Android asks, allow installs from that source.
 3. Launch **Liquor Cabinet**, tap **Use my location**, then **⚡ Smart Sync** to pull today's prices.
 
@@ -28,7 +31,7 @@ It asks for **location** (restaurants that deliver to you), **notifications** (o
 
 The same app runs on iPhone (iOS 15+). There's no App Store listing, and an iPhone won't install an app file the way Android does — it has to be signed with an Apple ID when you install it:
 
-1. Download [`release/LiquorCabinet-1.4-unsigned.ipa`](release/LiquorCabinet-1.4-unsigned.ipa) (every push also builds one: [iOS workflow](https://github.com/ShadowSlayer08/liquor-cabinet/actions/workflows/ios.yml) → Artifacts).
+1. Download `LiquorCabinet-1.4-unsigned.ipa` from the [latest release](https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest) (every push also builds one: [iOS workflow](https://github.com/ShadowSlayer08/Liquor-Cabinet/actions/workflows/ios.yml) → Artifacts).
 2. Install it with [Sideloadly](https://sideloadly.io/) (Windows / Mac) or [AltStore](https://altstore.io/), signing in with your own Apple ID.
 3. On the iPhone: Settings → General → VPN & Device Management → trust your Apple ID; on iOS 16+ also turn on Settings → Privacy & Security → **Developer Mode**.
 
@@ -142,6 +145,28 @@ storePassword=…
 keyAlias=…
 keyPassword=…
 ```
+
+## Data sources & legal notice
+
+**Liquor Cabinet is a free, non-profit, personal-use hobby project.** It is not sold, has no ads, subscriptions, affiliate links or sponsored bottles, and makes no money in any way.
+
+To do its job, the app connects — from your own phone, only when you use the related feature — to these third-party services:
+
+| Service | What the app uses it for |
+| --- | --- |
+| **Livcheers** (livcheers.com) | Liquor prices, ratings and tasting notes for your city |
+| **Zomato** (zomato.com) | Your delivery zone, restaurants that deliver a dish to you, restaurant menus; opening your order in the Zomato app |
+| **Blinkit** / **Bistro** (blinkit.com) | Opening your supply list or order in their apps; an optional live price check (beta) |
+| **Google Maps** | Searching for liquor stores near you |
+| **WhatsApp** / your share sheet | Sharing lists, invites and the bill split |
+
+- Data is fetched on demand and cached **only on your device**. There is no Liquor Cabinet server: nothing is collected, stored, resold or redistributed by this project. Every bottle links back to its source page.
+- All product names, prices, ratings, menus, logos and trademarks belong to their respective owners. This project is **not affiliated with, endorsed by or sponsored by** Livcheers, Zomato, Blinkit, Bistro, Google or WhatsApp.
+- Using a service through the app remains subject to that service's own terms of use; you're responsible for how you use it. The beta features (Zomato sign-in, live Blinkit prices) act with your own account and connection.
+- Prices and availability shown are **indicative** and may be out of date — the store, restaurant or app has the final word.
+- If you represent one of these services and want the app to stop using your data or change how it does, please [open an issue](https://github.com/ShadowSlayer08/Liquor-Cabinet/issues) — it will be honoured promptly.
+- For adults of legal drinking age in their state only. Not for use where alcohol is prohibited. Please drink responsibly.
+- The app and its source are provided "as is", without warranty of any kind. This notice is not legal advice.
 
 ## Notes
 

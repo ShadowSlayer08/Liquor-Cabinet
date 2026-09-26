@@ -12,7 +12,7 @@ _Updated 26 Sep 2026, v1.4 (iOS) — local Claude Code on the user's Windows PC.
 | v1.3 | (history) | Bar tab + cocktails, dry days, price-drop badges, store finder, bill split + UPI QR card, invite card, reminders, exact Zomato prices (beta), live Blinkit prices (beta), floating order checklist (beta) |
 | **v1.4** | `release/LiquorCabinet-1.4.apk` (versionCode 5) + `release/LiquorCabinet-1.4-unsigned.ipa` (iOS build 5) | iPhone (Capacitor iOS, Swift plugins, CI-built unsigned IPA), no upi:// links (NPCI), honest location copy, cfg in native storage, liquorcabinet:// links |
 
-Repo: **https://github.com/ShadowSlayer08/liquor-cabinet** (public, pushed at the user's request). The signing key (`android/keystore/`, `android/keystore.properties`) is git-ignored and never committed; every APK since v1.2 is signed with the same key (cert SHA-256 `a3d9f3e7…98abd9`), so it installs over it.
+Repo: **https://github.com/ShadowSlayer08/Liquor-Cabinet** (public, pushed at the user's request). The signing key (`android/keystore/`, `android/keystore.properties`) is git-ignored and never committed; every APK since v1.2 is signed with the same key (cert SHA-256 `a3d9f3e7…98abd9`), so it installs over it.
 
 ## v1.3 — what was built (HANDOFF items 1–10)
 
