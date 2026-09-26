@@ -1,12 +1,23 @@
-// Generates every launcher icon, adaptive-icon layer, splash screen and web icon
-// from resources/logo-mark.svg.   Run: npm run icons   (after `npx cap add android`)
+// Generates every launcher icon, adaptive-icon layer, splash screen and web icon — Android,
+// iOS and web — from resources/logo-mark.svg.
+//   npm run icons              everything (after `npx cap add android` / `npx cap add ios`)
+//   npm run icons -- ios       just one target: web | android | ios
+// The splash title is set in DejaVu Serif (Linux's default serif, used for the committed
+// images); where it isn't installed the text falls back to Georgia or the system serif.
 import sharp from "sharp";
-import { readFileSync, writeFileSync, existsSync, readdirSync, rmSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync, rmSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const ROOT = new URL("..", import.meta.url).pathname;
+// fileURLToPath, not URL.pathname — on Windows the latter is "/E:/…", which fs can't open.
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const RES = join(ROOT, "android/app/src/main/res");
+const XCASSETS = join(ROOT, "ios/App/App/Assets.xcassets");
 const MARK = readFileSync(join(ROOT, "resources/logo-mark.svg"));
+const BG = "#070504";
+
+const targets = process.argv.slice(2);
+const want = (t) => targets.length === 0 || targets.includes(t);
 
 const DENSITIES = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
 
@@ -20,7 +31,7 @@ const bgSvg = (w, h, shape = "rect") => {
     `<rect width="${w}" height="${h}" fill="url(#g)"/>`;
   return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
     <defs><radialGradient id="g" cx="50%" cy="42%" r="${shape === "rect" && w !== h ? 45 : 62}%">
-      <stop offset="0" stop-color="#3b2008"/><stop offset=".6" stop-color="#140a04"/><stop offset="1" stop-color="#070504"/>
+      <stop offset="0" stop-color="#3b2008"/><stop offset=".6" stop-color="#140a04"/><stop offset="1" stop-color="${BG}"/>
     </radialGradient></defs>${clip}</svg>`);
 };
 
@@ -65,7 +76,6 @@ async function launcherIcons() {
 
 // Status-bar icon for the order-checklist notification: white line-art, 24dp.
 async function notificationIcons() {
-  const { mkdirSync } = await import("node:fs");
   for (const [d, s] of Object.entries(DENSITIES)) {
     const px = Math.round(24 * s), art = Math.round(px * 1.18);
     const buf = await sharp(await mark(art)).extract({ left: Math.round((art - px) / 2), top: Math.round((art - px) / 2), width: px, height: px }).png().toBuffer();
@@ -81,10 +91,11 @@ async function splash(w, h) {
   const markPx = Math.round(r * 0.36);
   const top = Math.round(h / 2 - markPx * 0.72);
   const fs = Math.round(r * 0.055);
+  const font = "DejaVu Serif, Liberation Serif, Georgia, serif";
   const text = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
     <defs><linearGradient id="t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6cf6a"/><stop offset="1" stop-color="#c9731c"/></linearGradient></defs>
-    <text x="${w / 2}" y="${top + markPx + fs * 1.5}" text-anchor="middle" font-family="DejaVu Serif, Liberation Serif, serif" font-weight="bold" font-size="${fs}" letter-spacing="${fs * 0.12}" fill="url(#t)">LIQUOR CABINET</text>
-    <text x="${w / 2}" y="${top + markPx + fs * 2.6}" text-anchor="middle" font-family="DejaVu Serif, Liberation Serif, serif" font-size="${Math.round(fs * 0.4)}" letter-spacing="${fs * 0.25}" fill="#8f8270">PARTY PLANNER</text>
+    <text x="${w / 2}" y="${top + markPx + fs * 1.5}" text-anchor="middle" font-family="${font}" font-weight="bold" font-size="${fs}" letter-spacing="${fs * 0.12}" fill="url(#t)">LIQUOR CABINET</text>
+    <text x="${w / 2}" y="${top + markPx + fs * 2.6}" text-anchor="middle" font-family="${font}" font-size="${Math.round(fs * 0.4)}" letter-spacing="${fs * 0.25}" fill="#8f8270">PARTY PLANNER</text>
   </svg>`);
   return composite(w, h, "rect", markPx, top, [{ input: text }]);
 }
@@ -99,17 +110,59 @@ async function splashScreens() {
   }
 }
 
+// Asset-catalog Contents.json, spaced the way Xcode writes it so re-saving in Xcode is a no-op.
+const writeContents = (dir, images) =>
+  writeFileSync(join(dir, "Contents.json"), JSON.stringify({ images, info: { author: "xcode", version: 1 } }, null, 2).replace(/": /g, '" : ') + "\n");
+
+// iOS icon: one 1024 px image — Xcode 14+ derives every other size from it. It has to be
+// opaque (iOS fills an alpha channel with black, and App Store tools reject it) and square,
+// because iOS applies its own rounded mask; the artwork sits like it does in resources/icon-512.png.
+async function iosIcon() {
+  const dir = join(XCASSETS, "AppIcon.appiconset");
+  mkdirSync(dir, { recursive: true });
+  const art = await (await composite(1024, 1024, "rect", Math.round(1024 * 0.86))).toBuffer();
+  await sharp(art).flatten({ background: BG }).png().toFile(join(dir, "AppIcon-512@2x.png"));
+  writeContents(dir, [{ filename: "AppIcon-512@2x.png", idiom: "universal", platform: "ios", size: "1024x1024" }]);
+}
+
+// iOS splash: LaunchScreen.storyboard (which @capacitor/splash-screen reuses after launch)
+// aspect-fills this square image, so a portrait iPhone (19.5:9) shows only its middle ~46 %.
+// That strip is drawn exactly like the Android portrait splash, then padded to a square with
+// the background's edge colour. The same image serves 1x/2x/3x, as in Capacitor's template.
+async function iosSplash() {
+  const dir = join(XCASSETS, "Splash.imageset");
+  mkdirSync(dir, { recursive: true });
+  const size = 2732, strip = Math.round((size * 9) / 19.5);
+  const pad = size - strip;
+  const art = await (await splash(strip, size)).toBuffer();
+  const png = await sharp(art)
+    .extend({ left: Math.floor(pad / 2), right: Math.ceil(pad / 2), background: BG })
+    .flatten({ background: BG })
+    .png()
+    .toBuffer();
+  const files = ["splash-2732x2732-2.png", "splash-2732x2732-1.png", "splash-2732x2732.png"];
+  for (const f of files) writeFileSync(join(dir, f), png);
+  writeContents(dir, files.map((filename, i) => ({ idiom: "universal", filename, scale: `${i + 1}x` })));
+}
+
 async function webIcons() {
   await (await composite(64, 64, "rounded", 58)).toFile(join(ROOT, "public/favicon.png"));
   await (await composite(512, 512, "rounded", 470)).toFile(join(ROOT, "public/icon-512.png"));
   await (await composite(512, 512, "rect", 440)).toFile(join(ROOT, "resources/icon-512.png"));
 }
 
-await webIcons();
-if (existsSync(RES)) {
+if (want("web")) {
+  await webIcons();
+  console.log("Web icons written to public/ and resources/");
+}
+if (want("android") && existsSync(RES)) {
   await launcherIcons();
   await splashScreens();
   await notificationIcons();
   console.log("Android icons + splash screens written to", RES);
 }
-console.log("Web icons written to public/");
+if (want("ios") && existsSync(XCASSETS)) {
+  await iosIcon();
+  await iosSplash();
+  console.log("iOS app icon + splash written to", XCASSETS);
+}
