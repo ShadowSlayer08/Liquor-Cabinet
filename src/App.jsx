@@ -60,6 +60,7 @@ export default function App() {
   const [zomatoExact, setZomatoExact] = useState(false); // signed in to Zomato in-app → exact menu prices
   const [syncIds, setSyncIds] = useState(CATEGORIES.filter((c) => c.sync).map((c) => c.id));
   const [showScraper, setShowScraper] = useState(false);
+  const [autoSync, setAutoSync] = useState(false);
   const [showCity, setShowCity] = useState(false);
   const [cartView, setCartView] = useState("liquor");
   const [toastMsg, setToastMsg] = useState(null);
@@ -116,11 +117,13 @@ export default function App() {
   useEffect(() => onBubbleToggle((key, done) => {
     if (key.startsWith("b:")) setFood((p) => p.map((l) => (l.key === key ? { ...l, ordered: done } : l)));
   }), []);
-  // liquorcabinet://tab/<tab>[?view=liquor|food] opens a tab — for links from outside the app
-  // (and CI, which uses it to screenshot every tab in the iOS Simulator).
+  // liquorcabinet://tab/<tab>[?view=liquor|food] opens a tab and liquorcabinet://sync runs a
+  // Smart Sync — for links from outside the app (and CI, which uses them to load prices and
+  // screenshot every tab in the iOS Simulator).
   useEffect(() => {
     if (!isNative()) return;
     const open = (url) => {
+      if (/^liquorcabinet:\/\/sync/.test(url || "")) { setOnboarded(true); setAutoSync(true); setShowScraper(true); return; }
       const m = /^liquorcabinet:\/\/tab\/(cabinet|bar|food|cart|plan)(?:\?view=(liquor|food))?/.exec(url || "");
       if (!m) return;
       if (m[2]) setCartView(m[2]);
@@ -350,7 +353,8 @@ export default function App() {
         <CityPicker city={city} loc={loc} locating={locating} onPick={pickCity} onClose={() => setShowCity(false)}
           onLocate={async () => { setShowCity(false); await detectLocation(); }} />
       )}
-      {showScraper && <ScraperPanel city={city} syncIds={syncIds} setSyncIds={setSyncIds} onData={handleScraperData} onClose={() => setShowScraper(false)} />}
+      {showScraper && <ScraperPanel city={city} syncIds={syncIds} setSyncIds={setSyncIds} onData={handleScraperData} autoStart={autoSync}
+        onClose={() => { setShowScraper(false); setAutoSync(false); }} />}
       <RemindersWatcher party={party} city={city} customDry={customDry} reminders={reminders} setReminders={setReminders} toast={toast} />
       {toastMsg && <div className="toast">{toastMsg}</div>}
     </>

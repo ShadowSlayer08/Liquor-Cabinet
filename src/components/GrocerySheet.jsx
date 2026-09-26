@@ -10,7 +10,7 @@ const hhmm = (t) => new Date(t).toLocaleTimeString("en-IN", { hour: "2-digit", m
 
 // Product choices for one party-supply item, ordered on Blinkit: the usual MRP options, plus
 // (phone only, beta) live prices read off Blinkit's own search page. MRP stays the fallback.
-export default function GrocerySheet({ grocery, need, selectedId, onPick, onClose }) {
+export default function GrocerySheet({ grocery, need, selectedId, onPick, onClose, loc }) {
   const [live, setLive] = useState(null); // null · "loading" · "failed" · { options, at }
   const run = useRef(0);                  // ignores a lookup that finishes after the sheet moved on
   useEffect(() => { setLive(null); return () => { run.current++; }; }, [grocery.id]);
@@ -22,7 +22,7 @@ export default function GrocerySheet({ grocery, need, selectedId, onPick, onClos
     tap();
     setLive("loading");
     try {
-      const items = await blinkitLive(query);
+      const items = await blinkitLive(query, loc);
       if (id === run.current) setLive({ options: items.map((it) => liveOption(it, grocery.unit, grocery.options[0])), at: Date.now() });
     } catch (e) {
       console.warn("blinkitLive", e);
@@ -55,7 +55,7 @@ export default function GrocerySheet({ grocery, need, selectedId, onPick, onClos
       footer={<button className="btn btn-blinkit btn-block" onClick={() => openBlinkitSearch(grocery.options[0].blinkit)}>Browse “{grocery.name}” on Blinkit ↗</button>}
     >
       {!liveAvailable() ? (
-        <button className="btn btn-ghost btn-sm btn-block" disabled>Live Blinkit prices · Android app only</button>
+        <button className="btn btn-ghost btn-sm btn-block" disabled>Live Blinkit prices · phone app only</button>
       ) : live === "loading" ? (
         <Spinner label="Reading prices off Blinkit… (a few seconds)" />
       ) : live?.options ? (

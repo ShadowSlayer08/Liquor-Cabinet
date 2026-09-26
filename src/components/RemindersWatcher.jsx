@@ -33,7 +33,7 @@ export default function RemindersWatcher({ party, city, customDry, reminders, se
       const res = await scheduleReminders(list, enabled);
       if (!res.native) {
         setReminders((r) => ({ ...r, scheduledFor: null, scheduledSig: null, keptFor: null }));
-        toast("Reminders work in the Android app");
+        toast("Reminders work in the phone app");
         return;
       }
       setReminders((r) => ({ ...r, scheduledFor: res.scheduled ? when : null, scheduledSig: res.scheduled ? reminderSig(list, enabled) : null, keptFor: null }));

@@ -5,9 +5,10 @@ import { useEffect, useState } from "react";
 import { App as CapApp } from "@capacitor/app";
 import { bubbleAvailable, canDrawOverlay, requestOverlay, hideBubble } from "../../lib/bubble.js";
 import { tap } from "../../lib/order.js";
+import { isIOS } from "../../lib/http.js";
 
 export default function BubbleCard({ bubble, setBubble, toast }) {
-  const native = bubbleAvailable();
+  const native = bubbleAvailable(), iphone = isIOS();
   const [granted, setGranted] = useState(null);  // null = not checked yet
   const [ask, setAsk] = useState(false);         // showing the "why" before opening settings
   const [waiting, setWaiting] = useState(false); // in Android settings, waiting for the user to come back
@@ -57,7 +58,7 @@ export default function BubbleCard({ bubble, setBubble, toast }) {
     <div className="card fade-up">
       <div className="card-title">
         <span className="kicker">Order checklist</span>
-        {!native && <span className="pill nat-beta">Android only</span>}
+        {!native && <span className="pill nat-beta">{iphone ? "Not on iPhone" : "Android only"}</span>}
       </div>
       <button className="toggle" onClick={flip} disabled={!native} style={native ? undefined : { opacity: 0.5 }}>
         <span className="row" style={{ gap: 12, alignItems: "flex-start" }}>
@@ -86,7 +87,9 @@ export default function BubbleCard({ bubble, setBubble, toast }) {
           <button className="btn btn-gold btn-xs" style={{ marginLeft: 8 }} onClick={openSettings}>Allow again</button>
         </div>
       )}
-      {!native && <div className="tiny dim" style={{ marginTop: 10 }}>The bubble floats over other Android apps, so it only works in the Android app.</div>}
+      {!native && <div className="tiny dim" style={{ marginTop: 10 }}>{iphone
+        ? "iPhone doesn't let apps float over other apps, so this one is Android-only — your order checklist notification comes along instead."
+        : "The bubble floats over other Android apps, so it only works in the Android app."}</div>}
     </div>
   );
 }

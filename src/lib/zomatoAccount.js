@@ -5,14 +5,19 @@
 //  app's cookie store — `isIsolated: false` is essential: by default the web view
 //  runs in its own process with its own cookie jar and the login never reaches
 //  native requests. From then on every menu fetched through lib/http.js carries
-//  the session. Never verified with a real Zomato account, hence "beta".
+//  the session. On iPhone the web view and native requests keep separate cookie
+//  jars, so after sign-in ios/…/CookieBridgePlugin.swift copies Zomato's cookies
+//  across. Never verified with a real Zomato account, hence "beta".
 // ═══════════════════════════════════════════════════════════════════════════════
-import { CapacitorCookies } from "@capacitor/core";
+import { CapacitorCookies, registerPlugin } from "@capacitor/core";
 import { InAppBrowser, DefaultWebViewOptions, DefaultAndroidWebViewOptions } from "@capacitor/inappbrowser";
-import { isNative } from "./http.js";
+import { isNative, isIOS } from "./http.js";
 import { store } from "./store.js";
 import { fetchMenu } from "./sources.js";
 import { ZOMATO_BASE, hasExactPrices } from "./parse/zomato.js";
+
+const CookieBridge = registerPlugin("CookieBridge"); // iOS only
+const ZOMATO_DOMAIN = "zomato.com";
 
 // { at } — the user went through sign-in but no priced menu has confirmed it yet.
 const PENDING = "zomatoSignin";
@@ -24,7 +29,12 @@ export const clearPending = () => store.del(PENDING);
 export async function openZomatoSignIn(onClosed) {
   let handle = null, done = false;
   const stop = () => { done = true; handle?.remove(); handle = null; };
-  handle = await InAppBrowser.addListener("browserClosed", () => { if (!done) { stop(); onClosed(); } });
+  handle = await InAppBrowser.addListener("browserClosed", async () => {
+    if (done) return;
+    stop();
+    if (isIOS()) await CookieBridge.pull({ domain: ZOMATO_DOMAIN }).catch((e) => console.warn("CookieBridge.pull", e));
+    onClosed();
+  });
   await store.set(PENDING, { at: Date.now() });
   try {
     await InAppBrowser.openInWebView({
@@ -83,6 +93,8 @@ export async function signOutOfZomato() {
     // Blinkit just asks for your location again), so clear the whole jar.
     await CapacitorCookies.clearCookies({ url: ZOMATO_BASE }).catch(() => {});
     await CapacitorCookies.clearAllCookies();
+    // iOS: the sign-in's own cookies live in WebKit's store, which the calls above don't reach.
+    if (isIOS()) await CookieBridge.clearSite({ domain: ZOMATO_DOMAIN }).catch((e) => console.warn("CookieBridge.clearSite", e));
   }
   await dropCachedMenus();
   await clearPending();

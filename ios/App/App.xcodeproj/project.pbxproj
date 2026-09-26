@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1C0C0A000000000000000041 /* CookieBridgePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0C0A000000000000000042 /* CookieBridgePlugin.swift */; };
 		1C0C0A000000000000000011 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0C0A000000000000000012 /* MainViewController.swift */; };
 		1C0C0A000000000000000021 /* ExternalAppPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0C0A000000000000000022 /* ExternalAppPlugin.swift */; };
 		1C0C0A000000000000000031 /* WebRenderPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0C0A000000000000000032 /* WebRenderPlugin.swift */; };
@@ -22,6 +23,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		1C0C0A000000000000000042 /* CookieBridgePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CookieBridgePlugin.swift; sourceTree = "<group>"; };
 		1C0C0A000000000000000012 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		1C0C0A000000000000000022 /* ExternalAppPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalAppPlugin.swift; sourceTree = "<group>"; };
 		1C0C0A000000000000000032 /* WebRenderPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebRenderPlugin.swift; sourceTree = "<group>"; };
@@ -73,6 +75,7 @@
 				9582B6822FE993A50072D4E8 /* SceneDelegate.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
+				1C0C0A000000000000000042 /* CookieBridgePlugin.swift */,
 				1C0C0A000000000000000012 /* MainViewController.swift */,
 				1C0C0A000000000000000022 /* ExternalAppPlugin.swift */,
 				1C0C0A000000000000000032 /* WebRenderPlugin.swift */,
@@ -169,6 +172,7 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
+				1C0C0A000000000000000041 /* CookieBridgePlugin.swift in Sources */,
 				1C0C0A000000000000000011 /* MainViewController.swift in Sources */,
 				1C0C0A000000000000000021 /* ExternalAppPlugin.swift in Sources */,
 				1C0C0A000000000000000031 /* WebRenderPlugin.swift in Sources */,

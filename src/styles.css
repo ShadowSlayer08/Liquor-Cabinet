@@ -38,6 +38,7 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 html, body { background: var(--bg); color: var(--text); }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; } /* no font inflation on iOS rotation */
 body {
   font-family: var(--ui);
   font-size: 14px;

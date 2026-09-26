@@ -6,6 +6,8 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 import { Capacitor, CapacitorHttp, CapacitorCookies } from "@capacitor/core";
 
+// Requests look like the phone's own browser: Chrome on Android, Safari on iPhone (so a Zomato
+// sign-in made in the in-app browser and the app's own requests look like one client).
 export const UA =
   "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36";
 
@@ -29,6 +31,13 @@ export const platform = () => Capacitor.getPlatform();
 export const isAndroid = () => platform() === "android";
 export const isIOS = () => platform() === "ios";
 
+// WKWebView's own UA leaves out "Version/… Safari/…"; add them back for the iOS version it reports.
+export function iosSafariUA(webUA = typeof navigator !== "undefined" ? navigator.userAgent : "") {
+  const m = /OS (\d+)_(\d+)/.exec(webUA || "");
+  const v = m ? `${m[1]}.${m[2]}` : "18.0";
+  return `Mozilla/5.0 (iPhone; CPU iPhone OS ${v.replace(".", "_")} like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/${v} Mobile/15E148 Safari/604.1`;
+}
+
 // `cookie` ("a=1; b=2") must reach the site as cookies.
 //  • Natively, Capacitor routes every request through the app's shared cookie
 //    store (the same one in-app web views use — that's how a Zomato login
@@ -50,7 +59,7 @@ export async function getText(url, { timeout = 30000, headers = {}, cookie = nul
     const res = await CapacitorHttp.get({
       url,
       headers: {
-        "User-Agent": UA,
+        "User-Agent": isIOS() ? iosSafariUA() : UA,
         Accept: "text/html,application/json;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-IN,en;q=0.9",
         ...headers,

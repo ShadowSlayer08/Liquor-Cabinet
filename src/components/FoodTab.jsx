@@ -133,7 +133,7 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
         </div>
         <div className="form-grid" style={{ marginBottom: 14 }}>
           {/* An emptied date/time is ignored: dry days, reminders and the invite all need one. */}
-          <div className="field"><label>Date</label><input type="date" className="input bar-date" aria-label="Party date" value={party.date || ""} min={todayISO()} onChange={(e) => e.target.value && set("date")(e.target.value)} /></div>
+          <div className="field"><label>Date</label><input type="date" className="input bar-date" aria-label="Party date" value={party.date || ""} min={todayISO()} onChange={(e) => e.target.value && set("date")(e.target.value < todayISO() ? todayISO() : e.target.value)} /></div>
           <div className="field"><label>Time</label><input type="time" className="input bar-date" aria-label="Party time" value={party.time || ""} onChange={(e) => e.target.value && set("time")(e.target.value)} /></div>
         </div>
         <DryDayBanner date={party.date} city={city} customDry={customDry} style={{ marginBottom: 14 }} />
@@ -335,7 +335,7 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
           onClose={() => setMenuOpen(null)} />
       )}
       {groceryOpen && (
-        <GrocerySheet grocery={groceryOpen} need={needs[groceryOpen.id]} selectedId={chosen(groceryOpen).id} onClose={() => setGroceryOpen(null)}
+        <GrocerySheet grocery={groceryOpen} loc={loc} need={needs[groceryOpen.id]} selectedId={chosen(groceryOpen).id} onClose={() => setGroceryOpen(null)}
           onPick={(p, packs) => { upsertFood(groceryLine(groceryOpen, p, packs)); tap(); toast(`${groceryOpen.name} added to Blinkit list`); setGroceryOpen(null); }} />
       )}
     </div>

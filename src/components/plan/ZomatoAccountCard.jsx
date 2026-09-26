@@ -115,7 +115,7 @@ export default function ZomatoAccountCard({ loc, zomatoExact, setZomatoExact, fo
         {!zomatoExact && (status === "pending" || status === "failed") && <button className="btn btn-ghost btn-sm" onClick={verify}>Check again</button>}
         {(zomatoExact || status === "pending") && <button className="btn btn-ghost btn-sm" disabled={busy} onClick={signOut}>Sign out</button>}
       </div>
-      {!native && <div className="tiny dim" style={{ marginTop: 8 }}>Works in the Android app.</div>}
+      {!native && <div className="tiny dim" style={{ marginTop: 8 }}>Works in the phone app.</div>}
       <div className="tiny dim" style={{ marginTop: 8 }}>Beta — couldn't be tested with a real Zomato account. You sign in on Zomato's own page; Liquor Cabinet never sees your password.</div>
     </div>
   );

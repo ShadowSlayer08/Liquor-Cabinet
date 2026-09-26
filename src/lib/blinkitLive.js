@@ -145,8 +145,11 @@ export function liveOption(item, unit, ref = null) {
 // One page at a time: WebRender renders a single hidden page, so calls queue up.
 let queue = Promise.resolve();
 
-async function readSearch(query) {
-  const res = await WebRender.extract({ url: blinkitSearchUrl(query), script: CARD_SCRIPT, timeoutMs: 20000, pollMs: 700 });
+// `loc` (lib/location.js) → lat/lon: the hidden page gets them as its navigator.geolocation, so
+// Blinkit shows your delivery area's prices without asking (iOS; Android grants the page itself).
+async function readSearch(query, loc) {
+  const where = Number.isFinite(loc?.lat) && Number.isFinite(loc?.lon) ? { lat: loc.lat, lon: loc.lon } : {};
+  const res = await WebRender.extract({ url: blinkitSearchUrl(query), script: CARD_SCRIPT, timeoutMs: 20000, pollMs: 700, ...where });
   let cards = [];
   try { cards = JSON.parse(res?.result || "[]"); } catch { /* not JSON → no cards */ }
   const items = extractProducts(cards);
@@ -155,9 +158,9 @@ async function readSearch(query) {
 }
 
 // Live products for a Blinkit search → [{ name, price, pack, img }]. Phone only; throws on any failure.
-export function blinkitLive(query) {
-  if (!isNative()) return Promise.reject(new Error("Live Blinkit prices work in the Android app only"));
-  const run = queue.then(() => readSearch(query));
+export function blinkitLive(query, loc = null) {
+  if (!isNative()) return Promise.reject(new Error("Live Blinkit prices work in the phone app only"));
+  const run = queue.then(() => readSearch(query, loc));
   queue = run.catch(() => {});
   return run;
 }

@@ -13,7 +13,7 @@ import { Share } from "@capacitor/share";
 import { Clipboard } from "@capacitor/clipboard";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
-import { isNative } from "./http.js";
+import { isNative, isIOS } from "./http.js";
 
 const ExternalApp = registerPlugin("ExternalApp");
 
@@ -67,7 +67,8 @@ export async function postChecklist(id, title, lines, summary) {
     await LocalNotifications.schedule({
       notifications: [{
         id, title,
-        body: lines.slice(0, 2).join(" · ") + (lines.length > 2 ? ` +${lines.length - 2} more` : ""),
+        // iOS ignores largeBody and shows the full body on long-press, so the whole list goes there.
+        body: isIOS() ? lines.join("\n") : lines.slice(0, 2).join(" · ") + (lines.length > 2 ? ` +${lines.length - 2} more` : ""),
         largeBody: lines.join("\n"),
         summaryText: summary,
         smallIcon: "ic_stat_liquor",

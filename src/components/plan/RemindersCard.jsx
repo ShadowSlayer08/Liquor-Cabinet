@@ -23,7 +23,7 @@ export default function RemindersCard({ party, city, customDry, reminders, setRe
     tap(); setBusy(true);
     try {
       const res = await scheduleReminders(list, enabled);
-      if (!res.native) { toast("Reminders work in the Android app"); return; }
+      if (!res.native) { toast("Reminders work in the phone app"); return; }
       const sig = reminderSig(list, enabled);
       setReminders((r) => ({ ...r, scheduledFor: res.scheduled ? st.when : null, scheduledSig: res.scheduled ? sig : null, keptFor: null }));
       if (res.scheduled) { buzz(); toast(`${res.scheduled} reminder${res.scheduled === 1 ? "" : "s"} set`); }
@@ -74,7 +74,7 @@ export default function RemindersCard({ party, city, customDry, reminders, setRe
           </div>
 
           {!native ? (
-            <div className="note note-info" style={{ marginTop: 12 }}>Reminders are phone notifications — they work in the Android app.</div>
+            <div className="note note-info" style={{ marginTop: 12 }}>Reminders are phone notifications — they work in the phone app.</div>
           ) : st.moved ? (
             <div className="note note-warn" style={{ marginTop: 12 }}>Set for the old time ({prettyWhen(reminders.scheduledFor)}). Tap Set reminders to move them.</div>
           ) : st.dirty ? (

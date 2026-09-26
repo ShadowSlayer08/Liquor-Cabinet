@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CATEGORIES, cityName } from "../lib/parse/livcheers.js";
 import { scrapeCategory, priceKey, STALE_MS } from "../lib/sources.js";
 import { store } from "../lib/store.js";
@@ -7,7 +7,8 @@ import { useBackHandler } from "../lib/back.js";
 // ═══════════════════════════════════════════════════════════════════════════════
 //  SCRAPER PANEL — fetches Livcheers category pages directly and parses them.
 // ═══════════════════════════════════════════════════════════════════════════════
-export default function ScraperPanel({ city, syncIds, setSyncIds, onData, onClose }) {
+// `autoStart` runs a Smart Sync as soon as the panel opens (the liquorcabinet://sync link).
+export default function ScraperPanel({ city, syncIds, setSyncIds, onData, onClose, autoStart = false }) {
   const [logs, setLogs] = useState([]);
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(false);
@@ -67,6 +68,7 @@ export default function ScraperPanel({ city, syncIds, setSyncIds, onData, onClos
     addLog(`Done! ${products} products · fetched:${net} cache:${cache} errors:${errors}`, errors ? "warn" : "ok");
     setRunning(false); setDone(true);
   };
+  useEffect(() => { if (autoStart) run(false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pct = total ? phase / total : 0;
   const logColor = { ok: "#22c97a", error: "#e84040", warn: "#e8c030", pending: "#8a8a8a", info: "#6a6055" };

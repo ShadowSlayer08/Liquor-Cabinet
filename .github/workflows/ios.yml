@@ -30,10 +30,11 @@ jobs:
       - run: xcodebuild -version
       - name: Archive (no code signing)
         run: |
-          set -o pipefail
-          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
-            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" archive 2>&1 | tee "$RUNNER_TEMP/xcodebuild.log" | grep -E "error:|warning: .*\.swift|BUILD|ARCHIVE" || true
+          LOG="$RUNNER_TEMP/xcodebuild.log"
+          if ! xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release             -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive"             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" archive > "$LOG" 2>&1; then
+            grep -E "error:" -A3 "$LOG" | head -120; tail -30 "$LOG"; exit 1
+          fi
+          grep -E "(MainViewController|ExternalAppPlugin|WebRenderPlugin|CookieBridgePlugin)\.swift:[0-9]+:[0-9]+: warning" "$LOG" | sort -u || true
           test -d "$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app"
       - name: Package IPA
         run: |
@@ -62,10 +63,10 @@ jobs:
       - run: npx vite build && npx cap sync ios
       - name: Build for the simulator
         run: |
-          set -o pipefail
-          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
-            -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/dd" \
-            CODE_SIGNING_ALLOWED=NO build 2>&1 | tee "$RUNNER_TEMP/xcodebuild-sim.log" | grep -E "error:|BUILD" || true
+          LOG="$RUNNER_TEMP/xcodebuild-sim.log"
+          if ! xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug             -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/dd"             CODE_SIGNING_ALLOWED=NO build > "$LOG" 2>&1; then
+            grep -E "error:" -A3 "$LOG" | head -120; tail -30 "$LOG"; exit 1
+          fi
           test -d "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app"
       - name: Run and screenshot every tab
         run: bash scripts/ci/ios-screenshots.sh "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app" ios-screens
