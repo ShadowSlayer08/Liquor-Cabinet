@@ -19,6 +19,7 @@ export default function CabinetTab({
   city, loc, catalog, ages, activeCat, setActiveCat, qtyOf, addItem, remItem, budgetLeft, openScraper,
   plan, spent, budget, bottles, onPairing,
   party, liquorCats = [], customDry, onBar,
+  openFill,
 }) {
   const [tierF, setTierF] = useState("All");
   const [origF, setOrigF] = useState("All");
@@ -86,6 +87,7 @@ export default function CabinetTab({
         </div>
         <div className="bar-hero-row">
           <MixableChip liquorCats={liquorCats} onClick={onBar} />
+          {openFill && <button className="chip bar-chip" onClick={openFill}><Icon.sparkle size={14} /> Fill my bar</button>}
           <button className="chip bar-chip" onClick={findLiquorStores}><Icon.pin size={14} /> Find a store</button>
         </div>
         <DryDayBanner compact date={party?.date} city={city} customDry={customDry} style={{ marginTop: 10 }} />

@@ -58,6 +58,15 @@ export function dryDayOn(date, citySlug, custom = []) {
   return hits.sort((a, b) => RANK[a.level] - RANK[b.level])[0] || null;
 }
 
+// The next date of a festival in the tables above (e.g. "Diwali"), on or after `from` — for
+// party templates. null once the tables run out: they need the same yearly update.
+export function festivalDate(name, from = todayISO()) {
+  const n = String(name || "").trim().toLowerCase();
+  if (!n) return null;
+  const dates = [...OFTEN, ...STATE_DAYS].filter(([date, nm]) => nm.toLowerCase() === n && date >= from).map(([date]) => date);
+  return dates.sort()[0] || null;
+}
+
 export function upcomingDryDays(citySlug, custom = [], fromDate = todayISO(), n = 6) {
   const y = yearOf(fromDate);
   return dryDaysFor(citySlug, custom, [y, y + 1, y + 2]).filter((d) => d.date >= fromDate).slice(0, n);

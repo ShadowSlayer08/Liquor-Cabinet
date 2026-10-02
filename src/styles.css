@@ -583,6 +583,47 @@ body:has(.share-ask) .toast { bottom: calc(var(--safe-bottom) + var(--nav-h) + 1
 .gauge-actions .link { display: inline-flex; align-items: center; gap: 6px; color: var(--gold); font-size: 12.5px; font-weight: 600; }
 
 /* ── v1.4.1 · A: budget optimiser, templates, legal ──────────────────────── */
+/* Fill my bar: the amount field (₹ inside, as tall as the drinks stepper) and quick amounts */
+.opt-money { position: relative; }
+.opt-money > span { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--gold); font-size: 18px; font-weight: 700; pointer-events: none; }
+.opt-money .input { height: 52px; padding-left: 32px; font-family: var(--display); font-size: 20px; font-weight: 700; }
+.opt-quick { margin-bottom: 6px; }
+.opt-quick .chip { padding: 6px 12px; font-size: 12px; }
+.opt-note { display: flex; align-items: center; gap: 10px; }
+.opt-note .btn { flex-shrink: 0; }
+
+/* Result: four small stats, then one row per spirit family */
+.opt-sum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 6px 0 12px; }
+.opt-sum > div { min-width: 0; padding: 9px 6px; border-radius: 14px; text-align: center; background: rgba(0, 0, 0, .3); border: 1px solid var(--stroke); }
+.opt-sum .v { font-size: 17px; font-weight: 700; letter-spacing: -.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.opt-sum .l { font-size: 9.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.opt-line { align-items: flex-start; }
+.opt-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.opt-skipped { gap: 8px; margin: 4px 0 2px; }
+
+/* Stacking: the sync panel is rendered before the optimiser in App, so the optimiser steps
+   just below it; the legal notice also opens from the Welcome screen (z-index 150). */
+.overlay:has(.opt-fill) { z-index: 99; }
+.overlay:has(.opt-legal) { z-index: 160; }
+
+/* Party templates: "Start from" chips in the Food tab's party card, and the confirm sheet */
+.opt-tpl { margin-bottom: 14px; }
+.opt-tpl .chips { padding-bottom: 4px; }
+.opt-tpl-hero { font-size: 52px; line-height: 1; text-align: center; margin: 2px 0 14px; filter: drop-shadow(0 8px 14px rgba(0, 0, 0, .45)); }
+.opt-change { display: flex; align-items: baseline; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--stroke); font-size: 13px; }
+.opt-change b { white-space: nowrap; }
+.opt-from { text-decoration: line-through; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
+/* Legal notice & privacy */
+.opt-svc { display: grid; gap: 1px; padding: 9px 0; border-bottom: 1px solid var(--stroke); }
+.opt-svc:last-child { border-bottom: none; padding-bottom: 0; }
+.opt-svc b { font-size: 13.5px; }
+.opt-legal-list { display: grid; gap: 8px; padding-left: 18px; }
+.opt-legal-list li { line-height: 1.5; }
+.opt-legal-list li::marker { color: var(--gold); }
+.opt-legal-pt p { margin-top: 4px; line-height: 1.55; }
+.opt-legal-pt + .opt-legal-pt { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--stroke); }
+.opt-legal-foot { display: block; width: 100%; text-align: center; padding: 6px 0 2px; }
 
 /* (end v141-a) */
 
