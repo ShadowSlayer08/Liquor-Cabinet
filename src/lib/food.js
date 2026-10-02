@@ -14,6 +14,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 import { CAT } from "./parse/livcheers.js";
 import { cocktailUses, servingsByFamily, familyOfCat } from "./cocktails.js";
+export { DISHES, DISH, COURSES, suggestDishes } from "./dishes.js";
 
 export const MIXER_PER_DRINK = 150; // ml
 export const PIECES_PER_PLATE = 8;  // a typical Zomato starter plate
@@ -26,9 +27,20 @@ export const APPETITE = {
 
 // `name`, `date` (ISO, null = the coming Saturday — set by App), `time`, `host` and `upi`
 // describe the party itself: dry-day checks, reminders, the invite card and bill split.
+// `drivers` stay sober to drive (they count as non-drinkers); `mix` is the bar style a template
+// or the budget optimiser picked; `prefs` are the guests' tastes that steer the cocktail,
+// mocktail and food suggestions (lib/suggestDrinks.js, lib/suggestFood.js).
+export const DEFAULT_PREFS = {
+  drinks: [],         // cocktail tags they like, e.g. "refreshing", "sweet", "strong", "classic" (see TAGS in cocktails.js)
+  cuisines: [],       // food styles they like, e.g. "north-indian", "chinese", "street", "continental" (see CUISINES in dishes.js)
+  spice: "medium",    // "mild" | "medium" | "hot"
+  avoid: [],          // proteins nobody should be served, e.g. "mutton", "seafood", "egg" (see dishes.js)
+  jain: false,        // no onion / garlic / root vegetables
+};
 export const DEFAULT_PARTY = {
   guests: 10, hours: 4, drinkersPct: 80, vegPct: 40, appetite: "regular", dinner: true, pegMl: 60,
   name: "House party", date: null, time: "20:00", host: "", upi: "",
+  drivers: 0, mix: null, prefs: DEFAULT_PREFS,
 };
 
 export const MIXERS = {
@@ -38,46 +50,7 @@ export const MIXERS = {
   lemon: { label: "Lemon-lime soda", emoji: "🍈" },
 };
 
-// ── Zomato dishes ────────────────────────────────────────────────────────────
-// `path` is the Zomato city page listing restaurants that deliver the dish.
-// veg: true | false | "both" (the dish comes in veg and non-veg versions).
-// `pairs` lists liquor categories the dish goes well with.
-const WHISKY = ["malts", "worldwhisky", "scotch", "indian", "brandy"];
-const WINE = ["redwine", "whitewine", "rose", "sparkling", "champagne"];
-export const DISHES = [
-  { id: "tandoori-chicken", name: "Tandoori Chicken", emoji: "🍗", course: "starter", veg: false, path: "delivery/dish-tandoori-chicken", pairs: [...WHISKY, "rum", "beer"] },
-  { id: "kebab",            name: "Kebabs",           emoji: "🍢", course: "starter", veg: false, path: "restaurants/kebab",              pairs: [...WHISKY, "rum"] },
-  { id: "paneer",           name: "Paneer Tikka & more", emoji: "🧀", course: "starter", veg: true, path: "delivery/dish-paneer",        pairs: [...WHISKY, "gin", "beer"] },
-  { id: "chilli-chicken",   name: "Chilli Chicken",   emoji: "🌶️", course: "starter", veg: false, path: "delivery/dish-chilli-chicken",   pairs: ["rum", "vodka", "beer", "indian"] },
-  { id: "momos",            name: "Momos",            emoji: "🥟", course: "starter", veg: "both", path: "delivery/dish-momos",           pairs: ["vodka", "beer", "sake", "rum"] },
-  { id: "chaat",            name: "Chaat",            emoji: "🥗", course: "starter", veg: true,  path: "delivery/dish-chaat",            pairs: ["vodka", "gin", "beer"] },
-  { id: "samosa",           name: "Samosa",           emoji: "🔺", course: "starter", veg: true,  path: "delivery/dish-samosa",           pairs: ["beer", "rum", "indian"] },
-  { id: "rolls",            name: "Rolls",            emoji: "🌯", course: "starter", veg: "both", path: "delivery/dish-rolls",           pairs: ["tequila", "beer", "rtd"] },
-  { id: "shawarma",         name: "Chicken Shawarma", emoji: "🥙", course: "starter", veg: false, path: "delivery/dish-chicken-shawarma", pairs: ["tequila", "beer", "vodka"] },
-  { id: "fish",             name: "Fish Fry & Tikka", emoji: "🐟", course: "starter", veg: false, path: "delivery/dish-fish",             pairs: ["gin", "sake", ...WINE, "malts"] },
-  { id: "pizza",            name: "Pizza",            emoji: "🍕", course: "starter", veg: "both", path: "delivery/dish-pizza",           pairs: ["beer", ...WINE, "rtd", "tequila"] },
-  { id: "burger",           name: "Burgers",          emoji: "🍔", course: "starter", veg: "both", path: "delivery/dish-burger",          pairs: ["beer", "rtd", "rum"] },
-  { id: "sandwich",         name: "Sandwiches",       emoji: "🥪", course: "starter", veg: "both", path: "delivery/dish-sandwich",        pairs: ["gin", ...WINE] },
-  { id: "salad",            name: "Salads",           emoji: "🥬", course: "starter", veg: true,  path: "delivery/dish-salad",            pairs: ["gin", ...WINE, "vodka"] },
-  { id: "biryani",          name: "Chicken Biryani",  emoji: "🍛", course: "main", veg: false, path: "delivery/dish-chicken-biryani",     pairs: [...WHISKY, "beer", "rum"] },
-  { id: "mutton-biryani",   name: "Mutton Biryani",   emoji: "🍖", course: "main", veg: false, path: "delivery/dish-mutton-biryani",      pairs: [...WHISKY, "rum"] },
-  { id: "veg-biryani",      name: "Veg Biryani",      emoji: "🍚", course: "main", veg: true,  path: "delivery/dish-veg-biryani",         pairs: [...WHISKY, "beer"] },
-  { id: "butter-chicken",   name: "Butter Chicken",   emoji: "🍲", course: "main", veg: false, path: "delivery/dish-butter-chicken",      pairs: [...WHISKY, "redwine", "beer"] },
-  { id: "dal-makhani",      name: "Dal Makhani",      emoji: "🥣", course: "main", veg: true,  path: "delivery/dish-dal-makhani",         pairs: [...WHISKY, "redwine"] },
-  { id: "kadhai-paneer",    name: "Kadhai Paneer",    emoji: "🫕", course: "main", veg: true,  path: "delivery/dish-kadhai-paneer",       pairs: [...WHISKY, "beer"] },
-  { id: "north-indian",     name: "North Indian Meal", emoji: "🍱", course: "main", veg: "both", path: "delivery/dish-north-indian-meal", pairs: [...WHISKY, "beer", "rum"] },
-  { id: "fried-rice",       name: "Fried Rice & Noodles", emoji: "🍜", course: "main", veg: "both", path: "delivery/dish-fried-rice",     pairs: ["vodka", "beer", "sake", "rum"] },
-  { id: "gulab-jamun",      name: "Gulab Jamun",      emoji: "🟤", course: "dessert", veg: true, path: "delivery/dish-gulab-jamun",       pairs: ["liqueur", "brandy", "rum"] },
-  { id: "ice-cream",        name: "Ice Cream",        emoji: "🍨", course: "dessert", veg: true, path: "delivery/dish-ice-cream",         pairs: ["liqueur", "rum", ...WINE] },
-  { id: "cake",             name: "Cake",             emoji: "🎂", course: "dessert", veg: true, path: "delivery/dish-cake",              pairs: ["champagne", "sparkling", "liqueur"] },
-];
-export const DISH = Object.fromEntries(DISHES.map((d) => [d.id, d]));
-
-export const COURSES = {
-  starter: { label: "Starters",    emoji: "🍢" },
-  main:    { label: "Main course", emoji: "🍛" },
-  dessert: { label: "Desserts",    emoji: "🍨" },
-};
+// Zomato dishes, courses and pairing live in lib/dishes.js (re-exported here).
 
 // ── Blinkit party supplies ───────────────────────────────────────────────────
 // Blinkit blocks automated price lookups, so each supply comes with a few common
@@ -318,14 +291,6 @@ export function formatAmount(amount, unit) {
   if (unit === "ml") return amount >= 1000 ? `${(amount / 1000).toFixed(amount % 1000 ? 1 : 0)} L` : `${amount} ml`;
   if (unit === "g") return amount >= 1000 ? `${(amount / 1000).toFixed(amount % 1000 ? 1 : 0)} kg` : `${amount} g`;
   return `${amount} pcs`;
-}
-
-// Dishes ranked by how well they pair with the liquor categories in the cart.
-export function suggestDishes(catIds, course) {
-  const set = new Set(catIds);
-  return DISHES.filter((d) => !course || d.course === course)
-    .map((d) => ({ ...d, score: d.pairs.filter((c) => set.has(c)).length }))
-    .sort((a, b) => b.score - a.score);
 }
 
 // Blinkit search term for a chosen product.

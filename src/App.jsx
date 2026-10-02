@@ -17,6 +17,9 @@ import FoodTab from "./components/FoodTab.jsx";
 import CartTab from "./components/CartTab.jsx";
 import PlanTab from "./components/PlanTab.jsx";
 import RemindersWatcher from "./components/RemindersWatcher.jsx";
+import FillBarSheet from "./components/FillBarSheet.jsx";
+import SettleSheet from "./components/SettleSheet.jsx";
+import LegalSheet from "./components/LegalSheet.jsx";
 import Sheet from "./components/Sheet.jsx";
 import { Icon } from "./components/Art.jsx";
 
@@ -59,6 +62,12 @@ export default function App() {
   const [split, setSplit] = useState(DEFAULT_SPLIT);    // bill split settings (people/drinkers null = from the plan)
   const [bubble, setBubble] = useState(false);          // floating order checklist over other apps
   const [zomatoExact, setZomatoExact] = useState(false); // signed in to Zomato in-app → exact menu prices
+  const [settle, setSettle] = useState(null);           // settle-up after the party (lib/settle.js); survives the date roll-over
+  const [grocer, setGrocer] = useState("blinkit");      // which 10-minute app the supplies run uses (lib/grocers.js)
+  const [showFill, setShowFill] = useState(false);      // budget optimiser sheet
+  const [showSettle, setShowSettle] = useState(false);
+  const [showLegal, setShowLegal] = useState(false);
+  const [barKind, setBarKind] = useState("cocktails");  // Bar tab: cocktails | mocktails
   const [syncIds, setSyncIds] = useState(CATEGORIES.filter((c) => c.sync).map((c) => c.id));
   const [showScraper, setShowScraper] = useState(false);
   const [autoSync, setAutoSync] = useState(false);
@@ -77,13 +86,15 @@ export default function App() {
       if (cfg.batches?.length) setBatches(cfg.batches);
       if (cfg.activeBatch != null) setActiveBatch(cfg.activeBatch);
       if (cfg.food) setFood(migrateFood(cfg.food));
-      if (cfg.party) setParty(withDate({ ...DEFAULT_PARTY, ...cfg.party }));
+      if (cfg.party) setParty(withDate({ ...DEFAULT_PARTY, ...cfg.party, prefs: { ...DEFAULT_PARTY.prefs, ...cfg.party.prefs } }));
       if (cfg.cocktailMenu) setCocktailMenu(cfg.cocktailMenu);
       if (cfg.customDry) setCustomDry(cfg.customDry);
       if (cfg.reminders) setReminders(cfg.reminders);
       if (cfg.split) setSplit({ ...DEFAULT_SPLIT, ...cfg.split, include: { ...DEFAULT_SPLIT.include, ...cfg.split.include } });
       if (cfg.bubble != null) setBubble(cfg.bubble);
       if (cfg.zomatoExact != null) setZomatoExact(cfg.zomatoExact);
+      if (cfg.settle) setSettle(cfg.settle);
+      if (cfg.grocer) setGrocer(cfg.grocer);
       if (cfg.syncIds) setSyncIds(cfg.syncIds);
       if (cfg.activeCat) setActiveCat(cfg.activeCat);
       if (cfg.loc) setLoc(cfg.loc);
@@ -99,10 +110,10 @@ export default function App() {
   useEffect(() => {
     if (ready) store.set("cfg", {
       city, loc, budget, liquor, batches, activeBatch, food, party, syncIds, activeCat, onboarded,
-      cocktailMenu, customDry, reminders, split, bubble, zomatoExact,
+      cocktailMenu, customDry, reminders, split, bubble, zomatoExact, settle, grocer,
     });
   }, [ready, city, loc, budget, liquor, batches, activeBatch, food, party, syncIds, activeCat, onboarded,
-    cocktailMenu, customDry, reminders, split, bubble, zomatoExact]);
+    cocktailMenu, customDry, reminders, split, bubble, zomatoExact, settle, grocer]);
 
   // ── Android back button + notification taps ──────────────────────────────
   useEffect(() => {
@@ -139,10 +150,16 @@ export default function App() {
     const sub = CapApp.addListener("appUrlOpen", (e) => open(e.url));
     return () => { sub.then((s) => s.remove()); };
   }, []);
-  // Order checklists open Cart → Food; reminders name their tab ({ tab, view }).
+  // Order checklists open Cart → Food; reminders name their tab ({ tab, view, card }):
+  // a Plan card scrolls into view, and the "settle" reminder opens the settle-up sheet.
   useEffect(() => onChecklistTap((x) => {
     if (x?.tab === "food") setTab("food");
-    else { setCartView(x?.view || "food"); setTab("cart"); }
+    else if (x?.tab === "plan") {
+      setTab("plan");
+      if (x.card === "settle") setShowSettle(true);
+      else if (x.card) setTimeout(() => document.getElementById(x.card)?.scrollIntoView({ behavior: "smooth", block: "start" }), 300);
+      return;
+    } else { setCartView(x?.view || "food"); setTab("cart"); }
     window.scrollTo({ top: 0 });
   }), []);
 
@@ -214,6 +231,23 @@ export default function App() {
     });
   };
   const clearLiquor = () => { setLiquor({}); setBatches((bs) => bs.map((b) => ({ ...b, items: {} }))); };
+  // Several bottles at once (the budget optimiser): [{ cat, item, qty }] → one cart + one batch update.
+  const addItems = (lines) => {
+    const ok = (lines || []).filter((l) => l?.cat && l.item?.id && l.qty > 0);
+    if (!ok.length) return;
+    tap();
+    setLiquor((p) => {
+      const n = { ...p };
+      for (const l of ok) { const k = lkey(l.cat, l.item); n[k] = { cat: l.cat, item: slim(l.item), qty: (n[k]?.qty || 0) + l.qty }; }
+      return n;
+    });
+    setBatches((bs) => bs.map((b, i) => {
+      if (i !== activeBatch) return b;
+      const items = { ...b.items };
+      for (const l of ok) { const k = lkey(l.cat, l.item); items[k] = (items[k] || 0) + l.qty; }
+      return { ...b, items };
+    }));
+  };
 
   const handleScraperData = useCallback((results) => {
     const cm = {}, am = {};
@@ -265,6 +299,9 @@ export default function App() {
     toast("Cached data cleared");
   };
   const goTab = (t) => { setTab(t); window.scrollTo({ top: 0 }); };
+  const goBar = (kind = "cocktails") => { setBarKind(kind); goTab("bar"); };
+  // Sync some extra categories too (e.g. the optimiser asks for Indian whisky and brandy).
+  const openScraperWith = (ids = []) => { setSyncIds((cur) => [...new Set([...cur, ...ids])]); setShowScraper(true); };
 
   if (!ready) {
     return (
@@ -302,24 +339,27 @@ export default function App() {
             <CabinetTab city={city} loc={loc} catalog={catalog} ages={ages} activeCat={activeCat} setActiveCat={setActiveCat}
               qtyOf={qtyOf} addItem={addItem} remItem={remItem} budgetLeft={left} openScraper={() => setShowScraper(true)}
               plan={plan} spent={spent} budget={budget} bottles={bottles} onPairing={() => goTab("food")}
-              party={party} liquorCats={liquorCats} cocktailMenu={cocktailMenu} customDry={customDry} onBar={() => goTab("bar")} toast={toast} />
+              party={party} liquorCats={liquorCats} cocktailMenu={cocktailMenu} customDry={customDry} onBar={() => goTab("bar")} toast={toast}
+              openFill={() => setShowFill(true)} />
           )}
           {tab === "bar" && (
             <BarTab city={city} liquorCats={liquorCats} cocktailMenu={cocktailMenu} setCocktailMenu={setCocktailMenu} plan={plan} party={party}
-              toast={toast} goCabinet={() => goTab("cabinet")} goFood={() => goTab("food")} />
+              toast={toast} goCabinet={() => goTab("cabinet")} goFood={() => goTab("food")}
+              kind={barKind} setKind={setBarKind} />
           )}
           {tab === "food" && (
             <FoodTab city={city} loc={loc} locating={locating} onLocate={detectLocation} party={party} setParty={setParty} plan={plan}
               liquorCats={liquorCats} foodCart={food} upsertFood={upsertFood} removeFood={removeFood} toast={toast}
               goToCart={() => { setCartView("food"); goTab("cart"); }}
-              customDry={customDry} cocktailMenu={cocktailMenu} zomatoExact={zomatoExact} />
+              customDry={customDry} cocktailMenu={cocktailMenu} setCocktailMenu={setCocktailMenu} zomatoExact={zomatoExact}
+              openFill={() => setShowFill(true)} goBar={goBar} grocer={grocer} />
           )}
           {tab === "cart" && (
             <CartTab city={city} view={cartView} setView={setCartView}
               liquorLines={liquorLines} liquorTotal={liquorTotal} addItem={addItem} remItem={remItem} clearLiquor={clearLiquor}
               batches={batches} activeBatch={activeBatch}
               foodCart={food} updateFood={updateFood} removeFood={removeFood} clearFood={() => setFood([])} toast={toast}
-              bubble={bubble} />
+              bubble={bubble} openFill={() => setShowFill(true)} grocer={grocer} setGrocer={setGrocer} />
           )}
           {tab === "plan" && (
             <PlanTab city={city} loc={loc} locating={locating} onLocate={detectLocation} budget={budget} saveBudget={setBudget}
@@ -329,7 +369,8 @@ export default function App() {
               party={party} setParty={setParty} customDry={customDry} setCustomDry={setCustomDry} cocktailMenu={cocktailMenu}
               liquorLines={liquorLines} liquorTotal={liquorTotal} foodCart={food}
               reminders={reminders} setReminders={setReminders} split={split} setSplit={setSplit}
-              bubble={bubble} setBubble={setBubble} zomatoExact={zomatoExact} setZomatoExact={setZomatoExact} toast={toast} />
+              bubble={bubble} setBubble={setBubble} zomatoExact={zomatoExact} setZomatoExact={setZomatoExact} toast={toast}
+              settle={settle} openSettle={() => setShowSettle(true)} openLegal={() => setShowLegal(true)} />
           )}
         </main>
 
@@ -349,7 +390,7 @@ export default function App() {
       </div>
 
       {!onboarded && (
-        <Welcome locating={locating}
+        <Welcome locating={locating} onLegal={() => setShowLegal(true)}
           onLocate={async () => { await detectLocation(); setOnboarded(true); setShowScraper(true); }}
           onManual={() => { setOnboarded(true); setShowCity(true); }} />
       )}
@@ -359,13 +400,23 @@ export default function App() {
       )}
       {showScraper && <ScraperPanel city={city} syncIds={syncIds} setSyncIds={setSyncIds} onData={handleScraperData} autoStart={autoSync}
         onClose={() => { setShowScraper(false); setAutoSync(false); }} />}
+      {showFill && (
+        <FillBarSheet catalog={catalog} city={city} plan={plan} party={party} budget={budget} spent={spent} cocktailMenu={cocktailMenu}
+          batchName={batches[activeBatch]?.name} addItems={addItems} toast={toast} onClose={() => setShowFill(false)}
+          openScraper={() => setShowScraper(true)} openScraperWith={openScraperWith} />
+      )}
+      {showSettle && (
+        <SettleSheet settle={settle} setSettle={setSettle} party={party} split={split} plan={plan}
+          liquorTotal={liquorTotal} foodCart={food} blinkitTotal={blinkitTotal} toast={toast} onClose={() => setShowSettle(false)} />
+      )}
+      {showLegal && <LegalSheet onClose={() => setShowLegal(false)} />}
       <RemindersWatcher party={party} city={city} customDry={customDry} reminders={reminders} setReminders={setReminders} toast={toast} />
       {toastMsg && <div className="toast">{toastMsg}</div>}
     </>
   );
 }
 
-function Welcome({ locating, onLocate, onManual }) {
+function Welcome({ locating, onLocate, onManual, onLegal }) {
   return (
     <div className="welcome">
       <img src="./logo-mark.svg" alt="" />
@@ -380,7 +431,7 @@ function Welcome({ locating, onLocate, onManual }) {
         </button>
         <button className="btn btn-ghost btn-block" onClick={onManual}>Choose my city</button>
       </div>
-      <div className="tiny dim" style={{ marginTop: 18, maxWidth: 300 }}>Your location goes to Zomato only, to find restaurants that deliver to you — nothing is sent to us. 21+ · Drink responsibly.</div>
+      <div className="tiny dim" style={{ marginTop: 18, maxWidth: 300 }}>Your location goes to Zomato only, to find restaurants that deliver to you — nothing is sent to us. 21+ · Drink responsibly. <button className="gold tiny" onClick={onLegal}>Legal notice</button></div>
     </div>
   );
 }

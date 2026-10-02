@@ -4,6 +4,10 @@ import DishSheet from "./DishSheet.jsx";
 import MenuSheet from "./MenuSheet.jsx";
 import GrocerySheet from "./GrocerySheet.jsx";
 import DryDayBanner from "./DryDayBanner.jsx";
+import TemplatesRow from "./TemplatesRow.jsx";
+import DriversField from "./DriversField.jsx";
+import GuestPrefs from "./GuestPrefs.jsx";
+import GaugeActions from "./GaugeActions.jsx";
 import { todayISO } from "../lib/drydays.js";
 import {
   APPETITE, COURSES, GROCERIES, GROUPS, MIXERS, BISTRO_ITEMS, groceryNeeds, packsFor, formatAmount, suggestDishes, blinkitQuery,
@@ -18,7 +22,10 @@ import { Icon, Ring, VegMark } from "./Art.jsx";
 const DISH_TINT = { starter: ["#b8452a", "#3a130c"], main: ["#b07a1c", "#3a2608"], dessert: ["#b03a6e", "#3a0c22"] };
 const slimRest = (r) => ({ resId: r.resId, name: r.name, appLink: r.appLink, orderUrl: r.orderUrl, rating: r.rating, deliveryTime: r.deliveryTime, locality: r.locality, costText: r.costText, costForOne: r.costForOne, img: r.img, distance: r.distance, cuisines: r.cuisines });
 
-export default function FoodTab({ city, loc, locating, onLocate, party, setParty, plan, liquorCats, foodCart, upsertFood, removeFood, goToCart, toast, customDry, zomatoExact }) {
+export default function FoodTab({
+  city, loc, locating, onLocate, party, setParty, plan, liquorCats, foodCart, upsertFood, removeFood, goToCart, toast, customDry, zomatoExact,
+  cocktailMenu, setCocktailMenu, openFill, goBar, grocer,
+}) {
   const [provider, setProvider] = useState("zomato");
   const [course, setCourse] = useState("starter");
   const [dishOpen, setDishOpen] = useState(null);
@@ -127,6 +134,7 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
       {/* ── Party ── */}
       <div className="card fade-up">
         <div className="card-title"><span className="kicker">{party.date === todayISO() ? "Tonight's party" : "The party"}</span><span className="tiny muted">{plan.drinkers} drinking · {Math.round(party.vegPct)}% veg</span></div>
+        <TemplatesRow party={party} setParty={setParty} cocktailMenu={cocktailMenu} setCocktailMenu={setCocktailMenu} plan={plan} city={city} customDry={customDry} toast={toast} />
         <div className="field" style={{ marginBottom: 14 }}>
           <label>Party name</label>
           <input className="input" value={party.name || ""} maxLength={60} placeholder="House party" aria-label="Party name" onChange={(e) => set("name")(e.target.value)} />
@@ -144,6 +152,7 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
             <label>Drinking · {party.drinkersPct}%</label>
             <input type="range" min={0} max={100} step={5} value={party.drinkersPct} style={pctStyle(party.drinkersPct)} onChange={(e) => set("drinkersPct")(+e.target.value)} />
           </div>
+          <DriversField party={party} setParty={setParty} plan={plan} />
           <div className="field">
             <label>Vegetarian · {party.vegPct}%</label>
             <input type="range" min={0} max={100} step={5} value={party.vegPct} style={pctStyle(party.vegPct)} onChange={(e) => set("vegPct")(+e.target.value)} />
@@ -161,6 +170,7 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
           <span><span className="h3">Serving dinner</span><br /><span className="tiny muted">{party.dinner ? "Starters, mains & dessert" : "Snacks-only party"}</span></span>
           <span className={`switch ${party.dinner ? "on" : ""}`} />
         </button>
+        <GuestPrefs party={party} setParty={setParty} plan={plan} />
       </div>
 
       {/* ── Drinks gauge ── */}
@@ -182,6 +192,7 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
             <div className="note note-ok">You're covered, with ~{plan.available - plan.needed} drinks to spare. 🥂</div>
           )}
         </div>
+        <GaugeActions plan={plan} cocktailMenu={cocktailMenu} openFill={openFill} goBar={goBar} />
         {plan.available > 0 && (
           <div className="chips" style={{ marginTop: 10, marginBottom: -8 }}>
             {Object.entries(plan.byCat).map(([id, n]) => <span key={id} className="chip">{CAT[id].emoji} {CAT[id].label} <b className="gold">{n}</b></span>)}

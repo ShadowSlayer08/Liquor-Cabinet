@@ -9,6 +9,7 @@ import RemindersCard from "./plan/RemindersCard.jsx";
 import DryDaysCard from "./plan/DryDaysCard.jsx";
 import ZomatoAccountCard from "./plan/ZomatoAccountCard.jsx";
 import BubbleCard from "./plan/BubbleCard.jsx";
+import RidesCard from "./plan/RidesCard.jsx";
 
 function Donut({ rows, size = 150, stroke = 20 }) {
   const total = rows.reduce((s, r) => s + r.v, 0) || 1;
@@ -38,6 +39,7 @@ export default function PlanTab({
   batches, activeBatch, setActiveBatch, addBatch, ages, openScraper, clearCache, openCity,
   party, setParty, customDry, setCustomDry, cocktailMenu, liquorLines, liquorTotal, foodCart,
   reminders, setReminders, split, setSplit, bubble, setBubble, zomatoExact, setZomatoExact, toast,
+  settle, openSettle, openLegal,
 }) {
   const [draft, setDraft] = useState(String(budget));
   const [editing, setEditing] = useState(false);
@@ -96,8 +98,10 @@ export default function PlanTab({
 
       <InviteCard party={party} setParty={setParty} city={city} loc={loc} plan={plan} cocktailMenu={cocktailMenu} liquorLines={liquorLines} foodCart={foodCart} toast={toast} />
       <SplitCard party={party} setParty={setParty} plan={plan} split={split} setSplit={setSplit}
-        liquorTotal={liquorTotal} zomatoTotal={zomatoTotal} blinkitTotal={blinkitTotal} toast={toast} />
+        liquorTotal={liquorTotal} zomatoTotal={zomatoTotal} blinkitTotal={blinkitTotal} toast={toast}
+        settle={settle} openSettle={openSettle} />
       <RemindersCard party={party} city={city} customDry={customDry} reminders={reminders} setReminders={setReminders} toast={toast} />
+      <RidesCard party={party} setParty={setParty} plan={plan} loc={loc} locating={locating} onLocate={onLocate} toast={toast} />
       <DryDaysCard party={party} city={city} customDry={customDry} setCustomDry={setCustomDry} toast={toast} />
 
       <div className="card fade-up">
@@ -153,7 +157,7 @@ export default function PlanTab({
         <div>⚡ <b style={{ color: "var(--bistro)" }}>Bistro</b> — Blinkit's 10-minute kitchen; order opens in the Bistro app.</div>
         <div>🛒 <b style={{ color: "var(--blinkit)" }}>Blinkit</b> — mixers, ice & munchies at usual MRP, or the live price read from Blinkit on your phone (beta); each opens in Blinkit.</div>
         <div>🗓️ <b className="gold">Dry days</b> — national days are certain; festival and state days vary, so check your state's notice.</div>
-        <div className="tiny dim" style={{ marginTop: 10 }}>Not affiliated with or endorsed by Livcheers, Zomato, Blinkit or Bistro.</div>
+        <div className="tiny dim" style={{ marginTop: 10 }}>Not affiliated with or endorsed by Livcheers, Zomato, Blinkit or Bistro. <button className="gold tiny" onClick={openLegal}>Legal notice & privacy ›</button></div>
         <div className="tiny dim" style={{ marginTop: 4 }}>Liquor Cabinet v1.4 · Prices are indicative. Drink responsibly, and only where it's legal for you.</div>
       </div>
     </div>

@@ -65,6 +65,14 @@
         <package android:name="com.grofers.customerapp" />
         <package android:name="com.application.zomato" />
         <package android:name="com.blinkit.bistro" />
+        <!-- v1.4.1: rides home and other 10-minute grocery apps -->
+        <package android:name="com.ubercab" />
+        <package android:name="com.olacabs.customer" />
+        <package android:name="com.rapido.passenger" />
+        <package android:name="com.humblemobile.consumer" />
+        <package android:name="com.zeptoconsumerapp" />
+        <package android:name="in.swiggy.android" />
+        <package android:name="in.swiggy.android.instamart" />
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.BROWSABLE" />

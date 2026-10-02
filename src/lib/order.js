@@ -49,6 +49,17 @@ export async function openBistro() {
 
 export const openUrl = (url) => open(url, null, url);
 
+// Generic hand-offs for apps added later (rides, other grocers): open a link in an app,
+// or launch it (Android: by package; iOS: its scheme or universal link — ExternalAppPlugin.swift).
+export const openApp = (url, pkg, fallback = url) => open(url, pkg, fallback);
+export async function launchApp(pkg, fallback) {
+  if (isNative()) {
+    try { return await ExternalApp.launch({ pkg, fallback }); } catch (e) { console.warn("ExternalApp.launch", e); }
+  }
+  if (fallback) window.open(fallback, "_blank", "noopener");
+  return { opened: "browser" };
+}
+
 export async function isInstalled(app) {
   if (!isNative()) return false;
   try { return (await ExternalApp.isInstalled({ pkg: app.pkg })).installed; } catch { return false; }

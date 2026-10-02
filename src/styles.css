@@ -574,3 +574,26 @@ body:has(.share-ask) .toast { bottom: calc(var(--safe-bottom) + var(--nav-h) + 1
   color: #231404; font-weight: 800; font-size: 16px; box-shadow: 0 6px 16px rgba(231, 168, 70, .35); animation: float 4s ease-in-out infinite; }
 
 /* (end native) */
+
+/* ═══ v1.4.1 ═════════════════════════════════════════════════════════════════
+   One block per feature track, so parallel work merges cleanly. */
+
+/* Foundation: Food tab drinks-check actions */
+.gauge-actions { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 12px; }
+.gauge-actions .link { display: inline-flex; align-items: center; gap: 6px; color: var(--gold); font-size: 12.5px; font-weight: 600; }
+
+/* ── v1.4.1 · A: budget optimiser, templates, legal ──────────────────────── */
+
+/* (end v141-a) */
+
+/* ── v1.4.1 · B: mocktails, cocktails & drink suggestions ────────────────── */
+
+/* (end v141-b) */
+
+/* ── v1.4.1 · C: rides home, settle-up, grocers ──────────────────────────── */
+
+/* (end v141-c) */
+
+/* ── v1.4.1 · D: food suggestions & guest preferences ────────────────────── */
+
+/* (end v141-d) */

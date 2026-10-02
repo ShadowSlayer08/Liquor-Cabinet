@@ -28,7 +28,9 @@ public class ExternalAppPlugin: CAPPlugin, CAPBridgedPlugin {
     private static let schemes: [String: String] = [
         "com.application.zomato": "zomato",
         "com.google.android.apps.maps": "comgooglemaps",
-        "com.whatsapp": "whatsapp"
+        "com.whatsapp": "whatsapp",
+        "com.ubercab": "uber",
+        "com.olacabs.customer": "olacabs"
     ]
 
     /// Android package → a universal link that opens the iOS app (launch() has no "start by package" on iOS).
@@ -36,7 +38,14 @@ public class ExternalAppPlugin: CAPPlugin, CAPBridgedPlugin {
         "com.grofers.customerapp": "https://blinkit.com/",
         "com.blinkit.bistro": "https://bistro.blinkit.com/",
         "com.application.zomato": "https://www.zomato.com/",
-        "com.google.android.apps.maps": "https://www.google.com/maps/"
+        "com.google.android.apps.maps": "https://www.google.com/maps/",
+        "com.ubercab": "https://m.uber.com/looking",
+        "com.olacabs.customer": "https://book.olacabs.com/",
+        "com.rapido.passenger": "https://rapido.bike/",
+        "com.humblemobile.consumer": "https://www.driveu.in/",
+        "com.zeptoconsumerapp": "https://www.zeptonow.com/",
+        "in.swiggy.android": "https://www.swiggy.com/instamart",
+        "in.swiggy.android.instamart": "https://www.swiggy.com/instamart"
     ]
 
     @objc func open(_ call: CAPPluginCall) {
