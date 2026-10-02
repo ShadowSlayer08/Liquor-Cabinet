@@ -68,6 +68,7 @@ export default function App() {
   const [showSettle, setShowSettle] = useState(false);
   const [showLegal, setShowLegal] = useState(false);
   const [barKind, setBarKind] = useState("cocktails");  // Bar tab: cocktails | mocktails
+  const [focusCard, setFocusCard] = useState(null);     // Plan card id a reminder tap scrolls to
   const [syncIds, setSyncIds] = useState(CATEGORIES.filter((c) => c.sync).map((c) => c.id));
   const [showScraper, setShowScraper] = useState(false);
   const [autoSync, setAutoSync] = useState(false);
@@ -157,11 +158,21 @@ export default function App() {
     else if (x?.tab === "plan") {
       setTab("plan");
       if (x.card === "settle") setShowSettle(true);
-      else if (x.card) setTimeout(() => document.getElementById(x.card)?.scrollIntoView({ behavior: "smooth", block: "start" }), 300);
+      else if (x.card) setFocusCard(x.card);
       return;
     } else { setCartView(x?.view || "food"); setTab("cart"); }
     window.scrollTo({ top: 0 });
   }), []);
+  // A tap that starts the app arrives before the saved plan has loaded, so scroll only once
+  // the Plan tab is actually on screen (found on the emulator).
+  useEffect(() => {
+    if (!ready || tab !== "plan" || !focusCard) return;
+    const t = setTimeout(() => {
+      document.getElementById(focusCard)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setFocusCard(null);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [ready, tab, focusCard]);
 
   const toast = useCallback((msg) => {
     setToastMsg(msg);

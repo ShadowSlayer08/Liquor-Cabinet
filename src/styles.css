@@ -775,3 +775,6 @@ body:has(.share-ask) .toast { bottom: calc(var(--safe-bottom) + var(--nav-h) + 1
 .pref-why-item { font-size: 12px; padding: 5px 10px; border-radius: 999px; color: var(--soft); background: rgba(0, 0, 0, .25); border: 1px solid var(--stroke); }
 
 /* (end v141-d) */
+
+/* A Plan card a reminder tap scrolls to stops below the sticky top bar. */
+.card[id] { scroll-margin-top: calc(var(--safe-top) + 76px); }
