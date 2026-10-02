@@ -1,16 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import Sheet, { Spinner } from "./Sheet.jsx";
 import { packsFor, formatAmount } from "../lib/food.js";
-import { openBlinkitSearch, tap } from "../lib/order.js";
+import { openGrocerSearch, tap } from "../lib/order.js";
+import { grocerOf } from "../lib/grocers.js";
 import { blinkitLive, liveAvailable, liveOption } from "../lib/blinkitLive.js";
 import { fmt } from "../lib/format.js";
 import { Icon } from "./Art.jsx";
 
 const hhmm = (t) => new Date(t).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
 
-// Product choices for one party-supply item, ordered on Blinkit: the usual MRP options, plus
-// (phone only, beta) live prices read off Blinkit's own search page. MRP stays the fallback.
-export default function GrocerySheet({ grocery, need, selectedId, onPick, onClose, loc }) {
+// Product choices for one party-supply item, ordered on the host's grocer (Blinkit, Zepto or
+// Instamart — lib/grocers.js): the usual MRP options, plus (phone only, beta) live prices read
+// off Blinkit's own search page. Only Blinkit is ever read, so with another grocer the sheet
+// says so; MRP stays the fallback.
+export default function GrocerySheet({ grocery, need, selectedId, onPick, onClose, loc, grocer = "blinkit" }) {
+  const g = grocerOf(grocer);
+  const onBlinkit = g.id === "blinkit";
   const [live, setLive] = useState(null); // null · "loading" · "failed" · { options, at }
   const run = useRef(0);                  // ignores a lookup that finishes after the sheet moved on
   useEffect(() => { setLive(null); return () => { run.current++; }; }, [grocery.id]);
@@ -40,7 +45,7 @@ export default function GrocerySheet({ grocery, need, selectedId, onPick, onClos
           <div className="small clamp2" style={{ fontWeight: 700 }}>{p.name} {on && <span className="green tiny">✓ selected</span>}</div>
           {meta}
         </div>
-        <button className="btn btn-sm btn-blinkit" onClick={() => onPick(p, packs)}>
+        <button className={`btn btn-sm ${g.cls.btn}`} onClick={() => onPick(p, packs)}>
           ×{packs} · {fmt(p.price * packs)}
         </button>
       </div>
@@ -52,7 +57,7 @@ export default function GrocerySheet({ grocery, need, selectedId, onPick, onClos
       title={`${grocery.emoji} ${grocery.name}`}
       subtitle={need ? `You need about ${formatAmount(need, grocery.unit)}` : "Pick a product"}
       onClose={onClose}
-      footer={<button className="btn btn-blinkit btn-block" onClick={() => openBlinkitSearch(grocery.options[0].blinkit)}>Browse “{grocery.name}” on Blinkit ↗</button>}
+      footer={<button className={`btn ${g.cls.btn} btn-block`} onClick={() => { tap(); openGrocerSearch(g.id, grocery.options[0].blinkit); }}>Browse “{grocery.name}” on {g.name} ↗</button>}
     >
       {!liveAvailable() ? (
         <button className="btn btn-ghost btn-sm btn-block" disabled>Live Blinkit prices · phone app only</button>
@@ -65,7 +70,9 @@ export default function GrocerySheet({ grocery, need, selectedId, onPick, onClos
             <button className="tiny gold" onClick={checkLive}>Check again</button>
           </div>
           {live.options.map((p) => option(p, <div className="tiny muted">{p.packText} · {fmt(p.price)} · <span className="nat-live">live · checked {hhmm(live.at)}</span></div>))}
-          <div className="tiny dim" style={{ marginTop: 6 }}>Read from Blinkit's search for your location just now — the app can still change it at checkout.</div>
+          <div className="tiny dim" style={{ marginTop: 6 }}>
+            Read from Blinkit's search for your location just now — the app can still change it at checkout.{!onBlinkit && ` ${g.name} sets its own prices.`}
+          </div>
         </div>
       ) : (
         <>
@@ -73,15 +80,16 @@ export default function GrocerySheet({ grocery, need, selectedId, onPick, onClos
           {live === "failed" && <div className="note note-warn" style={{ marginTop: 10 }}>Couldn't read Blinkit right now — MRP shown.</div>}
         </>
       )}
+      {!onBlinkit && <div className="tiny dim" style={{ marginTop: 6 }}>Live prices are read from Blinkit only — {g.name} shows its own price in its app.</div>}
 
       <div className="kicker" style={{ marginTop: 16 }}>Usual MRP</div>
       {grocery.options.map((p) => option(p, (
         <>
           <div className="tiny muted">{p.packText} · MRP ≈ {fmt(p.price)}</div>
-          <button className="tiny gold" onClick={() => openBlinkitSearch(p.blinkit)}>See live price on Blinkit ↗</button>
+          <button className="tiny gold" onClick={() => openGrocerSearch(g.id, p.blinkit)}>See {onBlinkit ? "live " : ""}price on {g.name} ↗</button>
         </>
       )))}
-      <div className="tiny dim" style={{ marginTop: 10 }}>Prices are the usual printed MRP — Blinkit shows the exact price (often a little lower) when you open the item.</div>
+      <div className="tiny dim" style={{ marginTop: 10 }}>Prices are the usual printed MRP — {g.name} shows the exact price (often a little lower) when you open the item.</div>
     </Sheet>
   );
 }
