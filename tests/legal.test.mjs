@@ -65,19 +65,13 @@ test("the notice is complete", () => {
   assert.equal(ISSUES_URL, `${REPO_URL}/issues`);
 });
 
-// The README's "Data sources & legal notice" is the reference wording. Its table gains the
-// v1.4.1 services when the release is put together; until then this only checks the link.
-test("README notice names the same services", (t) => {
+// The README's "Data sources & legal notice" is the reference wording: it must name every service too.
+test("README notice names the same services", () => {
   const readme = readFileSync(join(ROOT, "README.md"), "utf8");
   const start = readme.indexOf("## Data sources & legal notice");
   assert.ok(start >= 0, "README has the notice");
   const end = readme.indexOf("\n## ", start + 4);
   const section = readme.slice(start, end < 0 ? undefined : end).replace(/\*\*/g, "");
   assert.ok(section.includes(ISSUES_URL), "README links the issues page");
-  const added = ["Uber", "Ola", "Rapido", "DriveU", "Zepto", "Swiggy Instamart"];
-  if (!added.some((n) => section.includes(n))) {
-    t.skip("README table not updated for v1.4.1 yet");
-    return;
-  }
   for (const s of LEGAL_SERVICES) assert.ok(section.includes(s.name), `README notice names ${s.name}`);
 });
