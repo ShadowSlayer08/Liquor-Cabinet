@@ -29,6 +29,7 @@ export const MIXES = {
   mixed:    { label: "Mixed bar",          shares: { whisky: 0.40, rum: 0.20, gin: 0.15, vodka: 0.15, beer: 0.10 } },
   whisky:   { label: "Whisky night",       shares: { whisky: 0.70, rum: 0.15, beer: 0.15 } },
   beerwine: { label: "Beer & wine",        shares: { beer: 0.60, redwine: 0.25, whitewine: 0.15 } },
+  light:    { label: "Light & easy",       shares: { beer: 0.45, vodka: 0.25, rum: 0.15, gin: 0.15 } },
   menu:     { label: "Match my cocktails", shares: null },
 };
 
