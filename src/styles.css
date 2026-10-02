@@ -628,6 +628,40 @@ body:has(.share-ask) .toast { bottom: calc(var(--safe-bottom) + var(--nav-h) + 1
 /* (end v141-a) */
 
 /* ── v1.4.1 · B: mocktails, cocktails & drink suggestions ────────────────── */
+/* Bar tab: Cocktails | Mocktails */
+.drk-seg { margin-bottom: 14px; }
+
+/* "Picked for your party": a scrolling row of small cards, each lit by its drink's colour */
+.drk-picks-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 2px 2px 8px; }
+.drk-picks-head .kicker { display: inline-flex; align-items: center; gap: 5px; color: var(--gold); }
+.drk-picks { padding-bottom: 14px; scroll-padding: 0 16px; } /* snap cards to the page gutter, not the screen edge */
+.drk-pick {
+  --c: #e7a846; width: 214px; display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 10px; border-radius: 18px; text-align: left;
+  border: 1px solid color-mix(in srgb, var(--c) 38%, var(--stroke));
+  background: radial-gradient(90% 130% at 0% 50%, color-mix(in srgb, var(--c) 22%, transparent), transparent 70%), linear-gradient(180deg, #1d1417, #140d0f);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, .3); transition: transform .15s;
+}
+.drk-pick:active { transform: scale(.97); }
+.drk-pick > .grow { display: flex; flex-direction: column; gap: 2px; }
+.drk-pick-glow {
+  width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; font-size: 25px; line-height: 1;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--c) 58%, transparent), color-mix(in srgb, var(--c) 14%, transparent) 70%, transparent);
+}
+.drk-pick-name { display: block; font-family: var(--display); font-size: 14.5px; font-weight: 700; line-height: 1.2; color: var(--text); }
+
+/* Party menu: one progress line for cocktails, one for mocktails */
+.drk-progress { margin-top: 12px; }
+.drk-progress .progress { margin-bottom: 6px; }
+.drk-soft > div { background: linear-gradient(135deg, #8af5c6 0%, #34d98f 55%, #1f8a4c 100%); }
+.drk-link { color: var(--gold); font-weight: 600; font-size: inherit; white-space: nowrap; }
+
+/* Recipe sheet: mocktail badge and why it was picked */
+.line-item .emo.drk-zero { font-size: 13px; font-weight: 800; color: var(--green); background: rgba(52, 217, 143, .1); letter-spacing: -.2px; }
+.drk-zero-pill { background: rgba(52, 217, 143, .14); color: var(--green); }
+.drk-why { margin: -4px 0 14px; padding: 11px 13px 12px; border-radius: 16px; background: rgba(231, 168, 70, .07); border: 1px solid rgba(231, 168, 70, .24); }
+.drk-why .kicker { display: inline-flex; align-items: center; gap: 5px; color: var(--gold); margin-bottom: 8px; }
+.drk-why-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.drk-why-item { font-size: 12px; padding: 5px 10px; border-radius: 999px; color: var(--soft); background: rgba(0, 0, 0, .25); border: 1px solid var(--stroke); }
 
 /* (end v141-b) */
 

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { COCKTAILS, TAGS, barList, menuSummary, withServings, perServing, cocktailUses } from "../src/lib/cocktails.js";
+import { COCKTAILS, MOCKTAILS, TAGS, MOCKTAIL_TAGS, barList, mocktailList, makeable, menuSummary, withServings, perServing, cocktailUses } from "../src/lib/cocktails.js";
 import { dryDayOn, upcomingDryDays, addCustomDry, removeCustomDry, stateListUrl, lastShoppingDay } from "../src/lib/drydays.js";
 
 test("tags cover every cocktail, without repeats", () => {
@@ -16,11 +16,28 @@ test("bar list puts what you can make first and keeps recipe order", () => {
   assert.ok(firstLocked > 0);
   assert.ok(list.slice(0, firstLocked).every((c) => c.can));
   assert.ok(list.slice(firstLocked).every((c) => !c.can));
-  assert.deepEqual(list.slice(0, firstLocked).map((c) => c.id), ["rum-coke", "mojito", "daiquiri", "pina-colada", "hot-rum"]);
+  assert.deepEqual(list.slice(0, firstLocked).map((c) => c.id),
+    ["rum-coke", "mojito", "daiquiri", "pina-colada", "hot-rum", "dark-n-stormy", "rum-punch", "jaljeera-mojito", "goan-cooler", "mango-daiquiri"]);
   // A tag narrows the list; an empty cabinet can make nothing.
-  assert.ok(barList(["rum"], "winter").every((c) => c.tags.includes("winter")));
+  assert.ok(barList(["rum"], "warm").every((c) => c.tags.includes("warm")));
+  assert.equal(barList(["rum"], "warm")[0].id, "hot-rum");
   assert.equal(barList([], "classic")[0].can, false);
   assert.equal(barList().filter((c) => c.can).length, 0);
+});
+
+test("mocktails stay out of the cocktail lists, and are always makeable", () => {
+  assert.ok(barList([]).every((c) => !c.mocktail));
+  assert.ok(barList(["rum", "gin"]).every((c) => !c.mocktail));
+  const all = mocktailList();
+  assert.equal(all.length, MOCKTAILS.length);
+  assert.ok(all.every((c) => c.can && c.mocktail && c.missing.length === 0 && c.needs.length === 0));
+  assert.ok(mocktailList("desi").length >= 5 && mocktailList("desi").every((c) => c.tags.includes("desi")));
+  // The Cabinet hero's "N cocktails you can make" counts makeable() — no mocktails in an empty cabinet.
+  assert.equal(makeable([]).filter((c) => c.can).length, 0);
+  assert.equal(makeable(["rum"]).filter((c) => c.can).length, 10);
+  // Every mocktail chip has a mocktail behind it.
+  assert.equal(new Set(MOCKTAIL_TAGS).size, MOCKTAIL_TAGS.length);
+  for (const t of MOCKTAIL_TAGS) assert.ok(mocktailList(t).length > 0, t);
 });
 
 test("menu summary skips unknown ids and empty entries", () => {
@@ -30,9 +47,20 @@ test("menu summary skips unknown ids and empty entries", () => {
   ]);
   assert.deepEqual(s.items.map((c) => [c.id, c.servings]), [["mojito", 12], ["margarita", 3]]);
   assert.equal(s.total, 15);
+  assert.equal(s.cocktails, 15);
+  assert.equal(s.mocktails, 0);
   assert.equal(s.items[0].name, "Mojito");
-  assert.deepEqual(menuSummary(undefined), { items: [], total: 0 });
-  assert.deepEqual(menuSummary(null), { items: [], total: 0 });
+  const empty = { items: [], total: 0, cocktails: 0, mocktails: 0 };
+  assert.deepEqual(menuSummary(undefined), empty);
+  assert.deepEqual(menuSummary(null), empty);
+});
+
+test("menu summary splits cocktails and mocktails", () => {
+  const s = menuSummary([{ id: "mojito", servings: 10 }, { id: "virgin-mojito", servings: 4 }, { id: "aam-panna", servings: 2 }, { id: "virgin-mojito", servings: 1 }]);
+  assert.deepEqual(s.items.map((c) => [c.id, c.servings, !!c.mocktail]), [["mojito", 10, false], ["virgin-mojito", 5, true], ["aam-panna", 2, true]]);
+  assert.equal(s.total, 17);
+  assert.equal(s.cocktails, 10);
+  assert.equal(s.mocktails, 7);
 });
 
 test("withServings adds, updates in place and removes", () => {
