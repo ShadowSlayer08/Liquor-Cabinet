@@ -9,14 +9,17 @@
 //  Quantities follow common Indian party-catering rules of thumb:
 //    • drinks: 2 in the first hour, then 1 per hour, per drinker
 //    • mixer: 150 ml per spirit drink; ice ≈ 0.5 kg per drinker (+0.1 kg/h after 3 h)
+//    • non-drinkers (designated drivers included) drink at the same pace: a 250 ml
+//      soft drink or juice each time, or a mocktail from the party menu
 //    • starters: ~6 pieces/guest before dinner, ~12 for a snacks-only party (4 h)
 //    • mains: one "for one" Zomato serving per guest; 2–3 breads each
 // ═══════════════════════════════════════════════════════════════════════════════
 import { CAT } from "./parse/livcheers.js";
-import { cocktailUses, servingsByFamily, familyOfCat } from "./cocktails.js";
+import { cocktailUses, servingsByFamily, familyOfCat, menuSummary } from "./cocktails.js";
 export { DISHES, DISH, COURSES, suggestDishes } from "./dishes.js";
 
 export const MIXER_PER_DRINK = 150; // ml
+export const SOFT_PER_DRINK = 250;  // ml — one soft drink or juice for a non-drinker
 export const PIECES_PER_PLATE = 8;  // a typical Zomato starter plate
 
 export const APPETITE = {
@@ -31,7 +34,7 @@ export const APPETITE = {
 // or the budget optimiser picked; `prefs` are the guests' tastes that steer the cocktail,
 // mocktail and food suggestions (lib/suggestDrinks.js, lib/suggestFood.js).
 export const DEFAULT_PREFS = {
-  drinks: [],         // cocktail tags they like, e.g. "refreshing", "sweet", "strong", "classic" (see TAGS in cocktails.js)
+  drinks: [],         // drink tags they like, e.g. "refreshing", "sweet", "strong", "classic" (see DRINK_TASTES / TAGS in cocktails.js)
   cuisines: [],       // food styles they like, e.g. "north-indian", "chinese", "street", "continental" (see CUISINES in dishes.js)
   spice: "medium",    // "mild" | "medium" | "hot"
   avoid: [],          // proteins nobody should be served, e.g. "mutton", "seafood", "egg" (see dishes.js)
@@ -83,6 +86,12 @@ export const GROCERIES = [
     opt("bisleri-1l", "Bisleri Packaged Drinking Water", 1000, "ml", "1 L", 20),
     opt("kinley-2l", "Kinley Packaged Drinking Water", 2000, "ml", "2 L", 35),
   ] },
+  // For the guests who aren't drinking (on top of the cola and lemon-lime soda above).
+  { id: "juice", name: "Fruit juice", emoji: "🧃", group: "soft", unit: "ml", options: [
+    opt("real-mixed-fruit-1l", "Real Fruit Power Mixed Fruit Juice", 1000, "ml", "1 L", 125),
+    opt("tropicana-orange-1l", "Tropicana 100% Orange Juice", 1000, "ml", "1 L", 135),
+    opt("maaza-1200", "Maaza Mango Drink", 1200, "ml", "1.2 L", 75),
+  ] },
   { id: "ice", name: "Ice cubes", emoji: "🧊", group: "ice", unit: "g", options: [
     opt("ice-1kg", "Ice Cubes", 1000, "g", "1 kg", 60),
   ] },
@@ -123,7 +132,7 @@ export const GROCERIES = [
   { id: "napkins", name: "Napkins", emoji: "🧻", group: "supplies", unit: "pc", options: [
     opt("tissue-napkins-100", "Tissue Paper Napkins", 100, "pc", "100 pcs", 50, "tissue napkins"),
   ] },
-  // Cocktail extras — only needed when cocktails are on the party menu.
+  // Cocktail & mocktail extras — only needed when those drinks are on the party menu.
   { id: "mint", name: "Mint leaves", emoji: "🌱", group: "cocktail", unit: "g", options: [opt("mint-100", "Mint Leaves (Pudina)", 100, "g", "100 g", 20, "mint leaves")] },
   { id: "sugar", name: "Sugar", emoji: "🧂", group: "cocktail", unit: "g", options: [opt("sugar-1kg", "Sugar", 1000, "g", "1 kg", 55, "sugar 1kg")] },
   { id: "oranges", name: "Oranges", emoji: "🍊", group: "cocktail", unit: "pc", options: [opt("orange-4", "Orange (Santra)", 4, "pc", "4 pcs (~600 g)", 90, "orange")] },
@@ -139,16 +148,46 @@ export const GROCERIES = [
   { id: "honey", name: "Honey", emoji: "🍯", group: "cocktail", unit: "g", options: [opt("dabur-honey-250", "Dabur Honey", 250, "g", "250 g", 125)] },
   { id: "salt", name: "Salt", emoji: "🧂", group: "cocktail", unit: "g", options: [opt("tata-salt-1kg", "Tata Salt", 1000, "g", "1 kg", 28)] },
   { id: "milk", name: "Milk", emoji: "🥛", group: "cocktail", unit: "ml", options: [opt("amul-milk-500", "Amul Taaza Toned Milk", 500, "ml", "500 ml", 28, "amul milk")] },
+  // v1.4.1: the bigger cocktail list and the mocktails (MRPs looked up on blinkit.com product pages, Oct 2026).
+  { id: "mango", name: "Mango drink", emoji: "🥭", group: "cocktail", unit: "ml", options: [opt("maaza-mango-1200", "Maaza Mango Drink", 1200, "ml", "1.2 L", 75)] },
+  { id: "guava", name: "Guava juice", emoji: "🍐", group: "cocktail", unit: "ml", options: [opt("real-guava-1l", "Real Fruit Power Guava Juice", 1000, "ml", "1 L", 115)] },
+  { id: "coconutwater", name: "Coconut water", emoji: "🥥", group: "cocktail", unit: "ml", options: [opt("real-activ-coconut-1l", "Real Activ Coconut Water", 1000, "ml", "1 L", 178, "coconut water")] },
+  { id: "roohafza", name: "Rooh Afza", emoji: "🌹", group: "cocktail", unit: "ml", options: [opt("roohafza-750", "Hamdard Rooh Afza Rose Sharbat", 750, "ml", "750 ml", 170)] },
+  { id: "kalakhatta", name: "Kala khatta syrup", emoji: "🍇", group: "cocktail", unit: "ml", options: [opt("mapro-kala-khatta-750", "Mapro Kala Khatta Squash", 750, "ml", "750 ml", 198, "kala khatta syrup")] },
+  { id: "aampanna", name: "Aam panna syrup", emoji: "🥭", group: "cocktail", unit: "ml", options: [opt("hitkary-aam-panna-700", "Hitkary Aam Panna Sharbat", 700, "ml", "700 ml", 195, "aam panna")] },
+  { id: "thandai", name: "Thandai syrup", emoji: "🥛", group: "cocktail", unit: "ml", options: [
+    opt("haldiram-thandai-750", "Haldiram's Kesaria Thandai Syrup", 750, "ml", "750 ml", 305),
+    opt("guruji-thandai-750", "Guruji Kesharia Thandai Syrup", 750, "ml", "750 ml", 350),
+  ] },
+  { id: "grenadine", name: "Grenadine syrup", emoji: "🍒", group: "cocktail", unit: "ml", options: [
+    opt("teisseire-grenadine-700", "Mathieu Teisseire Grenadine Syrup", 700, "ml", "700 ml", 690),
+    opt("monin-grenadine-700", "Monin Grenadine Syrup", 700, "ml", "700 ml", 895),
+  ] },
+  { id: "chaatmasala", name: "Chaat masala", emoji: "🧂", group: "cocktail", unit: "g", options: [opt("mdh-chaat-masala-100", "MDH Chunky Chaat Masala", 100, "g", "100 g", 94)] },
+  { id: "jaljeera", name: "Jaljeera masala", emoji: "🌿", group: "cocktail", unit: "g", options: [
+    opt("catch-jaljeera-100", "Catch Jaljeera Masala", 100, "g", "100 g", 70),
+    opt("everest-jaljeera-100", "Everest Jaljeera Masala", 100, "g", "100 g", 68),
+  ] },
+  { id: "coffee", name: "Instant coffee", emoji: "☕", group: "cocktail", unit: "g", options: [
+    opt("nescafe-classic-45", "Nescafé Classic Instant Coffee", 45, "g", "45 g", 235),
+    opt("nescafe-classic-24", "Nescafé Classic Instant Coffee", 24, "g", "24 g", 124),
+  ] },
+  { id: "cream", name: "Fresh cream", emoji: "🍦", group: "cocktail", unit: "ml", options: [opt("amul-fresh-cream-250", "Amul Fresh Cream", 250, "ml", "250 ml", 75)] },
+  { id: "tomatoes", name: "Tomatoes", emoji: "🍅", group: "cocktail", unit: "pc", options: [opt("tomato-500", "Tomato (Tamatar)", 6, "pc", "500 g (~6 pcs)", 30, "tomato")] },
+  { id: "ginger", name: "Fresh ginger", emoji: "🫚", group: "cocktail", unit: "g", options: [opt("ginger-100", "Ginger (Adrak)", 100, "g", "100 g", 20, "ginger")] },
+  { id: "greenchilli", name: "Green chillies", emoji: "🌶️", group: "cocktail", unit: "pc", options: [opt("green-chilli-100", "Green Chilli (Hari Mirch)", 25, "pc", "100 g (~25 pcs)", 15, "green chilli")] },
+  { id: "cinnamon", name: "Cinnamon sticks", emoji: "🪵", group: "cocktail", unit: "g", options: [opt("cinnamon-50", "Cinnamon Sticks (Dalchini)", 50, "g", "50 g", 60, "cinnamon sticks")] },
 ];
 export const GROCERY = Object.fromEntries(GROCERIES.map((g) => [g.id, g]));
 
 export const GROUPS = {
   mixers:   { label: "Mixers & water", emoji: "🥤" },
+  soft:     { label: "Soft drinks",    emoji: "🧃" },
   ice:      { label: "Ice",            emoji: "🧊" },
   garnish:  { label: "Garnish",        emoji: "🍋" },
   munchies: { label: "Munchies",       emoji: "🥜" },
   supplies: { label: "Party supplies", emoji: "🥛" },
-  cocktail: { label: "Cocktail extras", emoji: "🍸" },
+  cocktail: { label: "Cocktail & mocktail extras", emoji: "🍸" },
 };
 
 // ── Drinks maths ─────────────────────────────────────────────────────────────
@@ -170,16 +209,18 @@ export function servingsInBottle(catId, ml, pegMl = 60) {
 }
 
 /**
- * @param party        { guests, hours, drinkersPct, vegPct, appetite, dinner, pegMl } (+ name/date/time/host/upi, unused here)
+ * @param party        { guests, hours, drinkersPct, drivers, vegPct, appetite, dinner, pegMl } (+ name/date/time/host/upi/prefs, unused here)
  * @param liquorLines  [{ cat, ml, qty }] — the liquor cart
- * @param menu         [{ id, servings }] — cocktails on the party menu (lib/cocktails.js)
+ * @param menu         [{ id, servings }] — cocktails and mocktails on the party menu (lib/cocktails.js)
  */
 export function planParty(party, liquorLines = [], menu = []) {
   const p = { ...DEFAULT_PARTY, ...party };
   const guests = Math.max(1, Math.round(p.guests));
   const hours = clamp(p.hours, 1, 12);
   const appetite = APPETITE[p.appetite]?.f || 1;
-  const drinkers = Math.round((guests * clamp(p.drinkersPct, 0, 100)) / 100);
+  // Designated drivers never drink, whatever the drinking % says.
+  const drivers = clamp(Math.round(Number(p.drivers) || 0), 0, guests);
+  const drinkers = Math.min(Math.round((guests * clamp(p.drinkersPct, 0, 100)) / 100), guests - drivers);
   const perDrinker = drinksPerDrinker(hours);
   const needed = Math.ceil(drinkers * perDrinker);
 
@@ -220,6 +261,12 @@ export function planParty(party, liquorLines = [], menu = []) {
   for (const k of Object.keys(mixerMl)) mixerMl[k] = Math.round(mixerMl[k]);
 
   const nonDrinkers = guests - drinkers;
+  // Non-drinkers keep the drinkers' pace with soft drinks and juice; mocktails on the
+  // menu replace some of those, the way cocktails replace plain mixer.
+  const mocktailServings = menuSummary(menu).mocktails;
+  const softPlanned = Math.ceil(nonDrinkers * perDrinker);
+  const softDrinks = Math.max(0, softPlanned - mocktailServings);
+  const soft = { planned: softPlanned, drinks: softDrinks, ml: softDrinks * SOFT_PER_DRINK };
   const iceKg = Math.ceil(drinkers * (0.5 + 0.1 * Math.max(0, hours - 3)) + nonDrinkers * 0.2);
   const waterMl = Math.round(guests * (0.5 + 0.15 * hours) * 1000);
   const limes = Math.ceil(shots / 3 + ginDrinks / 6 + guests / 4);
@@ -253,23 +300,27 @@ export function planParty(party, liquorLines = [], menu = []) {
   const napkins = guests * 4;
 
   return {
-    guests, hours, drinkers, perDrinker, needed, available, poured, byCat,
+    guests, hours, drinkers, nonDrinkers, drivers, perDrinker, needed, available, poured, byCat,
     shortfall: Math.max(0, needed - available),
-    mixerMl, iceKg, waterMl, limes,
+    mixerMl, soft, iceKg, waterMl, limes,
     starters: { pieces, plates, veg: vegPlates, nonveg: plates - vegPlates },
     mains: { servings: mainServings, veg: vegMains, nonveg: mainServings - vegMains, breads },
     desserts,
     munchies, munchiesG,
     supplies: { cups, plates: paperPlates, napkins },
-    cocktailServings, cocktailUses: cocktailUses(menu),
+    cocktailServings, mocktailServings, cocktailUses: cocktailUses(menu),
   };
 }
 
 // What to buy on Blinkit: grocery id → amount in that grocery's unit.
-// Cocktail ingredients are added on top; ice is already sized for every drink.
+// Soft drinks for non-drinkers: 35% cola, 35% lemon-lime soda, 30% juice.
+// Cocktail and mocktail ingredients are added on top; ice is already sized for every drink.
 export function groceryNeeds(plan) {
+  const softMl = plan.soft?.ml || 0;
   const needs = {
-    soda: plan.mixerMl.soda, tonic: plan.mixerMl.tonic, cola: plan.mixerMl.cola, lemon: plan.mixerMl.lemon,
+    soda: plan.mixerMl.soda, tonic: plan.mixerMl.tonic,
+    cola: plan.mixerMl.cola + Math.round(softMl * 0.35), lemon: plan.mixerMl.lemon + Math.round(softMl * 0.35),
+    juice: Math.round(softMl * 0.3),
     water: plan.waterMl, ice: plan.iceKg * 1000, limes: plan.limes,
     ...plan.munchies,
     cups: plan.supplies.cups, plates: plan.supplies.plates, napkins: plan.supplies.napkins,
