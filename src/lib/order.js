@@ -113,6 +113,8 @@ export async function postChecklist(id, title, lines, summary) {
         smallIcon: "ic_stat_liquor",
         iconColor: "#D4872A",
         autoCancel: false,
+        // Shown now, not an alarm — without this the plugin opens Android's "Alarms & reminders" settings.
+        isExactNotification: false,
         extra: { tab: "cart" },
       }],
     });
