@@ -41,7 +41,7 @@ export const hasPrefs = (prefs) => {
 };
 
 // ── Drink-vibe chips ─────────────────────────────────────────────────────────
-// Cocktail tags come from lib/cocktails.js (TAGS). Today that's an array of strings; accept
+// The tags come from lib/cocktails.js (DRINK_TASTES, else TAGS) as an array of strings; accept
 // [{ id, label, emoji }] or { id: label | { label, emoji } } too, so new tags just show up.
 const TAG_EMOJI = {
   classic: "🎩", easy: "👌", strong: "💪", refreshing: "🧊", party: "🎉", sweet: "🍬", warm: "☕", winter: "☕",
