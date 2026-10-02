@@ -133,7 +133,7 @@ export default function FoodTab({
 
       {/* ── Party ── */}
       <div className="card fade-up">
-        <div className="card-title"><span className="kicker">{party.date === todayISO() ? "Tonight's party" : "The party"}</span><span className="tiny muted">{plan.drinkers} drinking · {Math.round(party.vegPct)}% veg</span></div>
+        <div className="card-title"><span className="kicker">{party.date === todayISO() ? "Tonight's party" : "The party"}</span><span className="tiny muted">{plan.drinkers} drinking{plan.nonDrinkers > 0 ? ` · ${plan.nonDrinkers} not` : ""} · {Math.round(party.vegPct)}% veg</span></div>
         <TemplatesRow party={party} setParty={setParty} cocktailMenu={cocktailMenu} setCocktailMenu={setCocktailMenu} plan={plan} city={city} customDry={customDry} toast={toast} />
         <div className="field" style={{ marginBottom: 14 }}>
           <label>Party name</label>

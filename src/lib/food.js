@@ -148,7 +148,8 @@ export const GROCERIES = [
   { id: "honey", name: "Honey", emoji: "🍯", group: "cocktail", unit: "g", options: [opt("dabur-honey-250", "Dabur Honey", 250, "g", "250 g", 125)] },
   { id: "salt", name: "Salt", emoji: "🧂", group: "cocktail", unit: "g", options: [opt("tata-salt-1kg", "Tata Salt", 1000, "g", "1 kg", 28)] },
   { id: "milk", name: "Milk", emoji: "🥛", group: "cocktail", unit: "ml", options: [opt("amul-milk-500", "Amul Taaza Toned Milk", 500, "ml", "500 ml", 28, "amul milk")] },
-  // v1.4.1: the bigger cocktail list and the mocktails (MRPs looked up on blinkit.com product pages, Oct 2026).
+  // v1.4.1: the bigger cocktail list and the mocktails. Packaged items: prices from blinkit.com
+  // listings (Oct 2026; Mapro from bigbasket); fresh produce and cinnamon are typical prices.
   { id: "mango", name: "Mango drink", emoji: "🥭", group: "cocktail", unit: "ml", options: [opt("maaza-mango-1200", "Maaza Mango Drink", 1200, "ml", "1.2 L", 75)] },
   { id: "guava", name: "Guava juice", emoji: "🍐", group: "cocktail", unit: "ml", options: [opt("real-guava-1l", "Real Fruit Power Guava Juice", 1000, "ml", "1 L", 115)] },
   { id: "coconutwater", name: "Coconut water", emoji: "🥥", group: "cocktail", unit: "ml", options: [opt("real-activ-coconut-1l", "Real Activ Coconut Water", 1000, "ml", "1 L", 178, "coconut water")] },
