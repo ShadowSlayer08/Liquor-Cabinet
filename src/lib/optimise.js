@@ -12,9 +12,10 @@
 //       exact multiple-choice knapsack over each family's price/rating frontier
 //       (in ₹10 steps, rounded up, so it never goes over). For the same mix,
 //       more money never gives a worse-rated bar;
-//    3. if even the cheapest basket doesn't fit (`trimmed`), every target shrinks
-//       by one factor until it does, and what's left buys extra bottles — often
-//       still every drink, from fewer spirits. `short` says how many are missing.
+//    3. if even the cheapest basket doesn't fit (`trimmed`), the money covers as
+//       many drinks as it can: every target shrinks by one factor, or the cheapest
+//       drinks go first — whichever covers more. Often that's still every drink,
+//       from fewer spirits. `short` says how many are missing.
 //  The host can swap a family's bottle (pins), drop a bottle (exclude) or a whole
 //  family (skip) — its drinks go to the others. Neutral on purpose: ratings and
 //  prices only, no brand boosts. Unrated bottles count as 3.5★ and are flagged.
@@ -159,6 +160,62 @@ const toLine = (o) => ({
   cost: o.qty * o.item.price, costPerDrink: Math.round(o.item.price / o.s), q: o.q, unrated: o.unrated, need: o.need,
 });
 
+// ── Tight budgets ── `lines` line up with `fams` (null = nothing bought for that family yet).
+const drinksOf = (lines) => sum(lines.map((l) => l?.drinks || 0));
+const byCpd = (a, b) => a.item.price / a.s - b.item.price / b.s || b.q - a.q || cmp(a.key, b.key);
+function addBottle(lines, i, c) {
+  const l = lines[i] || toLine(option(c, 0));
+  l.qty += 1; l.drinks = l.qty * l.perBottle; l.cost = l.qty * l.item.price; l.need = l.drinks;
+  lines[i] = l;
+}
+
+// Way 1: every family's target shrinks by one factor until the cheapest basket fits, then what's
+// left buys extra bottles (cheapest per drink first) for families still short, until every drink
+// is covered (whole bottles often cover a small family's drinks for free).
+function scaleDown(fams, T, choices, money, target) {
+  const cap = Math.floor(money / STEP);
+  const at = (a) => fams.map((f) => Math.floor(a * T[f]));
+  const unitsAt = (a) => sum(at(a).map((n, i) => (n > 0 ? frontier(choices(fams[i]), n)[0].units : 0)));
+  let lo = 0, hi = 1;
+  for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (unitsAt(mid) <= cap) lo = mid; else hi = mid; }
+  const lines = at(lo).map((n, i) => (n > 0 ? toLine(frontier(choices(fams[i]), n)[0]) : null));
+  let left = money - sum(lines.map((l) => l?.cost || 0));
+  while (drinksOf(lines) < target) {
+    let best = null;
+    fams.forEach((f, i) => {
+      const l = lines[i];
+      if ((l?.drinks || 0) >= T[f]) return;
+      const c = l ? choices(f).find((x) => x.key === l.key) : [...choices(f)].sort((a, b) => a.item.price - b.item.price || byCpd(a, b))[0];
+      if (!c || c.item.price > left) return;
+      const cpd = c.item.price / c.s;
+      if (!best || cpd < best.cpd) best = { i, c, cpd };
+    });
+    if (!best) break;
+    addBottle(lines, best.i, best.c);
+    left -= best.c.item.price;
+  }
+  return lines;
+}
+
+// Way 2: the cheapest drinks first — each family's cheapest-per-drink bottle up to its target,
+// cheapest family first, then more of whatever is cheapest until every drink is covered.
+function cheapestFirst(fams, T, choices, money, target) {
+  const lines = fams.map(() => null);
+  const best = fams.map((f) => [...choices(f)].sort(byCpd)[0]);
+  const order = fams.map((_, i) => i).sort((a, b) => byCpd(best[a], best[b]));
+  let left = money;
+  for (const i of order) {
+    while ((lines[i]?.drinks || 0) < T[fams[i]] && drinksOf(lines) < target && best[i].item.price <= left) { addBottle(lines, i, best[i]); left -= best[i].item.price; }
+  }
+  while (drinksOf(lines) < target) {
+    const i = order.find((j) => best[j].item.price <= left);
+    if (i == null) break;
+    addBottle(lines, i, best[i]);
+    left -= best[i].item.price;
+  }
+  return lines;
+}
+
 /**
  * @param catalog  { [catId]: items[] } — Livcheers items for the city
  * @param drinks   drinks to cover (the Food tab's needed, or the shortfall)
@@ -225,35 +282,11 @@ export function fillBar({ catalog = {}, drinks, budget, mix = "mixed", pegMl = 6
   if (pick) {
     lines = fams.map((f, i) => toLine(fronts[i][pick[i]]));
   } else {
-    // Not even the cheapest basket fits: shrink every target by one factor until it does…
-    const cap = Math.floor(money / STEP);
-    const at = (a) => fams.map((f) => Math.floor(a * T[f]));
-    const unitsAt = (a) => sum(at(a).map((n, i) => (n > 0 ? frontier(choices(fams[i]), n)[0].units : 0)));
-    let lo = 0, hi = 1;
-    for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (unitsAt(mid) <= cap) lo = mid; else hi = mid; }
-    const scaled = at(lo);
-    lines = fams.map((f, i) => (scaled[i] > 0 ? toLine(frontier(choices(f), scaled[i])[0]) : null));
-    // …then spend what's left on extra bottles, cheapest per drink first, until each family is
-    // covered or every drink is (whole bottles often cover a small family's drinks for free).
-    let left = money - sum(lines.filter(Boolean).map((l) => l.cost));
-    for (;;) {
-      if (sum(lines.map((l) => l?.drinks || 0)) >= target) break;
-      let best = null;
-      fams.forEach((f, i) => {
-        const l = lines[i];
-        if ((l?.drinks || 0) >= T[f]) return;
-        const c = l ? choices(f).find((x) => x.key === l.key) : [...choices(f)].sort((a, b) => a.item.price - b.item.price || a.item.price / a.s - b.item.price / b.s || cmp(a.key, b.key))[0];
-        if (!c || c.item.price > left) return;
-        const cpd = c.item.price / c.s;
-        if (!best || cpd < best.cpd) best = { i, c, cpd };
-      });
-      if (!best) break;
-      const l = lines[best.i] || toLine(option(best.c, 0));
-      l.qty += 1; l.drinks = l.qty * l.perBottle; l.cost = l.qty * l.item.price; l.need = l.drinks;
-      lines[best.i] = l;
-      left -= best.c.item.price;
-    }
-    lines = lines.filter((l) => l && l.qty > 0).map((l) => ({ ...l, need: l.drinks }));
+    // Not even the cheapest basket fits: whichever way covers more drinks (the closer-to-the-mix
+    // one on a tie). Either way, never over the amount.
+    const a = scaleDown(fams, T, choices, money, target), b = cheapestFirst(fams, T, choices, money, target);
+    const covers = (ls) => Math.min(target, drinksOf(ls));
+    lines = (covers(b) > covers(a) ? b : a).filter((l) => l && l.qty > 0).map((l) => ({ ...l, need: l.drinks }));
   }
 
   lines.sort((a, b) => T[b.family] - T[a.family] || byOrder(a.family, b.family));

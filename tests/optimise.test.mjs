@@ -63,11 +63,29 @@ test("for the same mix, more money never gives a worse-rated bar", () => {
 });
 
 test("a tiny budget is honest about what it covers", () => {
-  const out = fillBar({ catalog: CATALOG, drinks: 40, budget: 3000 });
+  const out = fillBar({ catalog: CATALOG, drinks: 40, budget: 2000 });
   assert.equal(out.feasible, false);
   assert.ok(out.short > 0 && out.drinks > 0);
-  assert.ok(out.cost <= 3000);
+  assert.ok(out.cost <= 2000);
   assert.equal(out.drinks + out.short, out.target);
+  // A tight budget goes for the cheapest drinks rather than a bottle of every spirit:
+  // ₹3,000 for 40 drinks = 2 × rum (24) + vodka (12) + 2 × beer (4), not a gin it can't afford alongside.
+  const cheap = {
+    rum: [it("monk", 700, 4.3)], vodka: [it("mm", 800, 3.8)], gin: [it("gt", 1300, 4.0)], beer: [it("kf", 180, 4.0, 650)],
+    scotch: [it("bd", 2100, 4.1)],
+  };
+  const tight = fillBar({ catalog: cheap, drinks: 40, budget: 3000 });
+  assert.ok(tight.trimmed && tight.feasible, JSON.stringify(tight.lines.map((l) => [l.key, l.qty])));
+  assert.ok(tight.cost <= 3000 && tight.drinks >= 40);
+  // Within the trimmed range, more money never covers fewer drinks.
+  let prev = 0;
+  for (let budget = 0; budget <= 8000; budget += 100) {
+    const out = fillBar({ catalog: CATALOG, drinks: 40, budget });
+    if (!out.trimmed) break;
+    const covered = Math.min(out.target, out.drinks);
+    assert.ok(covered >= prev, `₹${budget}: ${covered} < ${prev}`);
+    prev = covered;
+  }
   // Less than the cheapest bottle: nothing at all.
   const none = fillBar({ catalog: CATALOG, drinks: 40, budget: 150 });
   assert.deepEqual(none.lines, []);

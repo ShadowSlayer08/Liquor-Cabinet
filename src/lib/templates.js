@@ -14,6 +14,7 @@
 import { COCKTAIL } from "./cocktails.js";
 import { DEFAULT_PARTY, planParty } from "./food.js";
 import { dryDayOn, festivalDate, lastShoppingDay, prettyDate, todayISO } from "./drydays.js";
+import { prettyTime } from "./when.js";
 import { MIXES } from "./optimise.js";
 
 // date: "festival:<name in drydays.js>" | "MM-DD" (the next one) | absent (keep the party's date).
@@ -110,7 +111,7 @@ export function applyTemplate({ party, cocktailMenu = [], tpl, today = todayISO(
 // What the confirm sheet lists: the party fields that would change, in plain words.
 const SHOW = [
   ["date", "Date", (v) => prettyDate(v)],
-  ["time", "Time", (v) => v],
+  ["time", "Time", (v) => prettyTime(v)],
   ["guests", "Guests", (v) => String(v)],
   ["hours", "Hours", (v) => `${v} h`],
   ["drinkersPct", "Drinking", (v) => `${v}%`],
@@ -127,6 +128,7 @@ export function templateChanges(before, after) {
 // The toast after applying: when it is, and the dry-day "buy by" day if the date is one.
 export function templateToast({ party, note }, citySlug, custom = []) {
   if (note) return `${party.name} set up. ${note}.`;
+  if (!party.date) return `${party.name} set up 🎉`;
   const when = `${party.name} set for ${prettyDate(party.date)}`;
   const dry = dryDayOn(party.date, citySlug, custom);
   if (!dry) return `${when} 🎉`;

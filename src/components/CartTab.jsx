@@ -13,6 +13,7 @@ import { Qty } from "./Sheet.jsx";
 import { Icon, VegMark } from "./Art.jsx";
 
 export default function CartTab({
+  openFill,
   city, view, setView, liquorLines, liquorTotal, addItem, remItem, clearLiquor, batches, activeBatch,
   foodCart, updateFood, removeFood, clearFood, toast, bubble,
 }) {
@@ -103,7 +104,10 @@ export default function CartTab({
 
       {/* ── Liquor ── */}
       {view === "liquor" && (liquorLines.length === 0 ? (
-        <div className="card empty"><div style={{ fontSize: 44 }}>🥃</div><div className="t">Your cabinet is empty</div><div className="small">Add bottles from the Cabinet tab.</div></div>
+        <div className="card empty">
+          <div style={{ fontSize: 44 }}>🥃</div><div className="t">Your cabinet is empty</div><div className="small">Add bottles from the Cabinet tab.</div>
+          {openFill && <button className="btn btn-gold" style={{ marginTop: 18 }} onClick={openFill}><Icon.sparkle size={17} /> Fill my bar within budget</button>}
+        </div>
       ) : (
         <>
           {CATEGORIES.filter((c) => liquorLines.some((l) => l.cat === c.id)).map((c) => {

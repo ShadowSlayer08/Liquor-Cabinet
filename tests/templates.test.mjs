@@ -131,6 +131,7 @@ test("chip order, change list and toast", () => {
   assert.ok(!keys.includes("guests"));                    // unchanged → not listed
   assert.equal(ch.find((c) => c.key === "mix").to, "Mixed bar");
   assert.equal(ch.find((c) => c.key === "hours").from, "3 h");
+  assert.deepEqual(ch.find((c) => c.key === "time"), { key: "time", label: "Time", from: "7:00 pm", to: "8:00 pm" });
 
   const msg = templateToast({ party: next, note: null }, "gurgaon");
   assert.match(msg, /^Diwali party set for .*8 Nov — it's often a dry day, buy bottles by .*7 Nov$/);
