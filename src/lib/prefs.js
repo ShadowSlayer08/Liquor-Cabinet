@@ -24,8 +24,9 @@ export function normalizePrefs(prefs) {
   };
 }
 
-// What guests can say nobody eats (the "Nobody eats…" chips).
-export const AVOIDABLE = Object.keys(PROTEINS).filter((k) => k !== "veg");
+// What guests can say nobody eats (the "Nobody eats…" chips): the usual ones first.
+const AVOID_ORDER = ["mutton", "seafood", "egg", "chicken", "paneer"];
+export const AVOIDABLE = [...new Set([...AVOID_ORDER, ...Object.keys(PROTEINS)])].filter((k) => PROTEINS[k] && k !== "veg");
 
 // Adds or removes one id in a list field ("drinks", "cuisines", "avoid").
 export function togglePref(prefs, key, id) {

@@ -31,6 +31,19 @@ test("deterministic, one entry per dish, well-formed", () => {
   }
 });
 
+test("a dish marked as a fit always says why", () => {
+  const every = ["malts", "worldwhisky", "scotch", "indian", "gin", "tequila", "rum", "vodka", "brandy", "beer", "redwine", "whitewine", "rose", "sparkling", "champagne", "liqueur", "sake", "rtd"];
+  const menus = [[], [{ id: "highball", servings: 1 }, { id: "gnt", servings: 1 }, { id: "mojito", servings: 1 }, { id: "margarita", servings: 1 }, { id: "sangria", servings: 1 }]];
+  for (const cocktailMenu of menus) {
+    for (const p of [party(), party({ dinner: false, guests: 40, prefs: { spice: "hot" } })]) {
+      for (const d of suggestFood({ liquorCats: every, cocktailMenu, party: p })) {
+        assert.equal(d.hint === null, d.fit === "ok", d.id);
+        if (d.fit !== "ok") assert.ok(d.reasons.length > 0, d.id);
+      }
+    }
+  }
+});
+
 test("works for old saved parties and missing inputs", () => {
   assert.equal(suggestFood().length, DISHES.length);
   assert.equal(suggestFood({ party: { guests: 6 }, plan: null, cocktailMenu: [null, { id: "nope", servings: 3 }, { id: "gnt" }] }).length, DISHES.length);

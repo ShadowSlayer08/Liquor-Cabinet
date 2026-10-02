@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { normalizePrefs, togglePref, hasPrefs, tagOptions, prefsSummary, AVOIDABLE } from "../src/lib/prefs.js";
 import { DEFAULT_PREFS, DEFAULT_PARTY } from "../src/lib/food.js";
+import { PROTEINS } from "../src/lib/dishes.js";
 import * as cocktails from "../src/lib/cocktails.js";
 
 test("normalizePrefs: old parties without prefs and junk values give a clean shape", () => {
@@ -40,9 +41,9 @@ test("hasPrefs is false until something is picked", () => {
   assert.equal(hasPrefs({ avoid: ["veg"] }), false);
 });
 
-test("AVOIDABLE: every protein but veg", () => {
-  assert.ok(AVOIDABLE.includes("mutton") && AVOIDABLE.includes("seafood") && AVOIDABLE.includes("egg"));
-  assert.ok(!AVOIDABLE.includes("veg"));
+test("AVOIDABLE: every protein but veg, the usual ones first", () => {
+  assert.deepEqual([...AVOIDABLE].sort(), Object.keys(PROTEINS).filter((k) => k !== "veg").sort());
+  assert.deepEqual(AVOIDABLE.slice(0, 3), ["mutton", "seafood", "egg"]);
 });
 
 test("tagOptions accepts the cocktail tag list in any shape", () => {

@@ -28,7 +28,7 @@ export const BIG_GROUP = 20; // guests — from here on most people eat standing
 // means a few things line up (the bottles and the menu, or the bottles and a liked cuisine).
 const W = { pair: 4, cocktail: 1.5, cocktailShare: 2, cocktailMax: 4, family: 0.75, cuisine: 3, spice: 1.5, finger: 1.5, veg: 2, both: 1.5 };
 const FIT = { great: 5, good: 2 };
-const MIN_SHARE = 0.1; // a category under 10% of the drinks still scores, but isn't named
+const MIN_SHARE = 0.1; // pairings under 10% of the drinks still score a little, but aren't named
 // Variety: each pick already above with the same main cuisine / protein (/ course when all
 // courses are listed together) costs a little, so the top isn't five Chinese starters.
 const SAME = { cuisine: 0.6, protein: 0.4, course: 0.3 };
@@ -119,8 +119,8 @@ export function suggestFood({ liquorCats = [], cocktailMenu = [], party = null, 
     if (pairShare > 0) {
       const pts = W.pair * pairShare;
       bonus += pts;
-      const nouns = [...nounW].filter(([, w]) => w >= MIN_SHARE).sort((a, b) => b[1] - a[1]);
-      if (nouns.length) {
+      if (pairShare >= MIN_SHARE) {
+        const nouns = [...nounW].sort((a, b) => b[1] - a[1]);
         const shown = nouns.slice(0, nouns.length > 1 && nouns[1][1] >= 0.25 ? 2 : 1).map(([n]) => n);
         const emoji = Object.values(DRINK).find(([n]) => n === nouns[0][0])[1];
         why.push({ text: `Pairs with your ${and(shown)}`, pts, hint: { emoji, text: nouns[0][0] } });

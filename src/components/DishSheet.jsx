@@ -28,8 +28,16 @@ export default function DishSheet({ dish, city, loc, suggested, inCart, onQuickA
   }, [d, sort]);
 
   const where = loc?.zomato && d?.local ? loc.label : cityName(city);
+  // Why the Food tab suggests it (lib/suggestFood.js); a dish opened from elsewhere has none.
+  const reasons = Array.isArray(dish.reasons) ? dish.reasons : [];
   return (
     <Sheet title={`${dish.emoji} ${dish.name}`} subtitle={<span className="row" style={{ gap: 5 }}><Icon.pin size={13} /> Delivering to {where}</span>} onClose={onClose}>
+      {reasons.length > 0 && (
+        <div className={`pref-why ${dish.fit || ""}`}>
+          <div className="kicker"><Icon.sparkle size={12} /> {dish.fit === "great" ? "A great fit for your party" : dish.fit === "good" ? "Why it fits" : "Good to know"}</div>
+          <div className="pref-why-list">{reasons.map((r, i) => <span key={`${i}-${r}`} className="pref-why-item">{r}</span>)}</div>
+        </div>
+      )}
       <div className="card" style={{ padding: 14 }}>
         <div className="between">
           <div>
