@@ -93,7 +93,7 @@ export default function CartTab({
     `🍽️ Party food — ${cityName(city)}`, "",
     ...zomatoGroups.flatMap((g) => [`Zomato · ${g.restaurant.name}`, ...orderLines(g.lines).map((x) => `  ${x}`)]),
     ...(bistroLines.length ? ["Bistro", ...orderLines(bistroLines).map((x) => `  ${x}`)] : []),
-    ...(blinkitLines.length ? ["Blinkit", ...blinkitLines.map((l) => `  ${l.qty} × ${l.product.name} (${l.product.packText})`)] : []),
+    ...(blinkitLines.length ? [g.name, ...blinkitLines.map((l) => `  ${l.qty} × ${l.product.name} (${l.product.packText})`)] : []),
     "", `≈ ${fmt(zomatoTotal + blinkitTotal)}`,
   ].join("\n");
 
@@ -259,7 +259,7 @@ export default function CartTab({
           <div className="card">
             <div className="between small"><span className="muted">Zomato food</span><span>{fmt(zomatoTotal)}</span></div>
             {bistroLines.length > 0 && <div className="between small" style={{ marginTop: 4 }}><span className="muted">Bistro</span><span className="dim">priced in app</span></div>}
-            <div className="between small" style={{ marginTop: 4 }}><span className="muted">Blinkit supplies</span><span>{fmt(blinkitTotal)}</span></div>
+            <div className="between small" style={{ marginTop: 4 }}><span className="muted">{g.name} supplies</span><span>{fmt(blinkitTotal)}</span></div>
             <div className="sep" />
             <div className="between"><span className="muted">Food total</span><span className="h2 gold-text" style={{ fontFamily: "var(--ui)" }}>≈ {fmt(zomatoTotal + blinkitTotal)}</span></div>
             <div className="row" style={{ marginTop: 14 }}>

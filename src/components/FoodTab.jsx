@@ -59,7 +59,8 @@ export default function FoodTab({
     const todo = suppliesInCart ? staleGroceries : neededGroceries;
     for (const g of todo) { const p = chosen(g); upsertFood(groceryLine(g, p, packsFor(needs[g.id], p))); }
     tap();
-    toast(!todo.length ? "Your Blinkit list is up to date" : suppliesInCart ? `Updated ${todo.length} ${todo.length === 1 ? "supply" : "supplies"} on your Blinkit list` : `Added ${todo.length} party supplies to your Blinkit list`);
+    const list = `${grocerOf(grocer).name} list`;
+    toast(!todo.length ? `Your ${list} is up to date` : suppliesInCart ? `Updated ${todo.length} ${todo.length === 1 ? "supply" : "supplies"} on your ${list}` : `Added ${todo.length} party supplies to your ${list}`);
   };
   const groceryTotal = neededGroceries.reduce((s, g) => { const p = chosen(g); return s + p.price * packsFor(needs[g.id], p); }, 0);
 
@@ -310,7 +311,7 @@ export default function FoodTab({
               </div>
             );
           })}
-          <button className="btn btn-blinkit btn-block" style={{ marginTop: 14 }} onClick={fillGroceries}>{!suppliesInCart ? <><Icon.plus size={16} /> Add all supplies to cart</> : staleGroceries.length ? <>Update cart · {staleGroceries.length} changed</> : <><Icon.check size={16} /> All supplies in your cart</>}</button>
+          <button className={`btn ${grocerOf(grocer).cls.btn} btn-block`} style={{ marginTop: 14 }} onClick={fillGroceries}>{!suppliesInCart ? <><Icon.plus size={16} /> Add all supplies to cart</> : staleGroceries.length ? <>Update cart · {staleGroceries.length} changed</> : <><Icon.check size={16} /> All supplies in your cart</>}</button>
           <div className="tiny dim" style={{ marginTop: 8, textAlign: "center" }}>
             {Object.keys(MIXERS).filter((k) => needs[k] > 0).map((k) => `${MIXERS[k].label} ${formatAmount(needs[k], "ml")}`).join(" · ") || "No mixers needed"} · prices ≈ MRP{neededGroceries.some((g) => chosen(g).live) ? ", live where marked" : ""}
           </div>
@@ -322,7 +323,7 @@ export default function FoodTab({
           <span style={{ fontSize: 22 }}>🛒</span>
           <span className="grow" style={{ textAlign: "left" }}>
             <span className="h3">{foodItems} item{foodItems > 1 ? "s" : ""} ready to order</span><br />
-            <span className="tiny muted">≈ {fmt(foodTotal)} · Zomato, Bistro & Blinkit</span>
+            <span className="tiny muted">≈ {fmt(foodTotal)} · Zomato, Bistro & {grocerOf(grocer).name}</span>
           </span>
           <span className="btn btn-gold btn-sm">Checkout <Icon.chevron size={14} /></span>
         </button>

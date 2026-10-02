@@ -51,7 +51,7 @@ export default function RemindersCard({ party, city, customDry, reminders, setRe
         <div className="small muted">Pick a party date in the Food tab to plan reminders.</div>
       ) : (
         <>
-          <div className="small muted">Nudges on your phone before the party · {prettyWhen(party)}</div>
+          <div className="small muted">Nudges on your phone before and after the party · {prettyWhen(party)}</div>
           <div style={{ marginTop: 4 }}>
             {list.map((r) => {
               const on = isOn(enabled, r.key);

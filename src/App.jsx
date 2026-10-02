@@ -339,7 +339,7 @@ export default function App() {
             <CabinetTab city={city} loc={loc} catalog={catalog} ages={ages} activeCat={activeCat} setActiveCat={setActiveCat}
               qtyOf={qtyOf} addItem={addItem} remItem={remItem} budgetLeft={left} openScraper={() => setShowScraper(true)}
               plan={plan} spent={spent} budget={budget} bottles={bottles} onPairing={() => goTab("food")}
-              party={party} liquorCats={liquorCats} cocktailMenu={cocktailMenu} customDry={customDry} onBar={() => goTab("bar")} toast={toast}
+              party={party} liquorCats={liquorCats} cocktailMenu={cocktailMenu} customDry={customDry} onBar={() => goBar("cocktails")} toast={toast}
               openFill={() => setShowFill(true)} />
           )}
           {tab === "bar" && (
@@ -431,7 +431,7 @@ function Welcome({ locating, onLocate, onManual, onLegal }) {
         </button>
         <button className="btn btn-ghost btn-block" onClick={onManual}>Choose my city</button>
       </div>
-      <div className="tiny dim" style={{ marginTop: 18, maxWidth: 300 }}>Your location goes to Zomato only, to find restaurants that deliver to you — nothing is sent to us. 21+ · Drink responsibly. <button className="gold tiny" onClick={onLegal}>Legal notice</button></div>
+      <div className="tiny dim" style={{ marginTop: 18, maxWidth: 300 }}>Your location goes to Zomato to find restaurants that deliver to you (and to a ride app when you book a ride home) — nothing is sent to us. 21+ · Drink responsibly. <button className="gold tiny" onClick={onLegal}>Legal notice</button></div>
     </div>
   );
 }
