@@ -14,7 +14,6 @@ import {
 } from "../lib/food.js";
 import { CAT, cityName } from "../lib/parse/livcheers.js";
 import { bistroServes } from "../lib/location.js";
-import { dishPhotos } from "../lib/sources.js";
 import { openBistro, tap } from "../lib/order.js";
 import { grocerOf } from "../lib/grocers.js";
 import { fmt } from "../lib/format.js";
@@ -32,11 +31,8 @@ export default function FoodTab({
   const [dishOpen, setDishOpen] = useState(null);
   const [menuOpen, setMenuOpen] = useState(null); // { r, dish }
   const [groceryOpen, setGroceryOpen] = useState(null);
-  const [photos, setPhotos] = useState({});
   const set = (k) => (v) => setParty({ ...party, [k]: v });
 
-  const refreshPhotos = () => dishPhotos(suggestDishes([])).then(setPhotos);
-  useEffect(() => { refreshPhotos(); }, []);
 
   const needs = useMemo(() => groceryNeeds(plan), [plan]);
   const neededGroceries = GROCERIES.filter((g) => needs[g.id] > 0);
@@ -231,7 +227,7 @@ export default function FoodTab({
                 const n = dishCount(dsh.id), [c1, c2] = DISH_TINT[dsh.course];
                 return (
                   <button key={dsh.id} className={`dish fade-up ${n ? "in" : ""}`} style={{ animationDelay: `${i * 25}ms`, background: `linear-gradient(160deg, ${c1}, ${c2})` }} onClick={() => setDishOpen(dsh)}>
-                    {photos[dsh.id] ? <img src={photos[dsh.id]} alt="" loading="lazy" /> : <span className="e">{dsh.emoji}</span>}
+                    <span className="e">{dsh.emoji}</span>
                     {dsh.score > 0 && <span className="pair pill pill-glass">🍸</span>}
                     {n > 0 && <span className="in-badge pill" style={{ background: "var(--zomato)", color: "#fff" }}>{n}</span>}
                     <span className="n">{dsh.name}</span>
@@ -331,7 +327,7 @@ export default function FoodTab({
 
       {dishOpen && (
         <DishSheet dish={dishOpen} city={city} loc={loc} suggested={suggestedServings(dishOpen)} inCart={restCount}
-          onClose={() => { setDishOpen(null); refreshPhotos(); }}
+          onClose={() => setDishOpen(null)}
           onQuickAdd={(r, n) => quickAdd(r, dishOpen, n)}
           onOpenMenu={(r) => setMenuOpen({ r, dish: dishOpen })} />
       )}
