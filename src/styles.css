@@ -734,5 +734,44 @@ body:has(.share-ask) .toast { bottom: calc(var(--safe-bottom) + var(--nav-h) + 1
 /* (end v141-c) */
 
 /* ── v1.4.1 · D: food suggestions & guest preferences ────────────────────── */
+/* Food tab party card: "Guests like…", one line until opened */
+.pref { margin-top: 10px; }
+.pref-head .grow { display: flex; flex-direction: column; gap: 1px; }
+.pref-sum { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pref-chev { color: var(--muted); flex-shrink: 0; transition: transform .2s; }
+.pref.open .pref-chev { transform: rotate(90deg); }
+.pref-body { display: grid; gap: 16px; padding: 14px 2px 2px; }
+.pref-label { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px;
+  font-size: 10.5px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.pref-label .dim { letter-spacing: 0; text-transform: none; }
+.pref-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pref-chips .chip { padding: 6px 11px; font-size: 12px; }
+.pref-chips .chip.pref-no.on { background: rgba(255, 93, 98, .12); color: #ffb3b6; border-color: rgba(255, 93, 98, .45); box-shadow: none; }
+.pref-clear { justify-self: start; color: var(--gold); font-size: 12.5px; font-weight: 600; padding: 2px 0; }
+
+/* Zomato dish grid: a fit marker (gold = great) and the short why on each tile */
+.dish .pair.pref-great { background: var(--grad-gold); color: #231404; border: 1px solid transparent; box-shadow: 0 4px 12px rgba(231, 168, 70, .35); }
+.dish .v .pref-tile-why { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* "Picked for your guests": a few dishes across the meal */
+.pref-picks-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 2px 8px; }
+.pref-picks-head .kicker { display: inline-flex; align-items: center; gap: 5px; color: var(--gold); flex-shrink: 0; }
+.pref-picks-head .ellipsis { min-width: 0; }
+.pref-picks { padding-bottom: 12px; scroll-padding: 0 16px; }
+.pref-pick { width: 204px; display: flex; align-items: center; gap: 10px; padding: 9px 12px 9px 9px; border-radius: 16px; text-align: left;
+  background: rgba(0, 0, 0, .28); border: 1px solid var(--stroke); transition: transform .15s; }
+.pref-pick.great { border-color: rgba(231, 168, 70, .42); background: radial-gradient(90% 130% at 0% 50%, rgba(231, 168, 70, .16), transparent 70%), rgba(0, 0, 0, .28); }
+.pref-pick:active { transform: scale(.97); }
+.pref-pick > .grow { display: flex; flex-direction: column; gap: 2px; }
+.pref-pick-e { width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0; display: grid; place-items: center; font-size: 22px; background: rgba(255, 255, 255, .06); }
+.pref-pick-n { display: block; font-size: 13px; font-weight: 600; color: var(--text); }
+
+/* Dish sheet: why it's suggested */
+.pref-why { margin: -4px 0 14px; padding: 11px 13px 12px; border-radius: 16px; background: rgba(255, 255, 255, .04); border: 1px solid var(--stroke); }
+.pref-why.great, .pref-why.good { background: rgba(231, 168, 70, .07); border-color: rgba(231, 168, 70, .24); }
+.pref-why .kicker { display: inline-flex; align-items: center; gap: 5px; margin-bottom: 8px; }
+.pref-why.great .kicker, .pref-why.good .kicker { color: var(--gold); }
+.pref-why-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.pref-why-item { font-size: 12px; padding: 5px 10px; border-radius: 999px; color: var(--soft); background: rgba(0, 0, 0, .25); border: 1px solid var(--stroke); }
 
 /* (end v141-d) */

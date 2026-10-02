@@ -12,6 +12,8 @@ import { todayISO } from "../lib/drydays.js";
 import {
   APPETITE, COURSES, GROCERIES, GROUPS, MIXERS, BISTRO_ITEMS, groceryNeeds, packsFor, formatAmount, suggestDishes, blinkitQuery,
 } from "../lib/food.js";
+import { suggestFood, topPicks } from "../lib/suggestFood.js";
+import { prefsSummary } from "../lib/prefs.js";
 import { CAT, cityName } from "../lib/parse/livcheers.js";
 import { bistroServes } from "../lib/location.js";
 import { openBistro, tap } from "../lib/order.js";
@@ -83,6 +85,14 @@ export default function FoodTab({
   };
   const suggestedServings = (dish) =>
     dish.course === "starter" ? Math.max(1, Math.ceil(plan.starters.plates / 3)) : dish.course === "main" ? Math.max(1, Math.ceil(plan.mains.servings / 2)) : Math.max(1, plan.desserts);
+
+  // Dishes for this party, best first, each with why (lib/suggestFood.js). A snacks-only party
+  // has no mains tab, so a course left on "main" shows starters.
+  const shownCourse = party.dinner || course !== "main" ? course : "starter";
+  const liquorKey = liquorCats.join(",");
+  const dishes = useMemo(() => suggestFood({ liquorCats, cocktailMenu, party, plan, course: shownCourse }), [liquorKey, cocktailMenu, party, plan, shownCourse]);
+  const picks = useMemo(() => topPicks(suggestFood({ liquorCats, cocktailMenu, party, plan }), 4), [liquorKey, cocktailMenu, party, plan]);
+  const foodPrefs = prefsSummary(party.prefs, { drinks: false });
 
   // Bistro
   const bistroHere = bistroServes(loc?.citySlug || city);
@@ -217,26 +227,54 @@ export default function FoodTab({
               <div className="stat"><div className="v">{plan.mains.servings || "—"}</div><div className="l">Main servings</div></div>
               <div className="stat"><div className="v">{plan.desserts}</div><div className="l">Desserts</div></div>
             </div>
+            {picks.length > 0 && (
+              <>
+                <div className="pref-picks-head">
+                  <span className="kicker"><Icon.sparkle size={12} /> {foodPrefs ? "Picked for your guests" : "Picked for your party"}</span>
+                  {foodPrefs && <span className="tiny dim ellipsis">{foodPrefs}</span>}
+                </div>
+                <div className="scroll-x pref-picks">
+                  {picks.map((dsh) => (
+                    <button key={dsh.id} className={`pref-pick ${dsh.fit}`} onClick={() => { tap(); setDishOpen(dsh); }}>
+                      <span className="pref-pick-e">{dsh.emoji}</span>
+                      <span className="grow">
+                        <span className="pref-pick-n ellipsis">{dsh.name}</span>
+                        <span className="tiny muted clamp2">{dsh.reasons[0]}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
             <div className="seg" style={{ marginBottom: 12 }}>
               {Object.entries(COURSES).filter(([k]) => party.dinner || k !== "main").map(([k, c]) => (
-                <button key={k} className={course === k ? "on" : ""} onClick={() => setCourse(k)}>{c.emoji} {c.label}</button>
+                <button key={k} className={shownCourse === k ? "on" : ""} onClick={() => setCourse(k)}>{c.emoji} {c.label}</button>
               ))}
             </div>
             <div className="dish-grid">
-              {suggestDishes(liquorCats, course).map((dsh, i) => {
+              {dishes.map((dsh, i) => {
                 const n = dishCount(dsh.id), [c1, c2] = DISH_TINT[dsh.course];
                 return (
-                  <button key={dsh.id} className={`dish fade-up ${n ? "in" : ""}`} style={{ animationDelay: `${i * 25}ms`, background: `linear-gradient(160deg, ${c1}, ${c2})` }} onClick={() => setDishOpen(dsh)}>
+                  <button key={dsh.id} className={`dish fade-up ${n ? "in" : ""}`} style={{ animationDelay: `${Math.min(i, 24) * 25}ms`, background: `linear-gradient(160deg, ${c1}, ${c2})` }} onClick={() => setDishOpen(dsh)}
+                    aria-label={`${dsh.name}${dsh.reasons.length ? ` — ${dsh.reasons.join(", ")}` : ""}`}>
                     <span className="e">{dsh.emoji}</span>
-                    {dsh.score > 0 && <span className="pair pill pill-glass">🍸</span>}
+                    {dsh.hint && <span className={`pair pill ${dsh.fit === "great" ? "pref-great" : "pill-glass"}`}>{dsh.hint.emoji}</span>}
                     {n > 0 && <span className="in-badge pill" style={{ background: "var(--zomato)", color: "#fff" }}>{n}</span>}
                     <span className="n">{dsh.name}</span>
-                    <span className="v row" style={{ gap: 4 }}>{dsh.veg === "both" ? <><VegMark veg /><VegMark veg={false} /></> : <VegMark veg={dsh.veg} />}</span>
+                    <span className="v row" style={{ gap: 4 }}>
+                      {dsh.veg === "both" && !dsh.orderVeg ? <><VegMark veg /><VegMark veg={false} /></> : <VegMark veg={dsh.orderVeg || dsh.veg} />}
+                      {dsh.hint && <span className="pref-tile-why">{dsh.hint.text}</span>}
+                    </span>
                   </button>
                 );
               })}
             </div>
-            {liquorCats.length > 0 && <div className="tiny muted" style={{ marginTop: 10 }}>🍸 pairs with the bottles in your cabinet</div>}
+            {!dishes.length && (
+              <div className="note note-info">Nothing here fits your guests' rules — loosen them under <b>Guests like…</b> above.</div>
+            )}
+            {dishes.some((d) => d.hint) && (
+              <div className="tiny muted" style={{ marginTop: 10 }}>Marked dishes suit your party — <span className="gold">gold</span> is a great fit. Tap one to see why.</div>
+            )}
           </div>
         </div>
       )}
