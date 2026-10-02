@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { isNative } from "./http.js";
-import { BASE_ID } from "./reminderPlan.js";
+import { BASE_ID, reminderExtra } from "./reminderPlan.js";
 
 export { partyStart } from "./when.js";
 export { buildReminders } from "./reminderPlan.js";
@@ -21,8 +21,9 @@ export async function scheduleReminders(reminders, enabled) {
       notifications: due.map((r) => ({
         id: r.id, title: r.title, body: r.body, schedule: { at: r.at, allowWhileIdle: true },
         smallIcon: "ic_stat_liquor", iconColor: "#D4872A",
-        // `view` picks the Cart's bottles list for the shopping reminder.
-        extra: r.key === "stock" ? { tab: "cart", view: "liquor" } : { tab: "food" },
+        // Where a tap lands: the Cart's bottles list for the shopping reminder, Plan › Getting home
+        // for last call, the settle-up sheet the morning after, else the Food tab.
+        extra: reminderExtra(r.key),
       })),
     });
   }

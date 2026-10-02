@@ -11,6 +11,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 import { dryDayOn, lastShoppingDay, prettyDate, stateOf, todayISO } from "./drydays.js";
 import { partyStart, partyWhen } from "./when.js";
+import { driversOf } from "./rides.js";
 
 export const BASE_ID = 8100;
 
@@ -40,7 +41,36 @@ function stockReminder(party, citySlug, customDry, at) {
   return { at: new Date(`${day}T12:00:00`), body: `${dryNote(eveDry, eve, citySlug)} Buy your bottles today.` };
 }
 
-// Every reminder the party could use, with its fire time.
+// When the party ends, and last call 45 min before that — null without a date, and no last
+// call for a party so short it would fall in the first hour. Hours as planParty clamps them.
+export function partyEnd(party) {
+  const start = partyStart(party);
+  if (!start) return null;
+  const hours = Math.min(12, Math.max(1, Number(party.hours) || 4));
+  return new Date(start.getTime() + hours * 3600000);
+}
+export function lastCallAt(party) {
+  const start = partyStart(party), end = partyEnd(party);
+  if (!end) return null;
+  const at = new Date(end.getTime() - 45 * 60000);
+  return at.getTime() - start.getTime() >= 60 * 60000 ? at : null;
+}
+
+// Settle up the morning after: the first 11 am after the party ends, and never sooner than
+// 2 h after the end (a 12-hour night that ends at 10 am gets its nudge at noon).
+export function settleAt(party) {
+  const end = partyEnd(party);
+  if (!end) return null;
+  const eleven = new Date(end);
+  eleven.setHours(11, 0, 0, 0);
+  if (eleven <= end) eleven.setDate(eleven.getDate() + 1);
+  return new Date(Math.max(eleven.getTime(), end.getTime() + 2 * 3600000));
+}
+
+// Every reminder the party could use, with its fire time. New ones are appended, so the
+// earlier ones keep their ids; there are at most 7, inside the 12 cancelReminders clears.
+//  winddown — last call, 45 min before the end (lastCallAt)
+//  settle   — the morning after (settleAt): enter the actual bills, see who owes whom
 export function buildReminders(party, citySlug, customDry = [], now = Date.now()) {
   const start = partyStart(party);
   if (!start) return [];
@@ -53,7 +83,30 @@ export function buildReminders(party, citySlug, customDry = [], now = Date.now()
     { key: "starters", title: "🍢 Order the starters", body: "Send your Zomato / Bistro order so it lands as guests arrive.", at: at(-40) },
   ];
   if (party.dinner) list.push({ key: "dinner", title: "🍛 Time to order dinner", body: "Mains take ~45 min — order now from your Zomato cart.", at: at(Math.max(90, (party.hours * 60) / 2 - 45)) });
+  const lastCall = lastCallAt(party);
+  if (lastCall) {
+    const drivers = driversOf(party);
+    list.push({
+      key: "winddown", title: "🚕 Last call in 45 minutes",
+      body: `Put out water and soft drinks, and sort rides home${drivers ? ` (${drivers} driving tonight)` : ""}.`,
+      at: lastCall,
+    });
+  }
+  list.push({
+    key: "settle", title: "🧾 Settle up",
+    body: "Enter what everyone actually paid. Liquor Cabinet works out who owes whom.",
+    at: settleAt(party),
+  });
   return list.map((r, i) => ({ ...r, id: BASE_ID + i, past: r.at.getTime() < now }));
+}
+
+// Where a reminder's tap lands (lib/reminders.js puts it in the notification's `extra`;
+// App's onChecklistTap reads it): the bottles list, a Plan card, the settle-up sheet, else Food.
+export function reminderExtra(key) {
+  if (key === "stock") return { tab: "cart", view: "liquor" };
+  if (key === "winddown") return { tab: "plan", card: "rides" };
+  if (key === "settle") return { tab: "plan", card: "settle" };
+  return { tab: "food" };
 }
 
 export const isOn = (enabled, key) => (enabled || {})[key] !== false;
