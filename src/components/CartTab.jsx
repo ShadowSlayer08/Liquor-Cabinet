@@ -4,9 +4,10 @@ import { COURSES, GROUPS } from "../lib/food.js";
 import { thumb } from "../lib/parse/zomato.js";
 import { fmt } from "../lib/format.js";
 import {
-  openBlinkitSearch, openZomatoRestaurant, openBistro, openUrl, shareText, copyText, isInstalled, postChecklist,
-  CHECKLIST_IDS, zomatoChecklistId, BLINKIT, ZOMATO, BISTRO, buzz, findLiquorStores,
+  openGrocerSearch, openZomatoRestaurant, openBistro, openUrl, shareText, copyText, isInstalled, postChecklist,
+  CHECKLIST_IDS, zomatoChecklistId, BLINKIT, ZOMATO, BISTRO, buzz, tap, findLiquorStores,
 } from "../lib/order.js";
+import { GROCERS, GROCER_IDS, grocerOf } from "../lib/grocers.js";
 import { showBubble, hideBubble } from "../lib/bubble.js";
 import { BottleStage } from "./ProductCard.jsx";
 import { Qty } from "./Sheet.jsx";
@@ -14,6 +15,7 @@ import { Icon, VegMark } from "./Art.jsx";
 
 export default function CartTab({
   openFill,
+  grocer = "blinkit", setGrocer,
   city, view, setView, liquorLines, liquorTotal, addItem, remItem, clearLiquor, batches, activeBatch,
   foodCart, updateFood, removeFood, clearFood, toast, bubble,
 }) {
@@ -63,16 +65,19 @@ export default function CartTab({
     bistroLines.forEach((l) => updateFood(l.key, { ordered: true }));
     openBistro();
   };
-  const findOnBlinkit = async (l) => {
+  // The supplies run goes to the grocer picked on the supplies card (Blinkit, Zepto or Instamart);
+  // the lines and the one supplies checklist stay the same whichever it is.
+  const g = grocerOf(grocer);
+  const findSupply = async (l) => {
     const next = blinkitLines.map((x) => (x.key === l.key ? { ...x, ordered: true } : x));
     updateFood(l.key, { ordered: true });
-    await postChecklist(CHECKLIST_IDS.blinkit, `Blinkit list · ${next.filter((x) => x.ordered).length}/${next.length} done`, blinkitChecklist(next), "Tap to come back for the next item");
-    if (bubble) await showBubble("Blinkit list", blinkitChecklist(next), next.map((x) => x.key)); // nextBlinkit() lands here too
-    openBlinkitSearch(l.query);
+    await postChecklist(CHECKLIST_IDS.blinkit, `${g.name} list · ${next.filter((x) => x.ordered).length}/${next.length} done`, blinkitChecklist(next), "Tap to come back for the next item");
+    if (bubble) await showBubble(`${g.name} list`, blinkitChecklist(next), next.map((x) => x.key)); // nextSupply() lands here too
+    openGrocerSearch(g.id, l.query);
   };
-  const nextBlinkit = () => {
+  const nextSupply = () => {
     const next = blinkitLines.find((l) => !l.ordered);
-    if (next) findOnBlinkit(next); else toast("Everything's ticked off 🎉");
+    if (next) findSupply(next); else toast("Everything's ticked off 🎉");
   };
 
   const share = async (title, text) => { if ((await shareText(title, text)) === "copied") toast("List copied to clipboard"); };
@@ -214,29 +219,38 @@ export default function CartTab({
 
           {blinkitLines.length > 0 && (
             <div className="card flush fade-up">
-              <div className="provider-head provider-b">
-                <span className="logo logo-b">blinkit</span>
+              <div className={`provider-head ${g.cls.head}`}>
+                <span className={g.cls.logo}>{g.logo}</span>
                 <span className="grow small muted">Party supplies</span>
                 <span className="pill" style={{ background: "rgba(52,217,143,.14)", color: "var(--green)" }}>{blinkitLines.filter((l) => l.ordered).length}/{blinkitLines.length} done</span>
               </div>
               <div className="provider-body">
+                <div className="seg out-grocers" aria-label="Order supplies on">
+                  {GROCER_IDS.map((id) => (
+                    <button key={id} className={g.id === id ? "on" : ""} aria-pressed={g.id === id} onClick={() => { tap(); setGrocer?.(id); }}>{GROCERS[id].name}</button>
+                  ))}
+                </div>
+                <div className="tiny dim" style={{ marginTop: 6 }}>The same list works on any of them — pick the one that delivers to you.</div>
                 {Object.keys(GROUPS).flatMap((gid) => blinkitLines.filter((l) => l.group === gid)).map((l) => (
                   <div key={l.key} className={`line-item ${l.ordered ? "done" : ""}`}>
                     <button className={`check ${l.ordered ? "on" : ""}`} onClick={() => updateFood(l.key, { ordered: !l.ordered })} aria-label="Done">{l.ordered && <Icon.check size={14} />}</button>
                     <div className="emo" style={{ background: "rgba(248,203,70,.1)", width: 40, height: 40, fontSize: 19 }}>{l.emoji}</div>
                     <div className="grow">
                       <div className="small b ellipsis">{l.product.name}</div>
-                      <div className="tiny muted">{l.product.live && <span className="nat-live">live · </span>}{l.product.packText} · {fmt(l.product.price)} × {l.qty}</div>
+                      <div className="tiny muted">{g.id === "blinkit" && l.product.live && <span className="nat-live">live · </span>}{l.product.packText} · {fmt(l.product.price)} × {l.qty}</div>
                       <div className="row" style={{ marginTop: 6, gap: 8 }}>
                         <Qty value={l.qty} onChange={(v) => setQty(l, v)} />
-                        <button className="btn btn-xs btn-blinkit" style={{ marginLeft: "auto" }} onClick={() => findOnBlinkit(l)}>Find <Icon.external size={12} /></button>
+                        <button className={`btn btn-xs ${g.cls.btn}`} style={{ marginLeft: "auto" }} onClick={() => findSupply(l)}>Find <Icon.external size={12} /></button>
                       </div>
                     </div>
                   </div>
                 ))}
-                <div className="between" style={{ marginTop: 10 }}><span className="tiny muted">{blinkitLines.every((l) => l.product.live) ? "Live Blinkit prices" : blinkitLines.some((l) => l.product.live) ? "MRP · live where marked" : "Estimated (MRP)"}</span><b>≈ {fmt(blinkitTotal)}</b></div>
-                <button className="btn btn-blinkit btn-block" style={{ marginTop: 12 }} onClick={nextBlinkit}>
-                  {blinkitLines.some((l) => l.ordered) ? "Next item on Blinkit" : "Start Blinkit run"} <Icon.external size={16} />
+                <div className="between" style={{ marginTop: 10 }}>
+                  <span className="tiny muted">{g.id !== "blinkit" ? `Estimated (MRP): ${g.name} shows its own price` : blinkitLines.every((l) => l.product.live) ? "Live Blinkit prices" : blinkitLines.some((l) => l.product.live) ? "MRP · live where marked" : "Estimated (MRP)"}</span>
+                  <b>≈ {fmt(blinkitTotal)}</b>
+                </div>
+                <button className={`btn ${g.cls.btn} btn-block`} style={{ marginTop: 12 }} onClick={nextSupply}>
+                  {blinkitLines.some((l) => l.ordered) ? `Next item on ${g.name}` : `Start ${g.name} run`} <Icon.external size={16} />
                 </button>
               </div>
             </div>

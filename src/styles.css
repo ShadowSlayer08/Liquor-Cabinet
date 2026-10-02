@@ -666,6 +666,70 @@ body:has(.share-ask) .toast { bottom: calc(var(--safe-bottom) + var(--nav-h) + 1
 /* (end v141-b) */
 
 /* ── v1.4.1 · C: rides home, settle-up, grocers ──────────────────────────── */
+/* Grocers: Zepto and Instamart take their colour from --g (Blinkit keeps .logo-b / .btn-blinkit). */
+.out-g-zepto { --g: #7b2ff2; --g-hi: #a874ff; --g-ink: #fff; }
+.out-g-instamart { --g: #e0287d; --g-hi: #ff6fab; --g-ink: #fff; }
+.out-logo { background: var(--g); color: var(--g-ink); }
+.out-head { background: radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--g) 24%, transparent), transparent 60%); }
+.out-btn { background: linear-gradient(135deg, var(--g-hi), var(--g) 60%); color: var(--g-ink); box-shadow: 0 10px 24px color-mix(in srgb, var(--g) 30%, transparent); }
+.out-grocers { margin-bottom: 0; }
+
+/* Plan › Getting home */
+.out-drivers .stepper { max-width: 220px; }
+.out-pickup { display: flex; align-items: center; gap: 10px; }
+.out-pickup > svg, .out-pickup > .btn { flex-shrink: 0; }
+.out-rides { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+.out-ride {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; padding: 10px 6px 9px; border-radius: 16px;
+  background: var(--panel-2); border: 1px solid var(--stroke); text-align: center; transition: transform .12s;
+}
+.out-ride:active { transform: scale(.96); }
+.out-ride > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.out-ride-emoji { font-size: 24px; line-height: 1.15; }
+.out-ride-uber { border-color: rgba(255, 255, 255, .24); }
+.out-ride-ola { border-color: rgba(205, 220, 57, .38); }
+.out-ride-rapido { border-color: rgba(249, 201, 51, .42); }
+.out-driveu {
+  display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 8px; padding: 10px 12px; border-radius: 14px; text-align: left;
+  background: rgba(0, 0, 0, .25); border: 1px dashed var(--stroke-2); color: var(--soft);
+}
+.out-driveu > svg { flex-shrink: 0; color: var(--muted); }
+.out-inline-icon { vertical-align: -2px; }
+
+/* Split card › settle-up line */
+.out-settle-line { display: flex; align-items: center; gap: 10px; }
+.out-settle-line .btn { flex-shrink: 0; }
+
+/* Settle-up sheet */
+.out-total { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; padding: 12px 14px; border-radius: 18px; background: rgba(0, 0, 0, .3); border: 1px solid var(--stroke); }
+.out-sec { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 20px 2px 6px; }
+.out-bill { display: grid; gap: 8px; padding: 10px 0 12px; border-bottom: 1px solid var(--stroke); }
+.out-person { padding: 8px 0 10px; border-bottom: 1px solid var(--stroke); }
+.out-bill + .btn, .out-person + .btn { margin-top: 10px; }
+.out-bill .row .input, .out-person .row .input { padding: 9px 12px; }
+.out-amt { position: relative; display: block; width: 104px; flex-shrink: 0; }
+.out-amt span { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--muted); font-weight: 600; pointer-events: none; }
+.out-amt .input { padding-left: 24px; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.out-planned { justify-self: start; background: rgba(231, 168, 70, .14); color: var(--gold); }
+.out-parts { padding: 3px; }
+.out-parts button { padding: 7px 2px; font-size: 11.5px; letter-spacing: -.2px; }
+.out-paidby { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.out-paidby > .tiny { flex-shrink: 0; }
+.out-chips { flex: 1; min-width: 0; margin: 0; padding: 2px 0 4px; }
+.out-chips .chip { padding: 6px 11px; font-size: 12px; }
+.out-drink { flex-shrink: 0; padding: 7px 10px; font-size: 11.5px; }
+.out-upi { margin-top: 8px; padding: 9px 12px; font-size: 13px; }
+.out-paste { margin-bottom: 8px; }
+.out-paste textarea { font: inherit; font-size: 13.5px; line-height: 1.45; resize: vertical; min-height: 72px; }
+.out-bal { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px dashed var(--stroke); }
+.out-bal:last-child { border-bottom: none; }
+.out-pays { display: grid; gap: 8px; margin-top: 12px; }
+.out-pay { padding: 10px 12px; border-radius: 16px; background: var(--panel); border: 1px solid var(--stroke); }
+.out-pay .row > b, .out-pay .btn { flex-shrink: 0; }
+.out-pay.paid .grow, .out-pay.paid .row > b { opacity: .5; text-decoration: line-through; }
+.out-qr { margin-top: 12px; text-align: center; }
+.out-qr img { width: min(260px, 72vw); height: auto; aspect-ratio: 1; margin: 0 auto; border-radius: 16px; background: #fff; padding: 6px; }
+.out-qr-skel { width: min(260px, 72vw); aspect-ratio: 1; margin: 0 auto; }
 
 /* (end v141-c) */
 

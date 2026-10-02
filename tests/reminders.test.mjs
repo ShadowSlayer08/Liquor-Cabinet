@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildReminders, reminderSig, reminderState, isOn, BASE_ID } from "../src/lib/reminderPlan.js";
+import { buildReminders, reminderSig, reminderState, reminderExtra, isOn, lastCallAt, settleAt, BASE_ID } from "../src/lib/reminderPlan.js";
 import { partyStart, partyWhen, prettyTime, prettyWhen, clockOf } from "../src/lib/when.js";
 
 const party = { date: "2027-06-12", time: "20:00", hours: 4, dinner: true };
@@ -22,17 +22,57 @@ test("party date & time helpers", () => {
 
 test("reminders are timed off the party start", () => {
   const list = buildReminders(party, "delhi", [], new Date("2027-06-01T09:00:00").getTime());   // a fixed "now"
-  assert.deepEqual(list.map((r) => r.key), ["stock", "chill", "blinkit", "starters", "dinner"]);
-  assert.deepEqual(list.map((r) => r.id), [0, 1, 2, 3, 4].map((i) => BASE_ID + i));
+  // v1.4.1 appended last call and settle-up, so the v1.4 reminders keep their ids.
+  assert.deepEqual(list.map((r) => r.key), ["stock", "chill", "blinkit", "starters", "dinner", "winddown", "settle"]);
+  assert.deepEqual(list.map((r) => r.id), [0, 1, 2, 3, 4, 5, 6].map((i) => BASE_ID + i));
+  assert.ok(list.every((r) => r.id < BASE_ID + 12));   // cancelReminders clears 12
   assert.equal(mins(list, "stock"), -24 * 60 - 120);
   assert.equal(mins(list, "chill"), -180);
   assert.equal(mins(list, "blinkit"), -75);
   assert.equal(mins(list, "starters"), -40);
   assert.equal(mins(list, "dinner"), 90);        // max(90, 4 h / 2 − 45 min)
+  assert.equal(mins(list, "winddown"), 4 * 60 - 45);
+  assert.equal(list.find((r) => r.key === "settle").at.getTime(), new Date("2027-06-13T11:00:00").getTime());   // the morning after
   assert.ok(list.every((r) => r.past === false));
   assert.ok(buildReminders(party, "delhi", [], new Date("2027-06-12T19:00:00").getTime()).find((r) => r.key === "stock").past);
-  assert.equal(buildReminders({ ...party, dinner: false }, "delhi").length, 4);
+  const noDinner = buildReminders({ ...party, dinner: false }, "delhi");
+  assert.deepEqual(noDinner.map((r) => r.key), ["stock", "chill", "blinkit", "starters", "winddown", "settle"]);
+  assert.equal(mins(noDinner, "winddown"), 195);
   assert.deepEqual(buildReminders({ ...party, date: null }, "delhi"), []);
+});
+
+test("last call: 45 min before the end, with the drivers; none in a one-hour party", () => {
+  const list = buildReminders({ ...party, hours: 6, drivers: 2 }, "delhi");
+  const wd = list.find((r) => r.key === "winddown");
+  assert.equal(mins(list, "winddown"), 6 * 60 - 45);
+  assert.equal(wd.title, "🚕 Last call in 45 minutes");
+  assert.equal(wd.body, "Put out water and soft drinks, and sort rides home (2 driving tonight).");
+  assert.equal(buildReminders(party, "delhi").find((r) => r.key === "winddown").body, "Put out water and soft drinks, and sort rides home.");
+  assert.match(buildReminders({ ...party, guests: 3, drivers: 9 }, "delhi").find((r) => r.key === "winddown").body, /\(3 driving tonight\)/);   // clamped to the guests
+  assert.ok(!buildReminders({ ...party, hours: 1 }, "delhi").some((r) => r.key === "winddown"));
+  assert.equal(lastCallAt({ ...party, hours: 1 }), null);
+  assert.equal(lastCallAt({ ...party, hours: 2 }).getTime(), new Date("2027-06-12T21:15:00").getTime());
+  assert.equal(lastCallAt({ ...party, hours: 99 }).getTime(), new Date("2027-06-13T07:15:00").getTime());   // 12 h at most
+  assert.equal(lastCallAt({ date: null }), null);
+});
+
+test("settle-up: the first 11 am after the party, at least 2 h after it ends", () => {
+  const at = (p) => settleAt({ ...party, ...p }).getTime();
+  assert.equal(at({}), new Date("2027-06-13T11:00:00").getTime());
+  assert.equal(at({ time: "12:30" }), new Date("2027-06-13T11:00:00").getTime());           // a lunch party: next morning
+  assert.equal(at({ time: "01:00" }), new Date("2027-06-12T11:00:00").getTime());           // after midnight: that morning
+  assert.equal(at({ time: "22:00", hours: 12 }), new Date("2027-06-13T12:00:00").getTime()); // ends 10 am → noon
+  assert.equal(settleAt({ date: null }), null);
+  const s = buildReminders(party, "delhi").find((r) => r.key === "settle");
+  assert.equal(s.title, "🧾 Settle up");
+  assert.equal(s.body, "Enter what everyone actually paid. Liquor Cabinet works out who owes whom.");
+});
+
+test("where a reminder's tap lands", () => {
+  assert.deepEqual(reminderExtra("stock"), { tab: "cart", view: "liquor" });
+  assert.deepEqual(reminderExtra("winddown"), { tab: "plan", card: "rides" });
+  assert.deepEqual(reminderExtra("settle"), { tab: "plan", card: "settle" });
+  for (const k of ["chill", "blinkit", "starters", "dinner", "unknown"]) assert.deepEqual(reminderExtra(k), { tab: "food" });
 });
 
 test("a dry party day moves the shopping reminder to the last open day", () => {
@@ -48,7 +88,7 @@ test("switches and the signature of what's set", () => {
   assert.ok(!isOn({ chill: false }, "chill"));
   assert.ok(isOn(undefined, "chill"));
   const all = reminderSig(list, {});
-  assert.equal(all.split("|").length, 5);
+  assert.equal(all.split("|").length, 7);
   assert.notEqual(reminderSig(list, { chill: false }), all);
   assert.equal(reminderSig(list, { chill: true }), all);
   // Longer party → dinner reminder later → different signature

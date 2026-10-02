@@ -16,6 +16,7 @@ import { CAT, cityName } from "../lib/parse/livcheers.js";
 import { bistroServes } from "../lib/location.js";
 import { dishPhotos } from "../lib/sources.js";
 import { openBistro, tap } from "../lib/order.js";
+import { grocerOf } from "../lib/grocers.js";
 import { fmt } from "../lib/format.js";
 import { Icon, Ring, VegMark } from "./Art.jsx";
 
@@ -277,9 +278,9 @@ export default function FoodTab({
       {/* ── Blinkit supplies ── */}
       <div className="section-head"><div><div className="kicker">Bar supplies</div><div className="h2">Mixers, ice & munchies</div></div><b className="gold-text">{fmt(groceryTotal)}</b></div>
       <div className="card flush fade-up">
-        <div className="provider-head provider-b">
-          <span className="logo logo-b">blinkit</span>
-          <span className="grow small muted">Delivered in minutes</span>
+        <div className={`provider-head ${grocerOf(grocer).cls.head}`}>
+          <span className={grocerOf(grocer).cls.logo}>{grocerOf(grocer).logo}</span>
+          <span className="grow small muted">Delivered in minutes · on your {grocerOf(grocer).name} list</span>
         </div>
         <div className="provider-body">
           {Object.entries(GROUPS).map(([gid, grp]) => {
@@ -346,8 +347,8 @@ export default function FoodTab({
           onClose={() => setMenuOpen(null)} />
       )}
       {groceryOpen && (
-        <GrocerySheet grocery={groceryOpen} loc={loc} need={needs[groceryOpen.id]} selectedId={chosen(groceryOpen).id} onClose={() => setGroceryOpen(null)}
-          onPick={(p, packs) => { upsertFood(groceryLine(groceryOpen, p, packs)); tap(); toast(`${groceryOpen.name} added to Blinkit list`); setGroceryOpen(null); }} />
+        <GrocerySheet grocery={groceryOpen} loc={loc} need={needs[groceryOpen.id]} selectedId={chosen(groceryOpen).id} onClose={() => setGroceryOpen(null)} grocer={grocer}
+          onPick={(p, packs) => { upsertFood(groceryLine(groceryOpen, p, packs)); tap(); toast(`${groceryOpen.name} added to your ${grocerOf(grocer).name} list`); setGroceryOpen(null); }} />
       )}
     </div>
   );
