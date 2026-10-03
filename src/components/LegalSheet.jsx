@@ -1,8 +1,11 @@
 // Legal notice & privacy — the README's "Data sources & legal notice" inside the app, for
-// everyone who sideloads it and never sees the README. The wording lives in lib/legal.js.
+// everyone who sideloads it and never sees the README. The wording lives in lib/legal.js;
+// the drinking age per state comes from lib/age.js, so the two can't drift apart.
 // It also opens from the Welcome screen, so its overlay sits above it (.opt-legal in styles.css).
 import Sheet from "./Sheet.jsx";
 import { LEGAL_DATA, LEGAL_INTRO, LEGAL_POINTS, LEGAL_SERVICES, ISSUES_URL, REPO_URL } from "../lib/legal.js";
+import { ageSummary, RULES_CHECKED } from "../lib/age.js";
+import { prettyDate } from "../lib/drydays.js";
 import { openUrl } from "../lib/order.js";
 import { Icon } from "./Art.jsx";
 import pkg from "../../package.json";
@@ -44,12 +47,20 @@ export default function LegalSheet({ onClose }) {
           <Point id="affiliation" />
           <Point id="terms" />
           <Point id="prices" />
+          <Point id="outing" />
           <Point id="takedown">
             <button className="btn btn-sm btn-ghost" style={{ marginTop: 8 }} onClick={() => openUrl(ISSUES_URL)}>
               Open an issue on GitHub <Icon.external size={14} />
             </button>
           </Point>
-          <Point id="age" />
+          <Point id="age">
+            <div className="tiny dim" style={{ marginTop: 6, lineHeight: 1.6 }}>
+              {ageSummary().map((g) => (
+                <div key={g.age}><b className="soft">{g.age}</b> · {g.states.map((s) => `${s.text}${s.likely ? "*" : ""}`).join(", ")}</div>
+              ))}
+              <div>* reportedly (secondary sources). Checked {prettyDate(`${RULES_CHECKED}-01`, { month: "short", year: "numeric" })}.</div>
+            </div>
+          </Point>
           <Point id="warranty" />
         </div>
 
