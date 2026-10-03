@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { inviteData, inviteText } from "../src/lib/invite.js";
 import { wrapLines, ellipsize, fitText } from "../src/lib/canvas.js";
+import { entryLine } from "../src/lib/invite.js";
+import { DEFAULT_OUT, slimVenue, slimEvent } from "../src/lib/outModel.js";
 
 const party = { name: "  Diwali bash ", date: "2026-11-07", time: "20:30", host: " Rish " };
 const bottle = (name, price, qty) => ({ key: name, cat: "malts", qty, item: { name, price } });
@@ -71,4 +73,79 @@ test("fitText shrinks before it cuts", () => {
   assert.equal(c.size, 60);
   assert.equal(c.lines.length, 2);
   assert.ok(c.lines[1].endsWith("…"));
+});
+
+// ── v1.5: a party out ────────────────────────────────────────────────────────
+const SOI7_URL = "https://www.district.in/dining/ncr/soi-7-pub-brewery-dlf-cyber-city";
+const soi7 = slimVenue({
+  resId: 18383940, zcity: "ncr", slug: "soi-7-pub-brewery-dlf-cyber-city", name: "Soi 7 Pub & Brewery", locality: "DLF Cyber City",
+  lat: 28.495, lon: 77.0895, costForTwo: 2400, amenities: ["Full bar available", "DJ"], bookable: true, closes: "01:00",
+}, SOI7_URL);
+const xlive = slimEvent({
+  slug: "giada-brince-xlive-saturday-oct3-2026", name: "Giada Brince at XLive", venue: "XLive", locality: "Sector 29",
+  lat: 28.4683, lon: 77.064, start: "2026-10-03T15:30:00Z", priceFrom: 1500, rules: { ageEntry: 21, stag: "Not allowed" },
+}, "https://www.district.in/events/giada-brince-xlive-saturday-oct3-2026-buy-tickets");
+const outAt = (pick, more = {}) => ({ ...DEFAULT_OUT, active: true, pick, ...more });
+const homeStuff = {
+  city: "gurgaon", loc: { label: "Sector 57, Gurugram" },
+  cocktailMenu: [{ id: "gnt", servings: 10 }, { id: "virgin-mojito", servings: 4 }],
+  liquorLines: [bottle("Glenlivet 12", 5000, 1), bottle("Kingfisher Ultra", 150, 12)],
+  foodCart: [{ key: "z1", kind: "zomato", name: "Paneer Tikka" }],
+};
+
+test("out at a venue: the venue and its District link, not the home address or the home menu", () => {
+  const d = inviteData({ party, ...homeStuff, out: outAt(soi7) });
+  assert.equal(d.title, "Diwali bash");
+  assert.equal(d.venue, "Soi 7 Pub & Brewery, DLF Cyber City");
+  assert.equal(d.url, SOI7_URL);
+  assert.equal(d.event, "");
+  assert.equal(d.entry, "");
+  assert.deepEqual(d.bar, { kind: "bottles", items: [], more: 0 });   // the bar serves its own drinks
+  assert.deepEqual(d.food, { items: [], more: 0 });
+  assert.equal(d.mocktails, false);
+  const text = inviteText(d);
+  assert.match(text, /📍 Soi 7 Pub & Brewery, DLF Cyber City/);
+  assert.match(text, /🔗 https:\/\/www\.district\.in\/dining\/ncr\/soi-7-pub-brewery-dlf-cyber-city$/m);
+  assert.doesNotMatch(text, /Sector 57|Mocktails|Entry/);
+  assert.equal(inviteData({ party: { ...party, name: "" }, ...homeStuff, out: outAt(soi7) }).title, "Night out");
+});
+
+test("out inactive (or nothing picked): the invite is exactly the home one", () => {
+  const home = inviteData({ party, ...homeStuff });
+  assert.deepEqual(inviteData({ party, ...homeStuff, out: { ...outAt(soi7), active: false } }), home);
+  assert.deepEqual(inviteData({ party, ...homeStuff, out: { ...DEFAULT_OUT, active: true } }), home);
+  assert.deepEqual(inviteData({ party, ...homeStuff, out: null }), home);
+  assert.equal(home.venue, "Sector 57, Gurugram");
+  assert.equal(home.url, "");
+  assert.equal(inviteText(home), inviteText({ ...home, event: undefined, entry: undefined, url: undefined }));
+});
+
+test("a club night: the event, its venue, the organiser's age rule and the event page", () => {
+  const d = inviteData({ party, ...homeStuff, out: outAt(xlive, { kind: "club" }) });
+  assert.equal(d.event, "Giada Brince at XLive");
+  assert.equal(d.venue, "XLive, Sector 29");
+  assert.equal(d.entry, "Entry 21+ (organiser's rule). Carry ID.");
+  const text = inviteText(d);
+  assert.match(text, /🎟️ Giada Brince at XLive\n📍 XLive, Sector 29\n🆔 Entry 21\+ \(organiser's rule\)\. Carry ID\./);
+  assert.match(text, /🔗 https:\/\/www\.district\.in\/events\/giada-brince-xlive-saturday-oct3-2026-buy-tickets/);
+  assert.equal(entryLine(null), "");
+  assert.equal(entryLine(0), "");
+  assert.equal(entryLine("18"), "Entry 18+ (organiser's rule). Carry ID.");
+  // No age rule on the event → no entry line.
+  assert.equal(inviteData({ party, out: outAt({ ...xlive, ageEntry: null }) }).entry, "");
+});
+
+test("a BYOB night lists the bottles you're bringing; links are www.district.in only", () => {
+  const byob = inviteData({ party, ...homeStuff, out: outAt({ ...soi7, tags: [] }, { kind: "byob" }) });
+  assert.deepEqual(byob.bar, { kind: "byob", items: ["Glenlivet 12", "Kingfisher Ultra"], more: 0 });
+  assert.deepEqual(byob.food.items, []);
+  // A venue District lists as BYOB counts too, whatever chip is on now.
+  assert.equal(inviteData({ party, ...homeStuff, out: outAt({ ...soi7, tags: ["BYOB"] }, { kind: "bar" }) }).bar.kind, "byob");
+  // A missing URL is rebuilt from the slug; anything not on www.district.in is dropped.
+  assert.equal(inviteData({ party, out: outAt({ ...soi7, url: "" }) }).url, SOI7_URL);
+  assert.equal(inviteData({ party, out: outAt({ ...xlive, url: "" }) }).url, "https://www.district.in/events/giada-brince-xlive-saturday-oct3-2026-buy-tickets");
+  assert.equal(inviteData({ party, out: outAt({ ...soi7, url: "https://example.com/soi7" }) }).url, "");
+  assert.equal(inviteData({ party, out: outAt({ ...soi7, url: "", slug: "" }) }).url, "");
+  // A venue whose name already says the locality isn't repeated.
+  assert.equal(inviteData({ party, out: outAt({ ...soi7, name: "Soi 7, DLF Cyber City" }) }).venue, "Soi 7, DLF Cyber City");
 });

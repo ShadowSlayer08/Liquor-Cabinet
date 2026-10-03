@@ -1,0 +1,954 @@
+{
+ "_source": "GET https://www.district.in/gw/consumer/events/v1/event/getBySlug/the-inner-roo-m-may6-2026 (research capture only — the app reads the event page) (2026-10-03). Same object as the event page's flight \"data\"; trimmed to the fields the parser reads.",
+ "result": "ok",
+ "data": {
+  "_id": "69ef8fd26ecbd2bf1430bd22",
+  "name": "The Inner Room",
+  "slug": "the-inner-roo-m-may6-2026",
+  "description": "<p>Step into Bandra’s newest midweek experience at Mitron, where music, fashion, and elevated social energy come</p><p>together under one roof.</p><p>A reason to step out midweek, built around sound, connection, and a thoughtfully curated atmosphere where every</p><p>detail shifts the energy and turns an ordinary Wednesday into the place everyone wants to be.</p><p>Inner Room is built to pull you in from the second you enter. With the DJ at the centre of the room, the crowd</p><p>moves around the music from every side, making the whole space feel alive and locked into one energy.</p><p>Think warm amber glow, statement lighting, clean visuals, and a setup that flips Mitron into a whole new midweek</p><p>mood. Intimate enough to feel exclusive, loud enough to feel unforgettable.</p><p>Expect camera-ready moments, nonstop movement, and the kind of social buzz that keeps the night flowing. From the</p><p>dancefloor to select guest corners, The Inner Room is not just somewhere you go, it’s somewhere you feel</p>",
+  "city": "Mumbai",
+  "sold_out": false,
+  "event_state": "available",
+  "is_free": false,
+  "price_display_string": "999 onwards",
+  "price_string": "0 onwards",
+  "date_string_v2": "Every Wed, 8:00 PM to 1:30 AM",
+  "least_show_start_time": 1791383400,
+  "max_show_end_time": 1795032000,
+  "is_event_recurring": false,
+  "total_active_shows": 7,
+  "components": [
+   {
+    "type": "event_guide_v2",
+    "content": {
+     "icon_type_heading_subheading": []
+    },
+    "is_hidden": false
+   }
+  ],
+  "event_metadata": {
+   "nps_config": {
+    "questions": []
+   },
+   "is_cover_charge_enabled": false,
+   "is_cover_charge_redemption_disabled": true
+  },
+  "venue": {
+   "geolocation": {
+    "latitude": 19.0652467,
+    "longitude": 72.8334472
+   },
+   "name": "Mitron Bar & Cafe - Bandra",
+   "city": "Mumbai",
+   "display_address": "Mitron Bar & Cafe - Bandra, Mumbai",
+   "shows": [
+    {
+     "_id": "6a8705674a53c5855b3675ed",
+     "start_utc_timestamp": 1791383400,
+     "end_utc_timestamp": 1791403200,
+     "date_string": "October 7 | 8PM - October 8 | 1:30AM",
+     "sold_out": false,
+     "items_for_sale": [
+      {
+       "name": "Tickets",
+       "item_group_type": "ticket",
+       "is_available": true,
+       "items": [
+        {
+         "_id": "6a8706e1cc0b75b93a93a162",
+         "name": "COUPLE GUESTLIST",
+         "price": 0,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT BEFORE 11:00.ON THE VENUES GUESTLIST",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-10-07T14:30:00.000Z"
+        },
+        {
+         "_id": "6a870715cbef737ff4732d71",
+         "name": "FEMALE GUESTLIST",
+         "price": 0,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT BEFORE 11:00. ON THE VENUES GUESTLIST ",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-10-07T14:30:00.000Z"
+        },
+        {
+         "_id": "6a8708cbea9daf6a1bfa0b12",
+         "name": "FEMALE STAG",
+         "price": 999,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT AFTER 11:00.TICKETS ARE FULLY REDEEMABLE",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-10-07T14:30:00.000Z"
+        },
+        {
+         "_id": "6a8709a777f12638a878a09d",
+         "name": "COUPLE ",
+         "price": 2999,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT AFTER 11:00. TICKETS ARE FULLY REDEEMABLE ",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-10-07T14:30:00.000Z"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "_id": "6a8705674a53c5855b3675ea",
+     "start_utc_timestamp": 1791988200,
+     "end_utc_timestamp": 1792008000,
+     "date_string": "October 14 | 8PM - October 15 | 1:30AM",
+     "sold_out": false,
+     "items_for_sale": [
+      {
+       "name": "Tickets",
+       "item_group_type": "ticket",
+       "is_available": true,
+       "items": [
+        {
+         "_id": "6a8706e1cc0b75b93a93a163",
+         "name": "COUPLE GUESTLIST",
+         "price": 0,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT BEFORE 11:00.ON THE VENUES GUESTLIST",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-10-14T14:30:00.000Z"
+        },
+        {
+         "_id": "6a870715cbef737ff4732d72",
+         "name": "FEMALE GUESTLIST",
+         "price": 0,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT BEFORE 11:00. ON THE VENUES GUESTLIST ",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-10-14T14:30:00.000Z"
+        },
+        {
+         "_id": "6a8708cbea9daf6a1bfa0b13",
+         "name": "FEMALE STAG",
+         "price": 999,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT AFTER 11:00.TICKETS ARE FULLY REDEEMABLE",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-10-14T14:30:00.000Z"
+        },
+        {
+         "_id": "6a8709a777f12638a878a09c",
+         "name": "COUPLE ",
+         "price": 2999,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT AFTER 11:00. TICKETS ARE FULLY REDEEMABLE ",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-10-14T14:30:00.000Z"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "_id": "6a8705674a53c5855b3675e7",
+     "start_utc_timestamp": 1792593000,
+     "end_utc_timestamp": 1792612800,
+     "date_string": "October 21 | 8PM - October 22 | 1:30AM",
+     "sold_out": false,
+     "items_for_sale": [
+      {
+       "name": "Tickets",
+       "item_group_type": "ticket",
+       "is_available": true,
+       "items": [
+        {
+         "_id": "6a8706e1cc0b75b93a93a164",
+         "name": "COUPLE GUESTLIST",
+         "price": 0,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT BEFORE 11:00.ON THE VENUES GUESTLIST",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-10-21T14:30:00.000Z"
+        },
+        {
+         "_id": "6a870715cbef737ff4732d73",
+         "name": "FEMALE GUESTLIST",
+         "price": 0,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT BEFORE 11:00. ON THE VENUES GUESTLIST ",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-10-21T14:30:00.000Z"
+        },
+        {
+         "_id": "6a8708cbea9daf6a1bfa0b14",
+         "name": "FEMALE STAG",
+         "price": 999,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT AFTER 11:00.TICKETS ARE FULLY REDEEMABLE",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-10-21T14:30:00.000Z"
+        },
+        {
+         "_id": "6a8709a777f12638a878a09b",
+         "name": "COUPLE ",
+         "price": 2999,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT AFTER 11:00. TICKETS ARE FULLY REDEEMABLE ",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-10-21T14:30:00.000Z"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "_id": "6a8705674a53c5855b3675e4",
+     "start_utc_timestamp": 1793197800,
+     "end_utc_timestamp": 1793217600,
+     "date_string": "October 28 | 8PM - October 29 | 1:30AM",
+     "sold_out": false,
+     "items_for_sale": [
+      {
+       "name": "Tickets",
+       "item_group_type": "ticket",
+       "is_available": true,
+       "items": [
+        {
+         "_id": "6a8706e1cc0b75b93a93a165",
+         "name": "COUPLE GUESTLIST",
+         "price": 0,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT BEFORE 11:00.ON THE VENUES GUESTLIST",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-10-28T14:30:00.000Z"
+        },
+        {
+         "_id": "6a870715cbef737ff4732d74",
+         "name": "FEMALE GUESTLIST",
+         "price": 0,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT BEFORE 11:00. ON THE VENUES GUESTLIST ",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-10-28T14:30:00.000Z"
+        },
+        {
+         "_id": "6a8708cbea9daf6a1bfa0b15",
+         "name": "FEMALE STAG",
+         "price": 999,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT AFTER 11:00.TICKETS ARE FULLY REDEEMABLE",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-10-28T14:30:00.000Z"
+        },
+        {
+         "_id": "6a8709a777f12638a878a09a",
+         "name": "COUPLE ",
+         "price": 2999,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT AFTER 11:00. TICKETS ARE FULLY REDEEMABLE ",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-10-28T14:30:00.000Z"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "_id": "6a8705674a53c5855b3675e1",
+     "start_utc_timestamp": 1793802600,
+     "end_utc_timestamp": 1793822400,
+     "date_string": "November 4 | 8PM - November 5 | 1:30AM",
+     "sold_out": false,
+     "items_for_sale": [
+      {
+       "name": "Tickets",
+       "item_group_type": "ticket",
+       "is_available": true,
+       "items": [
+        {
+         "_id": "6a8706e1cc0b75b93a93a166",
+         "name": "COUPLE GUESTLIST",
+         "price": 0,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT BEFORE 11:00.ON THE VENUES GUESTLIST",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-11-04T14:30:00.000Z"
+        },
+        {
+         "_id": "6a870715cbef737ff4732d75",
+         "name": "FEMALE GUESTLIST",
+         "price": 0,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT BEFORE 11:00. ON THE VENUES GUESTLIST ",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-11-04T14:30:00.000Z"
+        },
+        {
+         "_id": "6a8708cbea9daf6a1bfa0b16",
+         "name": "FEMALE STAG",
+         "price": 999,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT AFTER 11:00.TICKETS ARE FULLY REDEEMABLE",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-11-04T14:30:00.000Z"
+        },
+        {
+         "_id": "6a8709a777f12638a878a099",
+         "name": "COUPLE ",
+         "price": 2999,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT AFTER 11:00. TICKETS ARE FULLY REDEEMABLE ",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-11-04T14:30:00.000Z"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "_id": "6a8705674a53c5855b3675de",
+     "start_utc_timestamp": 1794407400,
+     "end_utc_timestamp": 1794427200,
+     "date_string": "November 11 | 8PM - November 12 | 1:30AM",
+     "sold_out": false,
+     "items_for_sale": [
+      {
+       "name": "Tickets",
+       "item_group_type": "ticket",
+       "is_available": true,
+       "items": [
+        {
+         "_id": "6a8706e1cc0b75b93a93a167",
+         "name": "COUPLE GUESTLIST",
+         "price": 0,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT BEFORE 11:00.ON THE VENUES GUESTLIST",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-11-11T14:30:00.000Z"
+        },
+        {
+         "_id": "6a870715cbef737ff4732d76",
+         "name": "FEMALE GUESTLIST",
+         "price": 0,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT BEFORE 11:00. ON THE VENUES GUESTLIST ",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-11-11T14:30:00.000Z"
+        },
+        {
+         "_id": "6a8708cbea9daf6a1bfa0b17",
+         "name": "FEMALE STAG",
+         "price": 999,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT AFTER 11:00.TICKETS ARE FULLY REDEEMABLE",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-11-11T14:30:00.000Z"
+        },
+        {
+         "_id": "6a8709a777f12638a878a098",
+         "name": "COUPLE ",
+         "price": 2999,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT AFTER 11:00. TICKETS ARE FULLY REDEEMABLE ",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-11-11T14:30:00.000Z"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "_id": "6a8705674a53c5855b3675db",
+     "start_utc_timestamp": 1795012200,
+     "end_utc_timestamp": 1795032000,
+     "date_string": "November 18 | 8PM - November 19 | 1:30AM",
+     "sold_out": false,
+     "items_for_sale": [
+      {
+       "name": "Tickets",
+       "item_group_type": "ticket",
+       "is_available": true,
+       "items": [
+        {
+         "_id": "6a8706e1cc0b75b93a93a168",
+         "name": "COUPLE GUESTLIST",
+         "price": 0,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT BEFORE 11:00.ON THE VENUES GUESTLIST",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-11-18T14:30:00.000Z"
+        },
+        {
+         "_id": "6a870715cbef737ff4732d77",
+         "name": "FEMALE GUESTLIST",
+         "price": 0,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT BEFORE 11:00. ON THE VENUES GUESTLIST ",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-11-18T14:30:00.000Z"
+        },
+        {
+         "_id": "6a8708cbea9daf6a1bfa0b18",
+         "name": "FEMALE STAG",
+         "price": 999,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT AFTER 11:00.TICKETS ARE FULLY REDEEMABLE",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-11-18T14:30:00.000Z"
+        },
+        {
+         "_id": "6a8709a777f12638a878a097",
+         "name": "COUPLE ",
+         "price": 2999,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "TICKET GRANTS ENTRY TO THE EVENT AFTER 11:00. TICKETS ARE FULLY REDEEMABLE ",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [],
+         "item_service_types": [],
+         "convenience_fee_percentage": 0.04,
+         "gst": [
+          {
+           "percent": 0.09,
+           "name": "CGST"
+          },
+          {
+           "percent": 0.09,
+           "name": "SGST"
+          }
+         ],
+         "availability_date": "2026-11-18T14:30:00.000Z"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "terms": [
+   "Please carry a valid ID proof along with you.",
+   "No refunds on purchased ticket are possible, even in case of any rescheduling.",
+   "Security procedures, including frisking remain the right of the management.",
+   "No dangerous or potentially hazardous objects including but not limited to weapons, knives, guns, fireworks, helmets, lazer devices, bottles, musical instruments will be allowed in the venue and may be ejected with or without the owner from the venue",
+   "The sponsors/performers/organizers are not responsible for any injury or damage occurring due to the event. Any claims regarding the same would be settled in courts in Mumbai.",
+   "People in an inebriated state may not be allowed entry.",
+   "Organizers hold the right to deny late entry to the event.",
+   "Venue rules apply."
+  ]
+ }
+}

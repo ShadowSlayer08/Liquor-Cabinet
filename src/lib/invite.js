@@ -3,11 +3,20 @@
 //  canvas in the app's own style. inviteData() picks what goes on it (pure,
 //  tested); drawInvite() paints it and never runs past the canvas: long names
 //  shrink, then wrap, then get cut with "…"; lists drop rows until they fit.
+//
+//  A party out (v1.5, lib/outModel.js): the invite names the venue (or the event and
+//  its venue) instead of the home address, the caption carries the District page, and
+//  an event with an age rule says so — "21+" is the organiser's door rule, not the law.
+//  The home menu and food cart don't travel to a bar; a BYOB night lists the bottles
+//  you're bringing.
 // ═══════════════════════════════════════════════════════════════════════════════
 import { COCKTAIL } from "./cocktails.js";
 import { cityName } from "./parse/livcheers.js";
 import { prettyDate } from "./drydays.js";
 import { prettyTime } from "./when.js";
+import { isOut } from "./outModel.js";
+import { DISTRICT_BASE, venueUrl, eventUrl } from "./parse/district.js";
+import { byobNight } from "./reminderPlan.js";
 import {
   FONT, INK, font, loadFonts, loadSvg, makeCanvas, wrapLines, fitText, ellipsize, spaced,
   backdrop, panel, divider, goldGradient, stack, fits,
@@ -27,34 +36,62 @@ const uniq = (names) => {
 };
 const capped = (names, n) => ({ items: names.slice(0, n), more: Math.max(0, names.length - n) });
 
+// "Soi 7 Pub & Brewery, DLF Cyber City" — the locality only when the name doesn't already say it.
+const withLocality = (name, locality) => {
+  const n = String(name || "").trim(), l = String(locality || "").trim();
+  return n && l && !n.toLowerCase().includes(l.toLowerCase()) ? `${n}, ${l}` : n || l;
+};
+
+// The pick's District page: the one the Out tab saved, else built from its slug. Only ever a
+// www.district.in link (the one that opens the app).
+function districtUrl(p) {
+  const url = String(p.url || (p.type === "event" ? (p.slug ? eventUrl(p.slug) : "") : p.zcity && p.slug ? venueUrl(p) : ""));
+  return url.startsWith(`${DISTRICT_BASE}/`) ? url : "";
+}
+
+// "Entry 21+ (organiser's rule). Carry ID." for an event that sets an entry age.
+export const entryLine = (ageEntry) => (Number(ageEntry) > 0 ? `Entry ${Math.round(Number(ageEntry))}+ (organiser's rule). Carry ID.` : "");
+
 // What the invite says. Cocktails and mocktails on the party menu go "on the bar"; without a
 // menu, the priciest bottles in the cart do. Food = Zomato + Bistro dishes. `mocktails` tells
 // guests who aren't drinking that there's something for them too.
-export function inviteData({ party, city, loc, cocktailMenu = [], liquorLines = [], foodCart = [] }) {
-  const onMenu = (cocktailMenu || []).filter((m) => m && (m.servings ?? 1) > 0);
+// Out (`out`): `venue` is the picked place, `event` the event's name, `url` its District page,
+// `entry` the door's age rule; the lists stay empty except a BYOB night's bottles.
+export function inviteData({ party, city, loc, cocktailMenu = [], liquorLines = [], foodCart = [], out = null }) {
+  const pick = isOut(out) ? out.pick : null;
+  const byob = byobNight(out);
+  const onMenu = pick ? [] : (cocktailMenu || []).filter((m) => m && (m.servings ?? 1) > 0);
   const cocktails = uniq(onMenu.map((m) => COCKTAIL[m.id]?.name));
-  const bottles = uniq([...(liquorLines || [])].filter((l) => l?.item?.name)
+  const bottles = pick && !byob ? [] : uniq([...(liquorLines || [])].filter((l) => l?.item?.name)
     .sort((a, b) => (b.item.price || 0) * (b.qty || 0) - (a.item.price || 0) * (a.qty || 0)).map((l) => l.item.name));
-  const dishes = uniq((foodCart || []).filter((l) => l && (l.kind === "zomato" || l.kind === "bistro")).map((l) => l.name));
+  const dishes = pick ? [] : uniq((foodCart || []).filter((l) => l && (l.kind === "zomato" || l.kind === "bistro")).map((l) => l.name));
+  const isEvent = pick?.type === "event";
   return {
-    title: (party?.name || "").trim() || "House party",
+    title: (party?.name || "").trim() || (pick ? "Night out" : "House party"),
     date: party?.date ? prettyDate(party.date, { weekday: "long", day: "numeric", month: "long" }) : "",
     time: prettyTime(party?.time || "20:00"),
-    venue: loc?.label || (city ? cityName(city) : ""),
-    bar: cocktails.length ? { kind: "cocktails", ...capped(cocktails, 6) } : { kind: "bottles", ...capped(bottles, 5) },
+    venue: pick ? withLocality(isEvent ? pick.venue : pick.name, pick.locality) : loc?.label || (city ? cityName(city) : ""),
+    event: isEvent ? String(pick.name || "").trim() : "",
+    entry: isEvent ? entryLine(pick.ageEntry) : "",
+    url: pick ? districtUrl(pick) : "",
+    bar: cocktails.length ? { kind: "cocktails", ...capped(cocktails, 6) } : { kind: byob ? "byob" : "bottles", ...capped(bottles, 5) },
     food: capped(dishes, 6),
     mocktails: onMenu.some((m) => COCKTAIL[m.id]?.mocktail),
     host: (party?.host || "").trim(),
   };
 }
 
-// The share-sheet caption that travels with the image.
+// The share-sheet caption that travels with the image (a party out adds the event, the door's
+// age rule and the District link — WhatsApp makes it tappable).
 export function inviteText(d) {
   return [
     `🎉 You're invited: ${d.title}`,
     d.date && `📅 ${d.date}${d.time ? `, ${d.time}` : ""}`,
+    d.event && `🎟️ ${d.event}`,
     d.venue && `📍 ${d.venue}`,
+    d.entry && `🆔 ${d.entry}`,
     d.mocktails && "🍹 Mocktails too",
+    d.url && `🔗 ${d.url}`,
     d.host && `— ${d.host}`,
   ].filter(Boolean).join("\n");
 }
@@ -71,7 +108,7 @@ export async function drawInvite(d) {
   // Footer is pinned; everything else is centred in the space above it.
   const footerY = H - 104;
   const lists = [
-    d.bar.items.length && { label: "On the bar", ...d.bar },
+    d.bar.items.length && { label: d.bar.kind === "byob" ? "We're bringing" : "On the bar", ...d.bar },
     d.food.items.length && { label: "Food", ...d.food },
   ].filter(Boolean);
 
@@ -102,11 +139,17 @@ export async function drawInvite(d) {
 
     if (d.date) blocks.push({ h: 64, draw: (y) => { font(ctx, 600, 48); ctx.fillStyle = INK.text; ctx.textAlign = "center"; ctx.fillText(ellipsize(ctx, d.date, CW), cx, y); } });
     if (d.time) blocks.push({ h: 56, draw: (y) => { font(ctx, 500, 38); ctx.fillStyle = INK.gold; ctx.textAlign = "center"; ctx.fillText(`${d.time} onwards`, cx, y); } });
+    if (d.event) {
+      font(ctx, 700, 44, FONT.display, "italic");
+      const e = wrapLines(ctx, d.event, CW, 2);
+      blocks.push({ h: e.length * 54 + 12, draw: (y) => { font(ctx, 700, 44, FONT.display, "italic"); ctx.fillStyle = INK.text; ctx.textAlign = "center"; e.forEach((l, i) => ctx.fillText(l, cx, y + 8 + i * 54)); } });
+    }
     if (d.venue) {
       font(ctx, 400, 36);
       const v = wrapLines(ctx, d.venue, CW, 2);
       blocks.push({ h: v.length * 46 + 8, draw: (y) => { font(ctx, 400, 36); ctx.fillStyle = INK.soft; ctx.textAlign = "center"; v.forEach((l, i) => ctx.fillText(l, cx, y + 4 + i * 46)); } });
     }
+    if (d.entry) blocks.push({ h: 46, draw: (y) => { font(ctx, 500, 28); ctx.fillStyle = INK.muted; ctx.textAlign = "center"; ctx.fillText(ellipsize(ctx, d.entry, CW), cx, y + 8); } });
 
     if (lists.length) {
       const shown = lists.map((l) => {

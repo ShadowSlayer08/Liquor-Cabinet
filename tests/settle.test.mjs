@@ -5,6 +5,8 @@ import {
   addPerson, removePerson, patchPerson, patchExpense, addExpense, removeExpense, pasteNames, newId, rupees,
 } from "../src/lib/settle.js";
 import { splitBill } from "../src/lib/split.js";
+import { PARTS, OUT_PARTS } from "../src/lib/settle.js";
+import { DEFAULT_OUT, slimVenue, slimEvent } from "../src/lib/outModel.js";
 
 const person = (id, name, drinks = true, upi = "") => ({ id, name, drinks, upi });
 const expense = (id, part, amount, paidBy, what = id) => ({ id, what, part, amount, paidBy, planned: false });
@@ -198,4 +200,58 @@ test("the WhatsApp text: payments, UPI IDs, ticks — and no upi:// links", () =
   const square = settleMessage(settleOf(people, []));
   assert.match(square, /Everyone's square/);
   assert.doesNotMatch(square, /Reply when/);
+});
+
+// ── v1.5: a party out ────────────────────────────────────────────────────────
+const soi7 = slimVenue({ resId: 18383940, zcity: "ncr", slug: "soi-7", name: "Soi 7 Pub & Brewery", lat: 28.495, lon: 77.0895, costForTwo: 2400 });
+const xlive = slimEvent({ slug: "giada-brince-xlive", name: "Giada Brince at XLive", venue: "XLive" });
+const outAt = (pick, more = {}) => ({ ...DEFAULT_OUT, active: true, pick, ...more });
+
+test("the night-out parts: venue bill, tickets and cabs", () => {
+  assert.deepEqual(OUT_PARTS, ["venue", "tickets", "cabs"]);
+  assert.deepEqual([PARTS.venue.label, PARTS.tickets.label, PARTS.cabs.label], ["Venue bill", "Tickets", "Cabs"]);
+  assert.deepEqual(Object.keys(PARTS).filter((k) => !OUT_PARTS.includes(k)), ["liquor", "food", "supplies", "other"]);   // the v1.4.1 four, in order
+  assert.equal(normalizeSettle({ expenses: [{ id: "e1", part: "cabs", amount: 640 }] }).expenses[0].part, "cabs");
+  // They're shared by everyone, even in a fair split with non-drinkers.
+  const people = [person("p1", "Arjun"), person("p2", "Riya"), person("p3", "Meera", false), person("p4", "Dev", false)];
+  const s = settleOf(people, [expense("e1", "venue", 8000, "p1"), expense("e2", "tickets", 4000, "p2"), expense("e3", "cabs", 800, "p3")]);
+  assert.deepEqual(balances(s).map((b) => b.share), [320000, 320000, 320000, 320000]);
+});
+
+test("startSettle on a night out: the venue estimate and planned tickets, flagged planned", () => {
+  const party = { name: "", host: "Arjun", date: "2026-11-07", time: "20:00" };
+  const now = new Date("2026-11-07T23:00:00").getTime();
+  const plan = { guests: 10, drinkers: 8 };
+  const foodCart = [{ kind: "zomato", unitPrice: 300, qty: 2, restaurant: { resId: 11, name: "Biryani Blues" } }];
+  const s = startSettle({ party, plan, liquorTotal: 3000, foodCart, out: outAt(soi7, { tickets: [{ price: 500, qty: 2 }] }) }, now);
+  assert.equal(s.title, "Night out");
+  assert.deepEqual(s.expenses.map((e) => [e.what, e.part, e.amount, e.planned]), [
+    ["Soi 7 Pub & Brewery", "venue", 12000, true],   // ₹2,400 for two → ₹1,200 a head × 10
+    ["Tickets", "tickets", 1000, true],
+    ["Bottles", "liquor", 3000, true],                // still switched on in the split card
+    ["Biryani Blues", "food", 600, true],
+  ]);
+  assert.ok(s.expenses.every((e) => e.paidBy === "p1"));
+  // The venue estimate follows the split card's head count; switched off there, it's left out.
+  assert.equal(startSettle({ party, split: { people: 4 }, plan, out: outAt(soi7) }, now).expenses[0].amount, 4800);
+  assert.ok(!startSettle({ party, split: { include: { venue: false } }, plan, out: outAt(soi7) }, now).expenses.some((e) => e.part === "venue"));
+  // A venue without a cost for two still gets a ₹0 bill to fill in.
+  assert.deepEqual(startSettle({ party, plan, out: outAt({ ...soi7, costForTwo: null }) }, now).expenses.map((e) => [e.part, e.amount]), [["venue", 0]]);
+  // A club night: the tickets (₹0 if none were planned), no venue estimate.
+  const club = startSettle({ party: { ...party, name: "Diwali night" }, plan, out: outAt(xlive, { tickets: [{ price: 3000, qty: 2 }, { price: 1500, qty: 1 }] }) }, now);
+  assert.equal(club.title, "Diwali night");
+  assert.deepEqual(club.expenses.map((e) => [e.what, e.part, e.amount]), [["Tickets", "tickets", 7500]]);
+  assert.deepEqual(startSettle({ party, plan, out: outAt(xlive) }, now).expenses.map((e) => [e.part, e.amount]), [["tickets", 0]]);
+  assert.deepEqual(startSettle({ party, split: { include: { tickets: false } }, plan, out: outAt(xlive) }, now).expenses.map((e) => [e.what, e.amount]), [["Bottles", 0]]);
+});
+
+test("startSettle with the party at home is exactly v1.4.1", () => {
+  const party = { name: "Diwali night", host: "Arjun", date: "2026-11-07", time: "20:00" };
+  const now = new Date("2026-11-07T23:00:00").getTime();
+  const args = { party, plan: { guests: 5, drinkers: 3 }, liquorTotal: 6400, blinkitTotal: 840 };
+  const home = startSettle(args, now);
+  assert.deepEqual(startSettle({ ...args, out: { ...outAt(soi7), active: false } }, now), home);
+  assert.deepEqual(startSettle({ ...args, out: { ...DEFAULT_OUT, active: true } }, now), home);
+  assert.deepEqual(startSettle({ ...args, out: null }, now), home);
+  assert.equal(startSettle({ party: {} }, now).title, "House party");
 });
