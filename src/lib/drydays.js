@@ -9,6 +9,17 @@
 //    custom   — days you add yourself (e.g. an announced election ban)
 //  National days repeat every year; festival dates (Hindu panchang / public
 //  calendars) move, so OFTEN / STATE_DAYS cover 2026–2027 and need a yearly update.
+//
+//  Some closures are part-day: Haryana shuts shops and bars on 26 Jan and 15 Aug only
+//  until 5 pm (Excise Policy 2025-27, 2.13.1), so those entries carry until: "17:00"
+//  and still count as a shopping day in the evening.
+//
+//  Bars (v1.5 "Out" tab) don't always shut with the shops — barsDryOn() below:
+//    Delhi    — licensed bars shut only on 26 Jan, 15 Aug and 2 Oct (Excise Rules 2010,
+//               rule 52); on every other dry day only the shops do
+//    Haryana  — the same days and hours as the shops (policy 2.13.1)
+//    custom   — usually an election ban, which shuts bars too (RP Act 1951, s.135C)
+//    elsewhere — not known, so shown as "check"
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const CITY_STATE = {
@@ -22,6 +33,8 @@ export const CITY_STATE = {
 };
 
 const NATIONAL = [["01-26", "Republic Day"], ["08-15", "Independence Day"], ["10-02", "Gandhi Jayanti"]];
+// National days a state shuts only part of the day: { state: { "MM-DD": "HH:MM" it ends } }.
+const PART_DAY = { Haryana: { "01-26": "17:00", "08-15": "17:00" } };
 const yearOf = (iso) => Number(String(iso).slice(0, 4));
 
 const OFTEN = [
@@ -39,23 +52,74 @@ const STATE_DAYS = [
 export const stateOf = (citySlug) => CITY_STATE[citySlug] || null;
 
 // Every known dry day for the city; national days for `years` (default: last year to two years out).
+// A part-day closure carries until: "HH:MM" (shops and bars open again then).
 export function dryDaysFor(citySlug, custom = [], years = null) {
   const state = stateOf(citySlug);
   const y = yearOf(todayISO());
+  const national = (yr, md, name) => {
+    const until = PART_DAY[state]?.[md];
+    return until ? { date: `${yr}-${md}`, name, level: "national", until } : { date: `${yr}-${md}`, name, level: "national" };
+  };
   return [
-    ...(years || [y - 1, y, y + 1, y + 2]).flatMap((yr) => NATIONAL.map(([md, name]) => ({ date: `${yr}-${md}`, name, level: "national" }))),
+    ...(years || [y - 1, y, y + 1, y + 2]).flatMap((yr) => NATIONAL.map(([md, name]) => national(yr, md, name))),
     ...OFTEN.map(([date, name]) => ({ date, name, level: "often" })),
     ...STATE_DAYS.filter(([, , states]) => state && states.includes(state)).map(([date, name]) => ({ date, name, level: "state" })),
     ...(custom || []).filter((c) => c?.date).map((c) => ({ date: c.date, name: c.name || "Dry day", level: "custom" })),
   ].sort((a, b) => a.date.localeCompare(b.date));
 }
 
-// The most serious entry for a date, or null.
+// The most serious entry for a date, or null: { date, name, level, until? }. A part-day
+// closure ranks after a full-day one you added (an election ban on 26 Jan in Haryana).
 const RANK = { national: 0, custom: 1, state: 2, often: 3 };
+const rank = (d) => RANK[d.level] + (d.until ? 1.5 : 0);
 export function dryDayOn(date, citySlug, custom = []) {
   if (!date) return null;
   const hits = dryDaysFor(citySlug, custom, [yearOf(date)]).filter((d) => d.date === date);
-  return hits.sort((a, b) => RANK[a.level] - RANK[b.level])[0] || null;
+  return hits.sort((a, b) => rank(a) - rank(b))[0] || null;
+}
+
+// "17:00" → "5 pm";  untilText(dry) → "until 5 pm" for a part-day closure, else "".
+export function clock(hhmm) {
+  const t = /^(\d{1,2}):(\d{2})/.exec(String(hhmm || ""));
+  if (!t) return "";
+  const h = Number(t[1]), m = Number(t[2]);
+  return `${h % 12 || 12}${m ? `:${t[2]}` : ""} ${h < 12 ? "am" : "pm"}`;
+}
+export const untilText = (dry) => (dry?.until ? `until ${clock(dry.until)}` : "");
+
+// ── Bars on a dry day (v1.5 "Out" tab) ───────────────────────────────────────
+// null when it isn't a dry day, else { dry, name, level, shopsOnly?, until? }:
+//   dry true       bars are shut (until: "HH:MM" when only until then)
+//   dry "check"    shops are (or may be) shut; whether bars are isn't known here
+//   dry false      shopsOnly: the shops are shut, licensed bars stay open (Delhi)
+const BARS_SHUT_ON_NATIONAL = ["Delhi", "Haryana"];
+const barsRank = (v) => (v.dry === true ? (v.until ? 1 : 0) : v.dry === "check" ? 2 : 3);
+export function barsDryOn(date, citySlug, custom = []) {
+  if (!date) return null;
+  const state = stateOf(citySlug);
+  const verdicts = dryDaysFor(citySlug, custom, [yearOf(date)]).filter((d) => d.date === date).map((d) => {
+    const v = { name: d.name, level: d.level };
+    if (d.level === "custom") return { ...v, dry: true };
+    if (d.level === "national" && BARS_SHUT_ON_NATIONAL.includes(state)) return d.until ? { ...v, dry: true, until: d.until } : { ...v, dry: true };
+    if (state === "Delhi") return { ...v, dry: false, shopsOnly: true };
+    return { ...v, dry: "check" };
+  });
+  return verdicts.sort((a, b) => barsRank(a) - barsRank(b) || RANK[a.level] - RANK[b.level])[0] || null;
+}
+
+// What the bars banner says for barsDryOn(): { tone: "danger"|"warn"|"ok", lead, text, check }.
+// The lead is the bold part ("Fri, 2 Oct is Gandhi Jayanti"); check = offer the search link.
+export function barsDryText(r, date, citySlug, today = todayISO()) {
+  if (!r) return null;
+  const state = stateOf(citySlug);
+  const where = state ? ` in ${state}` : "";
+  const named = r.level === "custom" ? `a dry day${r.name && r.name !== "Dry day" ? ` (${r.name})` : ""}` : r.name;
+  const lead = `${date === today ? "Today" : prettyDate(date)} is ${named}`;
+  if (r.dry === true && r.until) return { tone: "warn", lead, text: `bars and liquor shops${where} are shut until ${clock(r.until)}.`, check: false };
+  if (r.dry === true) return { tone: "danger", lead, text: r.level === "custom" ? "bars are shut too, not just liquor shops." : `bars and liquor shops${where} are shut all day.`, check: false };
+  if (r.shopsOnly) return { tone: "ok", lead, text: `liquor shops may be shut, but licensed bars${where} stay open.`, check: false };
+  if (r.level === "national") return { tone: "warn", lead, text: "liquor shops are shut across India; bars may be too, so check.", check: true };
+  return { tone: "warn", lead, text: `often a dry day${where}: shops may be shut, and bars too, so check.`, check: true };
 }
 
 // The next date of a festival in the tables above (e.g. "Diwali"), on or after `from` — for
@@ -89,10 +153,12 @@ export const nextSaturday = (from = todayISO()) => addDays(from, (6 - new Date(`
 export const prettyDate = (iso, opts = { weekday: "short", day: "numeric", month: "short" }) =>
   iso ? new Date(`${iso}T12:00:00`).toLocaleDateString("en-IN", opts) : "";
 
-// "Buy by …": the last shopping day before `date` that isn't itself a dry day.
+// "Buy by …": the last shopping day before `date` that isn't itself a dry day. A part-day
+// dry day (Haryana's "until 5 pm") still is one: the shops open in the evening.
 export function lastShoppingDay(date, citySlug, custom = []) {
+  const shutAllDay = (iso) => { const dry = dryDayOn(iso, citySlug, custom); return !!dry && !dry.until; };
   let d = addDays(date, -1);
-  for (let i = 0; i < 7 && dryDayOn(d, citySlug, custom); i++) d = addDays(d, -1);
+  for (let i = 0; i < 7 && shutAllDay(d); i++) d = addDays(d, -1);
   return d;
 }
 
