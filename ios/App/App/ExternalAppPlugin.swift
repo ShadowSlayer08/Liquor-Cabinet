@@ -30,7 +30,8 @@ public class ExternalAppPlugin: CAPPlugin, CAPBridgedPlugin {
         "com.google.android.apps.maps": "comgooglemaps",
         "com.whatsapp": "whatsapp",
         "com.ubercab": "uber",
-        "com.olacabs.customer": "olacabs"
+        "com.olacabs.customer": "olacabs",
+        "com.application.zomato.district": "edition"
     ]
 
     /// Android package → a universal link that opens the iOS app (launch() has no "start by package" on iOS).
@@ -45,7 +46,8 @@ public class ExternalAppPlugin: CAPPlugin, CAPBridgedPlugin {
         "com.humblemobile.consumer": "https://www.driveu.in/",
         "com.zeptoconsumerapp": "https://www.zeptonow.com/",
         "in.swiggy.android": "https://www.swiggy.com/instamart",
-        "in.swiggy.android.instamart": "https://www.swiggy.com/instamart"
+        "in.swiggy.android.instamart": "https://www.swiggy.com/instamart",
+        "com.application.zomato.district": "https://www.district.in/"
     ]
 
     @objc func open(_ call: CAPPluginCall) {

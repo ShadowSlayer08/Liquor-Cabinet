@@ -14,6 +14,7 @@ export const UA =
 const DEV_PROXY = {
   "https://www.livcheers.com": "/proxy/livcheers",
   "https://www.zomato.com": "/proxy/zomato",
+  "https://www.district.in": "/proxy/district",
 };
 
 export class HttpError extends Error {

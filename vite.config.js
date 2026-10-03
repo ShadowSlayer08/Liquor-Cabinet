@@ -33,12 +33,14 @@ export default defineConfig({
     proxy: {
       "/proxy/livcheers": proxy("https://www.livcheers.com"),
       "/proxy/zomato": proxy("https://www.zomato.com"),
+      "/proxy/district": proxy("https://www.district.in"),
     },
   },
   preview: {
     proxy: {
       "/proxy/livcheers": proxy("https://www.livcheers.com"),
       "/proxy/zomato": proxy("https://www.zomato.com"),
+      "/proxy/district": proxy("https://www.district.in"),
     },
   },
   build: { outDir: "dist", target: "es2020", chunkSizeWarningLimit: 900 },

@@ -91,6 +91,8 @@ export const Icon = {
   cabinet: (p) => <I {...p}><path d="M5 21V9a7 7 0 0 1 14 0v12z" /><path d="M5 14h14" /><path d="M9.5 14v-3.5c0-1 .6-1.4 1-1.8V6.5h1.5v2.2c.4.4 1 .8 1 1.8V14" /></I>,
   food: (p) => <I {...p}><path d="M4 11h16a8 8 0 0 1-16 0z" /><path d="M12 3v2" /><path d="M8.5 4.5l.8 1.6" /><path d="M15.5 4.5l-.8 1.6" /><path d="M2 21h20" /></I>,
   bag: (p) => <I {...p}><path d="M5 8h14l-1.2 12H6.2z" /><path d="M9 8V6a3 3 0 0 1 6 0v2" /></I>,
+  // Out tab: a map pin holding a cocktail glass — the party somewhere else.
+  out: (p) => <I {...p}><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z" /><path d="M9.2 6.8h5.6L12 10z" /><path d="M12 10v2.4M10.6 12.4h2.8" /></I>,
   chart: (p) => <I {...p}><path d="M12 3a9 9 0 1 0 9 9h-9z" /><path d="M15 3.5A9 9 0 0 1 20.5 9H15z" /></I>,
   pin: (p) => <I {...p}><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></I>,
   bolt: (p) => <I {...p}><path d="M13 2L4 14h7l-1 8 9-12h-7z" /></I>,

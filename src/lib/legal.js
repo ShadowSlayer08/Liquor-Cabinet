@@ -14,7 +14,8 @@ export const ISSUES_URL = `${REPO_URL}/issues`;
 // `hosts` cover their subdomains (www., m., static. …).
 export const LEGAL_SERVICES = [
   { name: "Livcheers", hosts: ["livcheers.com", "static.livcheers.com"], use: "Liquor prices, ratings and tasting notes for your city" },
-  { name: "Zomato", hosts: ["zomato.com"], use: "Your delivery zone, restaurants that deliver a dish to you and their menus; opening your order in Zomato" },
+  { name: "Zomato", hosts: ["zomato.com"], use: "Your delivery zone, restaurants that deliver a dish to you and their menus, and bars and BYOB places near you; opening your order in Zomato" },
+  { name: "District", hosts: ["district.in"], use: "Bars, clubs and BYOB places: venue details and club nights read from district.in pages; booking a table or buying tickets in the District app" },
   { name: "Blinkit / Bistro", hosts: ["blinkit.com", "bistro.blinkit.com"], use: "Opening your supply list or order in their apps; an optional live price check (beta)" },
   { name: "Zepto", hosts: ["zeptonow.com", "zepto.com"], use: "Opening your supply list in Zepto, if you pick it" },
   { name: "Swiggy Instamart", hosts: ["swiggy.com"], use: "Opening your supply list in Instamart, if you pick it" },

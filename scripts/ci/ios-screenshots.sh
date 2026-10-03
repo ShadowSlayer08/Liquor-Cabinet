@@ -37,7 +37,7 @@ shot() { xcrun simctl io "$UDID" screenshot "$OUT/$1.png" >/dev/null; echo "shot
 launch; sleep 30; shot 0-welcome
 launch "liquorcabinet://sync"; sleep 60; shot 1-sync; sleep 10
 i=2
-for tab in cabinet bar food "cart?view=liquor" "cart?view=food" plan; do
+for tab in cabinet bar food "cart?view=liquor" "cart?view=food" plan out; do
   launch "liquorcabinet://tab/$tab"; sleep 15; shot "$i-${tab//[?=]/-}"
   i=$((i + 1))
 done

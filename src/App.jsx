@@ -10,12 +10,15 @@ import { handleBack } from "./lib/back.js";
 import { isNative } from "./lib/http.js";
 import { onChecklistTap, tap } from "./lib/order.js";
 import { onBubbleToggle } from "./lib/bubble.js";
+import { DEFAULT_OUT, withOut } from "./lib/outModel.js";
+import { AGE_LINE } from "./lib/age.js";
 import ScraperPanel from "./components/ScraperPanel.jsx";
 import CabinetTab from "./components/CabinetTab.jsx";
 import BarTab from "./components/BarTab.jsx";
 import FoodTab from "./components/FoodTab.jsx";
 import CartTab from "./components/CartTab.jsx";
 import PlanTab from "./components/PlanTab.jsx";
+import OutTab from "./components/OutTab.jsx";
 import RemindersWatcher from "./components/RemindersWatcher.jsx";
 import FillBarSheet from "./components/FillBarSheet.jsx";
 import SettleSheet from "./components/SettleSheet.jsx";
@@ -29,6 +32,7 @@ const TABS = [
   { id: "food", icon: Icon.food, label: "Food" },
   { id: "cart", icon: Icon.bag, label: "Cart" },
   { id: "plan", icon: Icon.chart, label: "Plan" },
+  { id: "out", icon: Icon.out, label: "Out" },      // v1.5: plan a party outside (District)
 ];
 
 // Only what the cart needs to survive a re-scrape or a city switch.
@@ -68,7 +72,8 @@ export default function App() {
   const [showSettle, setShowSettle] = useState(false);
   const [showLegal, setShowLegal] = useState(false);
   const [barKind, setBarKind] = useState("cocktails");  // Bar tab: cocktails | mocktails
-  const [focusCard, setFocusCard] = useState(null);     // Plan card id a reminder tap scrolls to
+  const [focusCard, setFocusCard] = useState(null);     // { tab, id }: a card to scroll to once its tab is on screen
+  const [out, setOut] = useState(DEFAULT_OUT);          // party outside: kind, pick, tickets… (lib/outModel.js)
   const [syncIds, setSyncIds] = useState(CATEGORIES.filter((c) => c.sync).map((c) => c.id));
   const [showScraper, setShowScraper] = useState(false);
   const [autoSync, setAutoSync] = useState(false);
@@ -96,6 +101,7 @@ export default function App() {
       if (cfg.zomatoExact != null) setZomatoExact(cfg.zomatoExact);
       if (cfg.settle) setSettle(cfg.settle);
       if (cfg.grocer) setGrocer(cfg.grocer);
+      if (cfg.out) setOut(withOut(cfg.out));
       if (cfg.syncIds) setSyncIds(cfg.syncIds);
       if (cfg.activeCat) setActiveCat(cfg.activeCat);
       if (cfg.loc) setLoc(cfg.loc);
@@ -111,10 +117,10 @@ export default function App() {
   useEffect(() => {
     if (ready) store.set("cfg", {
       city, loc, budget, liquor, batches, activeBatch, food, party, syncIds, activeCat, onboarded,
-      cocktailMenu, customDry, reminders, split, bubble, zomatoExact, settle, grocer,
+      cocktailMenu, customDry, reminders, split, bubble, zomatoExact, settle, grocer, out,
     });
   }, [ready, city, loc, budget, liquor, batches, activeBatch, food, party, syncIds, activeCat, onboarded,
-    cocktailMenu, customDry, reminders, split, bubble, zomatoExact, settle, grocer]);
+    cocktailMenu, customDry, reminders, split, bubble, zomatoExact, settle, grocer, out]);
 
   // ── Android back button + notification taps ──────────────────────────────
   useEffect(() => {
@@ -138,7 +144,7 @@ export default function App() {
     if (!isNative() && !import.meta.env.DEV) return;
     const open = (url) => {
       if (/^liquorcabinet:\/\/sync(?:$|[/?#])/.test(url || "")) { linked.current = true; setOnboarded(true); setAutoSync(true); setShowScraper(true); return; }
-      const m = /^liquorcabinet:\/\/tab\/(cabinet|bar|food|cart|plan)(?:\?view=(liquor|food))?/.exec(url || "");
+      const m = /^liquorcabinet:\/\/tab\/(cabinet|bar|food|cart|plan|out)(?:\?view=(liquor|food))?/.exec(url || "");
       if (!m) return;
       if (m[2]) setCartView(m[2]);
       linked.current = true;
@@ -152,23 +158,23 @@ export default function App() {
     return () => { sub.then((s) => s.remove()); };
   }, []);
   // Order checklists open Cart → Food; reminders name their tab ({ tab, view, card }):
-  // a Plan card scrolls into view, and the "settle" reminder opens the settle-up sheet.
+  // a Plan or Out card scrolls into view, and the "settle" reminder opens the settle-up sheet.
   useEffect(() => onChecklistTap((x) => {
     if (x?.tab === "food") setTab("food");
-    else if (x?.tab === "plan") {
-      setTab("plan");
+    else if (x?.tab === "plan" || x?.tab === "out") {
+      setTab(x.tab);
       if (x.card === "settle") setShowSettle(true);
-      else if (x.card) setFocusCard(x.card);
+      else if (x.card) setFocusCard({ tab: x.tab, id: x.card });
       return;
     } else { setCartView(x?.view || "food"); setTab("cart"); }
     window.scrollTo({ top: 0 });
   }), []);
   // A tap that starts the app arrives before the saved plan has loaded, so scroll only once
-  // the Plan tab is actually on screen (found on the emulator).
+  // the card's tab is actually on screen (found on the emulator).
   useEffect(() => {
-    if (!ready || tab !== "plan" || !focusCard) return;
+    if (!ready || !focusCard || tab !== focusCard.tab) return;
     const t = setTimeout(() => {
-      document.getElementById(focusCard)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById(focusCard.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
       setFocusCard(null);
     }, 400);
     return () => clearTimeout(t);
@@ -305,12 +311,14 @@ export default function App() {
 
   const addBatch = () => { setBatches((bs) => [...bs, { name: `Batch ${bs.length + 1}`, items: {} }]); setActiveBatch(batches.length); };
   const clearCache = async () => {
-    for (const prefix of ["price:", "hist:", "zomato:", "menu:", "dishphoto:"]) for (const k of await store.list(prefix)) await store.del(k);
+    for (const prefix of ["price:", "hist:", "zomato:", "menu:", "dishphoto:", "out:", "dv:", "ev:"]) for (const k of await store.list(prefix)) await store.del(k);
     setCatalog({}); setAges({});
     toast("Cached data cleared");
   };
   const goTab = (t) => { setTab(t); window.scrollTo({ top: 0 }); };
   const goBar = (kind = "cocktails") => { setBarKind(kind); goTab("bar"); };
+  // Jump to a Plan card (invite, split, rides…) from the Out tab.
+  const goPlanCard = (id) => { setTab("plan"); setFocusCard({ tab: "plan", id }); };
   // Sync some extra categories too (e.g. the optimiser asks for Indian whisky and brandy).
   const openScraperWith = (ids = []) => { setSyncIds((cur) => [...new Set([...cur, ...ids])]); setShowScraper(true); };
 
@@ -381,7 +389,12 @@ export default function App() {
               liquorLines={liquorLines} liquorTotal={liquorTotal} foodCart={food}
               reminders={reminders} setReminders={setReminders} split={split} setSplit={setSplit}
               bubble={bubble} setBubble={setBubble} zomatoExact={zomatoExact} setZomatoExact={setZomatoExact} toast={toast}
-              settle={settle} openSettle={() => setShowSettle(true)} openLegal={() => setShowLegal(true)} />
+              settle={settle} openSettle={() => setShowSettle(true)} openLegal={() => setShowLegal(true)} out={out} />
+          )}
+          {tab === "out" && (
+            <OutTab city={city} loc={loc} locating={locating} onLocate={detectLocation} party={party} setParty={setParty} plan={plan}
+              out={out} setOut={setOut} liquorLines={liquorLines} liquorTotal={liquorTotal} customDry={customDry} toast={toast}
+              openFill={() => setShowFill(true)} goTab={goTab} goPlanCard={goPlanCard} />
           )}
         </main>
 
@@ -417,11 +430,11 @@ export default function App() {
           openScraper={() => setShowScraper(true)} openScraperWith={openScraperWith} />
       )}
       {showSettle && (
-        <SettleSheet settle={settle} setSettle={setSettle} party={party} split={split} plan={plan}
+        <SettleSheet settle={settle} setSettle={setSettle} party={party} split={split} plan={plan} out={out}
           liquorTotal={liquorTotal} foodCart={food} blinkitTotal={blinkitTotal} toast={toast} onClose={() => setShowSettle(false)} />
       )}
       {showLegal && <LegalSheet onClose={() => setShowLegal(false)} />}
-      <RemindersWatcher party={party} city={city} customDry={customDry} reminders={reminders} setReminders={setReminders} toast={toast} />
+      <RemindersWatcher party={party} city={city} customDry={customDry} reminders={reminders} setReminders={setReminders} toast={toast} out={out} loc={loc} />
       {toastMsg && <div className="toast">{toastMsg}</div>}
     </>
   );
@@ -434,7 +447,7 @@ function Welcome({ locating, onLocate, onManual, onLegal }) {
       <div className="kicker" style={{ marginTop: 18 }}>Party planner</div>
       <h1 className="h1" style={{ fontSize: 38, marginTop: 8 }}>Liquor <em>Cabinet</em></h1>
       <p className="muted" style={{ maxWidth: 320, marginTop: 12, lineHeight: 1.6 }}>
-        Live bottle prices from Livcheers, a party food calculator, and one-tap ordering on Zomato, Bistro & Blinkit.
+        Live bottle prices from Livcheers, a party food calculator, one-tap ordering on Zomato, Bistro & Blinkit — or a night out at a bar, club or BYOB place on District.
       </p>
       <div style={{ width: "100%", maxWidth: 340, marginTop: 30, display: "grid", gap: 10 }}>
         <button className="btn btn-gold btn-block" disabled={locating} onClick={onLocate}>
@@ -442,7 +455,7 @@ function Welcome({ locating, onLocate, onManual, onLegal }) {
         </button>
         <button className="btn btn-ghost btn-block" onClick={onManual}>Choose my city</button>
       </div>
-      <div className="tiny dim" style={{ marginTop: 18, maxWidth: 300 }}>Your location goes to Zomato to find restaurants that deliver to you (and to a ride app when you book a ride home) — nothing is sent to us. 21+ · Drink responsibly. <button className="gold tiny" onClick={onLegal}>Legal notice</button></div>
+      <div className="tiny dim" style={{ marginTop: 18, maxWidth: 300 }}>Your location goes to Zomato to find restaurants that deliver to you (and to a ride app when you book a ride home) — nothing is sent to us. {AGE_LINE}. Drink responsibly. <button className="gold tiny" onClick={onLegal}>Legal notice</button></div>
     </div>
   );
 }

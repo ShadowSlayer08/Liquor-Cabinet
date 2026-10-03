@@ -177,7 +177,8 @@ To do its job, the app connects — from your own phone, only when you use the r
 | Service | What the app uses it for |
 | --- | --- |
 | **Livcheers** (livcheers.com) | Liquor prices, ratings and tasting notes for your city |
-| **Zomato** (zomato.com) | Your delivery zone, restaurants that deliver a dish to you, restaurant menus; opening your order in the Zomato app |
+| **Zomato** (zomato.com) | Your delivery zone, restaurants that deliver a dish to you, restaurant menus, and bars and BYOB places near you; opening your order in the Zomato app |
+| **District** (district.in) | Bars, clubs and BYOB places: venue details and club nights read from district.in pages; booking a table or buying tickets in the District app |
 | **Blinkit** / **Bistro** (blinkit.com) | Opening your supply list or order in their apps; an optional live price check (beta) |
 | **Zepto** (zeptonow.com) | Opening your supply list in Zepto, if you pick it |
 | **Swiggy Instamart** (swiggy.com) | Opening your supply list in Instamart, if you pick it |
@@ -189,7 +190,7 @@ To do its job, the app connects — from your own phone, only when you use the r
 
 - Your location goes to Zomato (rounded to about 10 m) to find restaurants that deliver to you, and to Uber or Ola as the pickup when you open a ride.
 - Data is fetched on demand and cached **only on your device**. There is no Liquor Cabinet server: nothing is collected, stored, resold or redistributed by this project. Every bottle links back to its source page.
-- All product names, prices, ratings, menus, logos and trademarks belong to their respective owners. This project is **not affiliated with, endorsed by or sponsored by** Livcheers, Zomato, Blinkit, Bistro, Zepto, Swiggy, Uber, Ola, Rapido, DriveU, Google or WhatsApp.
+- All product names, prices, ratings, menus, logos and trademarks belong to their respective owners. This project is **not affiliated with, endorsed by or sponsored by** Livcheers, Zomato, District, Blinkit, Bistro, Zepto, Swiggy, Uber, Ola, Rapido, DriveU, Google or WhatsApp.
 - Using a service through the app remains subject to that service's own terms of use; you're responsible for how you use it. The beta features (Zomato sign-in, live Blinkit prices) act with your own account and connection.
 - Prices and availability shown are **indicative** and may be out of date — the store, restaurant or app has the final word.
 - If you represent one of these services and want the app to stop using your data or change how it does, please [open an issue](https://github.com/ShadowSlayer08/Liquor-Cabinet/issues) — it will be honoured promptly.

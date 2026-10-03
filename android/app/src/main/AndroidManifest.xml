@@ -77,6 +77,8 @@
         <package android:name="com.zeptoconsumerapp" />
         <package android:name="in.swiggy.android" />
         <package android:name="in.swiggy.android.instamart" />
+        <!-- v1.5: District (bars, clubs, BYOB, events) -->
+        <package android:name="com.application.zomato.district" />
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.BROWSABLE" />
