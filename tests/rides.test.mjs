@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { RIDES, RIDE, rideLink, ridePrefills, pickupOf, driversOf, homeSafeMessage } from "../src/lib/rides.js";
+import { ridePickup, outVenueName } from "../src/lib/rides.js";
+import { DEFAULT_OUT, slimVenue, slimEvent } from "../src/lib/outModel.js";
 
 const loc = { lat: 28.459512345, lon: 77.026634567, label: "Sector 57 & Golf Course #2, गुरुग्राम", citySlug: "gurgaon" };
 
@@ -78,4 +80,44 @@ test("the WhatsApp message: https links only, falls back to 'the host'", () => {
   assert.doesNotMatch(one, /Pickup:/);
   assert.match(homeSafeMessage({ party: {}, drivers: 0 }), /Getting home from the party\*\n/);
   assert.doesNotMatch(homeSafeMessage({ party }), /driving tonight/);
+});
+
+// ── v1.5: a party out ────────────────────────────────────────────────────────
+const soi7 = slimVenue({ resId: 18383940, zcity: "ncr", slug: "soi-7-pub-brewery-dlf-cyber-city", name: "Soi 7 Pub & Brewery", locality: "DLF Cyber City", lat: 28.49503, lon: 77.08951 });
+const xlive = slimEvent({ slug: "giada-brince-xlive", name: "Giada Brince at XLive", venue: "XLive", lat: 28.4683, lon: 77.064 });
+const outAt = (pick, more = {}) => ({ ...DEFAULT_OUT, active: true, pick, ...more });
+
+test("out: rides start from the venue, never from home", () => {
+  assert.deepEqual(ridePickup(outAt(soi7), loc), { lat: 28.49503, lon: 77.08951, label: "Soi 7 Pub & Brewery" });
+  assert.equal(ridePickup({ ...outAt(soi7), active: false }, loc), loc);
+  assert.equal(ridePickup(null, loc), loc);
+  assert.equal(ridePickup(outAt({ ...soi7, lat: null }), loc), null);   // no venue pin: no pickup, not home
+  assert.deepEqual(pickupOf(ridePickup(outAt(soi7), loc)), { lat: 28.495, lon: 77.0895, label: "Soi 7 Pub & Brewery", named: true });
+  const uber = JSON.parse(new URL(rideLink("uber", ridePickup(outAt(soi7), loc))).searchParams.get("pickup"));
+  assert.deepEqual(uber, { latitude: 28.495, longitude: 77.0895, addressLine1: "Soi 7 Pub & Brewery" });
+  assert.equal(new URL(rideLink("ola", ridePickup(outAt(xlive), loc))).searchParams.get("pickup_name"), "XLive");
+  assert.equal(rideLink("uber", ridePickup(outAt({ ...soi7, lat: null }), loc)), "https://m.uber.com/looking");
+  assert.equal(outVenueName(outAt(soi7)), "Soi 7 Pub & Brewery");
+  assert.equal(outVenueName(outAt(xlive)), "XLive");
+  assert.equal(outVenueName(outAt({ ...xlive, venue: "" })), "Giada Brince at XLive");
+  assert.equal(outVenueName({ ...outAt(soi7), active: false }), "");
+});
+
+test("out: the WhatsApp message names the venue and picks up there", () => {
+  const party = { name: "Diwali night", date: "2026-11-07", time: "20:00" };
+  const msg = homeSafeMessage({ party, loc, host: "Arjun", drivers: 1, out: outAt(soi7) });
+  assert.match(msg, /^🚕 \*Getting home from Diwali night at Soi 7 Pub & Brewery\* — /);
+  assert.match(msg, /\nPickup: Soi 7 Pub & Brewery\n/);
+  assert.doesNotMatch(msg, /Sector 57|गुरुग्राम/);
+  const uber = msg.match(/https:\/\/m\.uber\.com\/\S+/)[0];
+  assert.equal(JSON.parse(new URL(uber).searchParams.get("pickup")).latitude, 28.495);
+  assert.match(msg, /1 of us is driving tonight/);
+  // No party name: the venue is the name. No venue pin: still named, links without a pickup.
+  assert.match(homeSafeMessage({ party: {}, loc, out: outAt(soi7) }), /Getting home from Soi 7 Pub & Brewery\*/);
+  const noPin = homeSafeMessage({ party, loc, out: outAt({ ...soi7, lat: null }) });
+  assert.match(noPin, /Getting home from Diwali night at Soi 7 Pub & Brewery/);
+  assert.doesNotMatch(noPin, /Pickup:/);
+  assert.match(noPin, /Uber: https:\/\/m\.uber\.com\/looking\n/);
+  // Not out: the v1.4.1 message, word for word.
+  assert.equal(homeSafeMessage({ party, loc, host: "Arjun", drivers: 1, out: { ...outAt(soi7), active: false } }), homeSafeMessage({ party, loc, host: "Arjun", drivers: 1 }));
 });

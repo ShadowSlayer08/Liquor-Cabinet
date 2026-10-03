@@ -3,14 +3,17 @@
 // morning-after reminder; with nothing to settle yet it starts from the plan. Each payment
 // gets a "Paid" tick and, when the person being paid has a UPI ID, a QR to scan from this
 // screen (QR is fine; upi:// links in chats aren't — see split.js).
+// v1.5: a party out starts from the venue's estimate and the planned tickets, and bills can be
+// a venue bill, tickets or cabs (shown as scrolling chips: seven parts don't fit a segment).
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import Sheet from "./Sheet.jsx";
 import {
-  PARTS, startSettle, normalizeSettle, settleSummary, settleMessage,
+  PARTS, OUT_PARTS, startSettle, normalizeSettle, settleSummary, settleMessage,
   addPerson, removePerson, patchPerson, patchExpense, addExpense, removeExpense, pasteNames,
 } from "../lib/settle.js";
 import { upiLink, validVpa, whatsappUrl } from "../lib/split.js";
+import { isOut } from "../lib/outModel.js";
 import { prettyWhen } from "../lib/when.js";
 import { fmt } from "../lib/format.js";
 import { openUrl, shareText, tap, buzz } from "../lib/order.js";
@@ -18,8 +21,8 @@ import { Icon } from "./Art.jsx";
 
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
-export default function SettleSheet({ settle, setSettle, party, split, plan, liquorTotal, foodCart, blinkitTotal, toast, onClose }) {
-  const fresh = () => startSettle({ party, split, plan, liquorTotal, foodCart, blinkitTotal });
+export default function SettleSheet({ settle, setSettle, party, split, plan, liquorTotal, foodCart, blinkitTotal, toast, onClose, out }) {
+  const fresh = () => startSettle({ party, split, plan, liquorTotal, foodCart, blinkitTotal, out });
   // Nothing to settle yet: start from the plan, snapshotted now (the party date rolls on later).
   const seed = useRef(null);
   if (!settle && !seed.current) seed.current = fresh();
@@ -38,6 +41,9 @@ export default function SettleSheet({ settle, setSettle, party, split, plan, liq
   };
   const net = Object.fromEntries(sum.balances.map((b) => [b.id, b.net]));
   const anyPlanned = s.expenses.some((e) => e.planned);
+  // The night-out parts show on a party out, or once a bill uses one; at home it's the v1.4.1 four.
+  const outParts = isOut(out) || s.expenses.some((e) => OUT_PARTS.includes(e.part));
+  const parts = Object.entries(PARTS).filter(([k]) => outParts || !OUT_PARTS.includes(k));
   const drinking = s.people.filter((p) => p.drinks).length;
   const fairNote = drinking === 0 ? "Fair: nobody's drinking, so everything is split among everyone."
     : drinking === s.people.length ? "Fair: everyone's drinking, so everyone pays the same."
@@ -121,13 +127,28 @@ export default function SettleSheet({ settle, setSettle, party, split, plan, liq
                 </label>
                 <button className="bar-x" aria-label="Remove bill" onClick={() => { tap(); edit((cur) => removeExpense(cur, e.id)); }}><Icon.close size={14} /></button>
               </div>
-              {e.planned && <span className="pill out-planned">planned · edit to what was actually paid</span>}
-              <div className="seg out-parts">
-                {Object.entries(PARTS).map(([k, part]) => (
-                  <button key={k} className={e.part === k ? "on" : ""} aria-pressed={e.part === k}
-                    onClick={() => edit((cur) => patchExpense(cur, e.id, { part: k }))}>{part.emoji} {part.label}</button>
-                ))}
-              </div>
+              {e.planned && (
+                <span className="pill out-planned">
+                  {e.part === "venue" ? "the venue's estimate · edit to the real bill"
+                    : e.part === "tickets" ? "tickets as planned · edit to what was paid, with fees"
+                      : "planned · edit to what was actually paid"}
+                </span>
+              )}
+              {outParts ? (
+                <div className="chips out-chips" role="group" aria-label="What the bill was for">
+                  {parts.map(([k, part]) => (
+                    <button key={k} className={`chip ${e.part === k ? "on" : ""}`} aria-pressed={e.part === k}
+                      onClick={() => edit((cur) => patchExpense(cur, e.id, { part: k }))}>{part.emoji} {part.label}</button>
+                  ))}
+                </div>
+              ) : (
+                <div className="seg out-parts">
+                  {parts.map(([k, part]) => (
+                    <button key={k} className={e.part === k ? "on" : ""} aria-pressed={e.part === k}
+                      onClick={() => edit((cur) => patchExpense(cur, e.id, { part: k }))}>{part.emoji} {part.label}</button>
+                  ))}
+                </div>
+              )}
               <div className="out-paidby">
                 <span className="tiny muted">Paid by</span>
                 <div className="chips out-chips">
