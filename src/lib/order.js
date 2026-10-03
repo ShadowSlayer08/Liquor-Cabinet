@@ -6,6 +6,8 @@
 //   2. puts your order list on the clipboard; and
 //   3. posts an "order checklist" notification you can pull down while you're
 //      in their app, so every item and quantity comes along with you.
+//  The supplies run can go to Zepto or Swiggy Instamart instead (lib/grocers.js),
+//  and rides home open Uber / Ola / Rapido / DriveU (lib/rides.js).
 //  Native side: android/…/ExternalAppPlugin.java
 // ═══════════════════════════════════════════════════════════════════════════════
 import { registerPlugin } from "@capacitor/core";
@@ -14,6 +16,8 @@ import { Clipboard } from "@capacitor/clipboard";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 import { isNative, isIOS } from "./http.js";
+import { blinkitSearchUrl, grocerOf } from "./grocers.js";
+import { RIDE, rideLink } from "./rides.js";
 
 const ExternalApp = registerPlugin("ExternalApp");
 
@@ -21,7 +25,7 @@ export const BLINKIT = { name: "Blinkit", pkg: "com.grofers.customerapp", url: "
 export const ZOMATO = { name: "Zomato", pkg: "com.application.zomato", url: "https://www.zomato.com/" };
 export const BISTRO = { name: "Bistro", pkg: "com.blinkit.bistro", url: "https://bistro.blinkit.com/" };
 
-export const blinkitSearchUrl = (q) => `https://blinkit.com/s/?q=${encodeURIComponent(q)}`;
+export { blinkitSearchUrl }; // lives in lib/grocers.js with Zepto's and Instamart's
 
 async function open(url, pkg, fallback) {
   if (isNative()) {
@@ -49,9 +53,44 @@ export async function openBistro() {
 
 export const openUrl = (url) => open(url, null, url);
 
+// Generic hand-offs for apps added later (rides, other grocers): open a link in an app,
+// or launch it (Android: by package; iOS: its scheme or universal link — ExternalAppPlugin.swift).
+export const openApp = (url, pkg, fallback = url) => open(url, pkg, fallback);
+export async function launchApp(pkg, fallback) {
+  if (isNative()) {
+    try { return await ExternalApp.launch({ pkg, fallback }); } catch (e) { console.warn("ExternalApp.launch", e); }
+  }
+  if (fallback) window.open(fallback, "_blank", "noopener");
+  return { opened: "browser" };
+}
+
 export async function isInstalled(app) {
   if (!isNative()) return false;
   try { return (await ExternalApp.isInstalled({ pkg: app.pkg })).installed; } catch { return false; }
+}
+
+// Rides home (lib/rides.js): Uber and Ola open with the pickup filled in; Rapido and DriveU
+// have no documented links, so their app just opens (or their website). Nothing is booked.
+export function openRide(id, loc) {
+  const r = RIDE[id];
+  if (!r) return Promise.resolve({ opened: "none" });
+  if (r.launch) return launchApp(r.pkg, r.home);
+  const url = rideLink(id, loc);
+  return openApp(url, r.pkg, url);
+}
+
+// A supply search in the chosen grocery app (lib/grocers.js). Android: the first of its apps
+// that's installed (Instamart's own app before Swiggy's). Otherwise the plain https link — a
+// verified App Link / universal link still opens the app, and the browser is the fallback.
+// (iOS can't check these apps, so nothing here depends on isInstalled being true.)
+export async function openGrocerSearch(id, query) {
+  const g = grocerOf(id);
+  const url = g.search(String(query ?? "").trim());
+  let pkg = null;
+  for (const p of g.pkgs) {
+    if (await isInstalled({ pkg: p })) { pkg = p; break; }
+  }
+  return openApp(url, pkg, url);
 }
 
 // ── Order checklist notification ─────────────────────────────────────────────
@@ -74,6 +113,8 @@ export async function postChecklist(id, title, lines, summary) {
         smallIcon: "ic_stat_liquor",
         iconColor: "#D4872A",
         autoCancel: false,
+        // Shown now, not an alarm — without this the plugin opens Android's "Alarms & reminders" settings.
+        isExactNotification: false,
         extra: { tab: "cart" },
       }],
     });

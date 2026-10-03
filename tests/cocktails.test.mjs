@@ -1,14 +1,32 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { COCKTAILS, makeable, cocktailUses, familyOfCat } from "../src/lib/cocktails.js";
+import { COCKTAILS, MOCKTAILS, COCKTAIL, FAMILIES, makeable, cocktailUses, servingsByFamily, familyOfCat } from "../src/lib/cocktails.js";
 import { planParty, groceryNeeds, GROCERY } from "../src/lib/food.js";
 import { dryDayOn, lastShoppingDay, upcomingDryDays, stateOf, nextSaturday } from "../src/lib/drydays.js";
 
-test("every cocktail uses known supplies and families", () => {
-  for (const c of COCKTAILS) {
-    for (const g of Object.keys(c.uses)) assert.ok(GROCERY[g], `${c.id} uses unknown supply ${g}`);
-    assert.ok(c.needs.length && c.steps.length, c.id);
+test("every cocktail and mocktail uses known supplies and families", () => {
+  for (const c of [...COCKTAILS, ...MOCKTAILS]) {
+    for (const [g, amt] of Object.entries(c.uses)) {
+      assert.ok(GROCERY[g], `${c.id} uses unknown supply ${g}`);
+      assert.ok(amt > 0, `${c.id} ${g} amount`);
+    }
+    for (const f of c.needs) assert.ok(FAMILIES[f], `${c.id} needs unknown family ${f}`);
+    assert.ok((c.mocktail || c.needs.length) && c.steps.length, c.id);
   }
+});
+
+test("mocktails on the menu never take a spirit's mixer away", () => {
+  const lines = [{ cat: "gin", ml: 750, qty: 1 }];
+  const party = { guests: 10, hours: 4, drinkersPct: 80, pegMl: 60 };
+  const plain = planParty(party, lines);
+  const withMocktails = planParty(party, lines, [{ id: "virgin-mojito", servings: 6 }, { id: "masala-cola", servings: 2 }]);
+  assert.deepEqual(servingsByFamily([{ id: "virgin-mojito", servings: 6 }]), {});
+  assert.deepEqual(withMocktails.mixerMl, plain.mixerMl);
+  assert.equal(withMocktails.cocktailServings, 0);
+  assert.equal(withMocktails.mocktailServings, 8);
+  // …but their own supplies do land on the Blinkit list.
+  assert.equal(groceryNeeds(withMocktails).mint, 24);
+  assert.equal(COCKTAIL["virgin-mojito"].mocktail, true);
 });
 
 test("makeable follows the cabinet", () => {

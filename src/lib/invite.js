@@ -27,10 +27,12 @@ const uniq = (names) => {
 };
 const capped = (names, n) => ({ items: names.slice(0, n), more: Math.max(0, names.length - n) });
 
-// What the invite says. Cocktails on the party menu go "on the bar"; without a
-// menu, the priciest bottles in the cart do. Food = Zomato + Bistro dishes.
+// What the invite says. Cocktails and mocktails on the party menu go "on the bar"; without a
+// menu, the priciest bottles in the cart do. Food = Zomato + Bistro dishes. `mocktails` tells
+// guests who aren't drinking that there's something for them too.
 export function inviteData({ party, city, loc, cocktailMenu = [], liquorLines = [], foodCart = [] }) {
-  const cocktails = uniq((cocktailMenu || []).filter((m) => m && (m.servings ?? 1) > 0).map((m) => COCKTAIL[m.id]?.name));
+  const onMenu = (cocktailMenu || []).filter((m) => m && (m.servings ?? 1) > 0);
+  const cocktails = uniq(onMenu.map((m) => COCKTAIL[m.id]?.name));
   const bottles = uniq([...(liquorLines || [])].filter((l) => l?.item?.name)
     .sort((a, b) => (b.item.price || 0) * (b.qty || 0) - (a.item.price || 0) * (a.qty || 0)).map((l) => l.item.name));
   const dishes = uniq((foodCart || []).filter((l) => l && (l.kind === "zomato" || l.kind === "bistro")).map((l) => l.name));
@@ -41,6 +43,7 @@ export function inviteData({ party, city, loc, cocktailMenu = [], liquorLines = 
     venue: loc?.label || (city ? cityName(city) : ""),
     bar: cocktails.length ? { kind: "cocktails", ...capped(cocktails, 6) } : { kind: "bottles", ...capped(bottles, 5) },
     food: capped(dishes, 6),
+    mocktails: onMenu.some((m) => COCKTAIL[m.id]?.mocktail),
     host: (party?.host || "").trim(),
   };
 }
@@ -51,6 +54,7 @@ export function inviteText(d) {
     `🎉 You're invited: ${d.title}`,
     d.date && `📅 ${d.date}${d.time ? `, ${d.time}` : ""}`,
     d.venue && `📍 ${d.venue}`,
+    d.mocktails && "🍹 Mocktails too",
     d.host && `— ${d.host}`,
   ].filter(Boolean).join("\n");
 }

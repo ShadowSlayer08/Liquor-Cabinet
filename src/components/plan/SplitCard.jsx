@@ -5,6 +5,7 @@ import { fmt } from "../../lib/format.js";
 import { splitBill, resolveSplit, shareRows, splitMessage, whatsappUrl, validVpa } from "../../lib/split.js";
 import { prettyWhen } from "../../lib/when.js";
 import { drawPayCard } from "../../lib/paycard.js";
+import { settleSummary } from "../../lib/settle.js";
 import { shareImage } from "../../lib/shareImage.js";
 import { openUrl, shareText, tap, buzz } from "../../lib/order.js";
 import { Stepper } from "../Sheet.jsx";
@@ -13,7 +14,7 @@ import { Icon } from "../Art.jsx";
 const PARTS = [["liquor", "🥃 Liquor"], ["food", "🍽️ Food"], ["supplies", "🛒 Supplies"]];
 const rowSub = (r) => `each · ${r.key === "everyone" ? `${r.count} ${r.count === 1 ? "person" : "people"}` : `${r.count} ${r.key === "drinkers" ? "drinking" : "not drinking"}`}`;
 
-export default function SplitCard({ party, setParty, plan, split, setSplit, liquorTotal, zomatoTotal, blinkitTotal, toast }) {
+export default function SplitCard({ party, setParty, plan, split, setSplit, liquorTotal, zomatoTotal, blinkitTotal, toast, settle, openSettle }) {
   const [busy, setBusy] = useState(false);
   const totals = { liquor: liquorTotal || 0, food: zomatoTotal || 0, supplies: blinkitTotal || 0 };
   const s = resolveSplit(split, plan);
@@ -24,6 +25,7 @@ export default function SplitCard({ party, setParty, plan, split, setSplit, liqu
   const upiOk = validVpa(upi);
   const custom = split?.people != null || split?.drinkers != null;
   const title = (party?.name || "").trim() || "House party";
+  const settleNow = settleSummary(settle); // null when there's no settle-up
 
   const toggle = (k) => { tap(); setSplit((cur) => ({ ...cur, include: { liquor: true, food: true, supplies: true, ...cur?.include, [k]: !(cur?.include?.[k] ?? true) } })); };
   // resolveSplit() caps drinkers at people on every render, so a custom drinker count survives typing.
@@ -125,6 +127,22 @@ export default function SplitCard({ party, setParty, plan, split, setSplit, liqu
             {busy ? <span className="spin">◌</span> : <Icon.grid size={17} />} Share payment card
           </button>
           {!upiOk && <div className="tiny dim" style={{ marginTop: 6, textAlign: "center" }}>Add a valid UPI ID to make a payment card with QR codes.</div>}
+        </>
+      )}
+
+      {/* v1.4.1 · after the party: the actual bills, who paid, who owes whom (SettleSheet) */}
+      <div className="sep" />
+      {settleNow && !settleNow.done ? (
+        <div className="out-settle-line">
+          <span className="grow small">🧾 Settle-up in progress · <b>{settleNow.paid} of {settleNow.transfers.length}</b> paid</span>
+          <button className="btn btn-ghost btn-sm" onClick={() => { tap(); openSettle?.(); }}>Open</button>
+        </div>
+      ) : (
+        <>
+          <button className="btn btn-ghost btn-block" onClick={() => { tap(); openSettle?.(); }}>🧾 Settle up with actual amounts</button>
+          <div className="tiny dim" style={{ marginTop: 6, textAlign: "center" }}>
+            {settleNow?.transfers.length ? "✓ Everyone's paid on your last settle-up." : "After the party: enter what was really paid, and by whom."}
+          </div>
         </>
       )}
     </div>

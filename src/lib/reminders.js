@@ -3,8 +3,8 @@
 //  The plan (which reminders, when) lives in reminderPlan.js so node can test it.
 // ═══════════════════════════════════════════════════════════════════════════════
 import { LocalNotifications } from "@capacitor/local-notifications";
-import { isNative } from "./http.js";
-import { BASE_ID } from "./reminderPlan.js";
+import { isAndroid, isNative } from "./http.js";
+import { BASE_ID, reminderExtra } from "./reminderPlan.js";
 
 export { partyStart } from "./when.js";
 export { buildReminders } from "./reminderPlan.js";
@@ -17,12 +17,17 @@ export async function scheduleReminders(reminders, enabled) {
   await cancelReminders();
   const due = reminders.filter((r) => enabled[r.key] !== false && !r.past);
   if (due.length) {
+    // Android 12+: an exact alarm needs "Alarms & reminders" access, and the plugin opens that
+    // settings screen unasked when it's missing. A party nudge a few minutes late is fine, so
+    // reminders are exact only when the phone already allows it (iOS: always on time).
+    const exact = isAndroid() ? (await LocalNotifications.checkExactNotificationSetting().catch(() => null))?.exact_alarm === "granted" : true;
     await LocalNotifications.schedule({
       notifications: due.map((r) => ({
-        id: r.id, title: r.title, body: r.body, schedule: { at: r.at, allowWhileIdle: true },
+        id: r.id, title: r.title, body: r.body, schedule: { at: r.at, allowWhileIdle: true }, isExactNotification: exact,
         smallIcon: "ic_stat_liquor", iconColor: "#D4872A",
-        // `view` picks the Cart's bottles list for the shopping reminder.
-        extra: r.key === "stock" ? { tab: "cart", view: "liquor" } : { tab: "food" },
+        // Where a tap lands: the Cart's bottles list for the shopping reminder, Plan › Getting home
+        // for last call, the settle-up sheet the morning after, else the Food tab.
+        extra: reminderExtra(r.key),
       })),
     });
   }

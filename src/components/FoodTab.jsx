@@ -4,31 +4,37 @@ import DishSheet from "./DishSheet.jsx";
 import MenuSheet from "./MenuSheet.jsx";
 import GrocerySheet from "./GrocerySheet.jsx";
 import DryDayBanner from "./DryDayBanner.jsx";
+import TemplatesRow from "./TemplatesRow.jsx";
+import DriversField from "./DriversField.jsx";
+import GuestPrefs from "./GuestPrefs.jsx";
+import GaugeActions from "./GaugeActions.jsx";
 import { todayISO } from "../lib/drydays.js";
 import {
   APPETITE, COURSES, GROCERIES, GROUPS, MIXERS, BISTRO_ITEMS, groceryNeeds, packsFor, formatAmount, suggestDishes, blinkitQuery,
 } from "../lib/food.js";
+import { suggestFood, topPicks } from "../lib/suggestFood.js";
+import { prefsSummary } from "../lib/prefs.js";
 import { CAT, cityName } from "../lib/parse/livcheers.js";
 import { bistroServes } from "../lib/location.js";
-import { dishPhotos } from "../lib/sources.js";
 import { openBistro, tap } from "../lib/order.js";
+import { grocerOf } from "../lib/grocers.js";
 import { fmt } from "../lib/format.js";
 import { Icon, Ring, VegMark } from "./Art.jsx";
 
 const DISH_TINT = { starter: ["#b8452a", "#3a130c"], main: ["#b07a1c", "#3a2608"], dessert: ["#b03a6e", "#3a0c22"] };
 const slimRest = (r) => ({ resId: r.resId, name: r.name, appLink: r.appLink, orderUrl: r.orderUrl, rating: r.rating, deliveryTime: r.deliveryTime, locality: r.locality, costText: r.costText, costForOne: r.costForOne, img: r.img, distance: r.distance, cuisines: r.cuisines });
 
-export default function FoodTab({ city, loc, locating, onLocate, party, setParty, plan, liquorCats, foodCart, upsertFood, removeFood, goToCart, toast, customDry, zomatoExact }) {
+export default function FoodTab({
+  city, loc, locating, onLocate, party, setParty, plan, liquorCats, foodCart, upsertFood, removeFood, goToCart, toast, customDry, zomatoExact,
+  cocktailMenu, setCocktailMenu, openFill, goBar, grocer,
+}) {
   const [provider, setProvider] = useState("zomato");
   const [course, setCourse] = useState("starter");
   const [dishOpen, setDishOpen] = useState(null);
   const [menuOpen, setMenuOpen] = useState(null); // { r, dish }
   const [groceryOpen, setGroceryOpen] = useState(null);
-  const [photos, setPhotos] = useState({});
   const set = (k) => (v) => setParty({ ...party, [k]: v });
 
-  const refreshPhotos = () => dishPhotos(suggestDishes([])).then(setPhotos);
-  useEffect(() => { refreshPhotos(); }, []);
 
   const needs = useMemo(() => groceryNeeds(plan), [plan]);
   const neededGroceries = GROCERIES.filter((g) => needs[g.id] > 0);
@@ -51,7 +57,8 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
     const todo = suppliesInCart ? staleGroceries : neededGroceries;
     for (const g of todo) { const p = chosen(g); upsertFood(groceryLine(g, p, packsFor(needs[g.id], p))); }
     tap();
-    toast(!todo.length ? "Your Blinkit list is up to date" : suppliesInCart ? `Updated ${todo.length} ${todo.length === 1 ? "supply" : "supplies"} on your Blinkit list` : `Added ${todo.length} party supplies to your Blinkit list`);
+    const list = `${grocerOf(grocer).name} list`;
+    toast(!todo.length ? `Your ${list} is up to date` : suppliesInCart ? `Updated ${todo.length} ${todo.length === 1 ? "supply" : "supplies"} on your ${list}` : `Added ${todo.length} party supplies to your ${list}`);
   };
   const groceryTotal = neededGroceries.reduce((s, g) => { const p = chosen(g); return s + p.price * packsFor(needs[g.id], p); }, 0);
 
@@ -78,6 +85,14 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
   };
   const suggestedServings = (dish) =>
     dish.course === "starter" ? Math.max(1, Math.ceil(plan.starters.plates / 3)) : dish.course === "main" ? Math.max(1, Math.ceil(plan.mains.servings / 2)) : Math.max(1, plan.desserts);
+
+  // Dishes for this party, best first, each with why (lib/suggestFood.js). A snacks-only party
+  // has no mains tab, so a course left on "main" shows starters.
+  const shownCourse = party.dinner || course !== "main" ? course : "starter";
+  const liquorKey = liquorCats.join(",");
+  const dishes = useMemo(() => suggestFood({ liquorCats, cocktailMenu, party, plan, course: shownCourse }), [liquorKey, cocktailMenu, party, plan, shownCourse]);
+  const picks = useMemo(() => topPicks(suggestFood({ liquorCats, cocktailMenu, party, plan }), 4), [liquorKey, cocktailMenu, party, plan]);
+  const foodPrefs = prefsSummary(party.prefs, { drinks: false });
 
   // Bistro
   const bistroHere = bistroServes(loc?.citySlug || city);
@@ -126,7 +141,8 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
 
       {/* ── Party ── */}
       <div className="card fade-up">
-        <div className="card-title"><span className="kicker">{party.date === todayISO() ? "Tonight's party" : "The party"}</span><span className="tiny muted">{plan.drinkers} drinking · {Math.round(party.vegPct)}% veg</span></div>
+        <div className="card-title"><span className="kicker">{party.date === todayISO() ? "Tonight's party" : "The party"}</span><span className="tiny muted">{plan.drinkers} drinking{plan.nonDrinkers > 0 ? ` · ${plan.nonDrinkers} not` : ""} · {Math.round(party.vegPct)}% veg</span></div>
+        <TemplatesRow party={party} setParty={setParty} cocktailMenu={cocktailMenu} setCocktailMenu={setCocktailMenu} plan={plan} city={city} customDry={customDry} toast={toast} />
         <div className="field" style={{ marginBottom: 14 }}>
           <label>Party name</label>
           <input className="input" value={party.name || ""} maxLength={60} placeholder="House party" aria-label="Party name" onChange={(e) => set("name")(e.target.value)} />
@@ -144,6 +160,7 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
             <label>Drinking · {party.drinkersPct}%</label>
             <input type="range" min={0} max={100} step={5} value={party.drinkersPct} style={pctStyle(party.drinkersPct)} onChange={(e) => set("drinkersPct")(+e.target.value)} />
           </div>
+          <DriversField party={party} setParty={setParty} plan={plan} />
           <div className="field">
             <label>Vegetarian · {party.vegPct}%</label>
             <input type="range" min={0} max={100} step={5} value={party.vegPct} style={pctStyle(party.vegPct)} onChange={(e) => set("vegPct")(+e.target.value)} />
@@ -161,6 +178,7 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
           <span><span className="h3">Serving dinner</span><br /><span className="tiny muted">{party.dinner ? "Starters, mains & dessert" : "Snacks-only party"}</span></span>
           <span className={`switch ${party.dinner ? "on" : ""}`} />
         </button>
+        <GuestPrefs party={party} setParty={setParty} plan={plan} />
       </div>
 
       {/* ── Drinks gauge ── */}
@@ -182,6 +200,7 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
             <div className="note note-ok">You're covered, with ~{plan.available - plan.needed} drinks to spare. 🥂</div>
           )}
         </div>
+        <GaugeActions plan={plan} cocktailMenu={cocktailMenu} openFill={openFill} goBar={goBar} />
         {plan.available > 0 && (
           <div className="chips" style={{ marginTop: 10, marginBottom: -8 }}>
             {Object.entries(plan.byCat).map(([id, n]) => <span key={id} className="chip">{CAT[id].emoji} {CAT[id].label} <b className="gold">{n}</b></span>)}
@@ -208,26 +227,54 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
               <div className="stat"><div className="v">{plan.mains.servings || "—"}</div><div className="l">Main servings</div></div>
               <div className="stat"><div className="v">{plan.desserts}</div><div className="l">Desserts</div></div>
             </div>
+            {picks.length > 0 && (
+              <>
+                <div className="pref-picks-head">
+                  <span className="kicker"><Icon.sparkle size={12} /> {foodPrefs ? "Picked for your guests" : "Picked for your party"}</span>
+                  {foodPrefs && <span className="tiny dim ellipsis">{foodPrefs}</span>}
+                </div>
+                <div className="scroll-x pref-picks">
+                  {picks.map((dsh) => (
+                    <button key={dsh.id} className={`pref-pick ${dsh.fit}`} onClick={() => { tap(); setDishOpen(dsh); }}>
+                      <span className="pref-pick-e">{dsh.emoji}</span>
+                      <span className="grow">
+                        <span className="pref-pick-n ellipsis">{dsh.name}</span>
+                        <span className="tiny muted clamp2">{dsh.reasons[0]}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
             <div className="seg" style={{ marginBottom: 12 }}>
               {Object.entries(COURSES).filter(([k]) => party.dinner || k !== "main").map(([k, c]) => (
-                <button key={k} className={course === k ? "on" : ""} onClick={() => setCourse(k)}>{c.emoji} {c.label}</button>
+                <button key={k} className={shownCourse === k ? "on" : ""} onClick={() => setCourse(k)}>{c.emoji} {c.label}</button>
               ))}
             </div>
             <div className="dish-grid">
-              {suggestDishes(liquorCats, course).map((dsh, i) => {
+              {dishes.map((dsh, i) => {
                 const n = dishCount(dsh.id), [c1, c2] = DISH_TINT[dsh.course];
                 return (
-                  <button key={dsh.id} className={`dish fade-up ${n ? "in" : ""}`} style={{ animationDelay: `${i * 25}ms`, background: `linear-gradient(160deg, ${c1}, ${c2})` }} onClick={() => setDishOpen(dsh)}>
-                    {photos[dsh.id] ? <img src={photos[dsh.id]} alt="" loading="lazy" /> : <span className="e">{dsh.emoji}</span>}
-                    {dsh.score > 0 && <span className="pair pill pill-glass">🍸</span>}
+                  <button key={dsh.id} className={`dish fade-up ${n ? "in" : ""}`} style={{ animationDelay: `${Math.min(i, 24) * 25}ms`, background: `linear-gradient(160deg, ${c1}, ${c2})` }} onClick={() => setDishOpen(dsh)}
+                    aria-label={`${dsh.name}${dsh.reasons.length ? ` — ${dsh.reasons.join(", ")}` : ""}`}>
+                    <span className="e">{dsh.emoji}</span>
+                    {dsh.hint && <span className={`pair pill ${dsh.fit === "great" ? "pref-great" : "pill-glass"}`}>{dsh.hint.emoji}</span>}
                     {n > 0 && <span className="in-badge pill" style={{ background: "var(--zomato)", color: "#fff" }}>{n}</span>}
                     <span className="n">{dsh.name}</span>
-                    <span className="v row" style={{ gap: 4 }}>{dsh.veg === "both" ? <><VegMark veg /><VegMark veg={false} /></> : <VegMark veg={dsh.veg} />}</span>
+                    <span className="v row" style={{ gap: 4 }}>
+                      {dsh.veg === "both" && !dsh.orderVeg ? <><VegMark veg /><VegMark veg={false} /></> : <VegMark veg={dsh.orderVeg || dsh.veg} />}
+                      {dsh.hint && <span className="pref-tile-why">{dsh.hint.text}</span>}
+                    </span>
                   </button>
                 );
               })}
             </div>
-            {liquorCats.length > 0 && <div className="tiny muted" style={{ marginTop: 10 }}>🍸 pairs with the bottles in your cabinet</div>}
+            {!dishes.length && (
+              <div className="note note-info">Nothing here fits your guests' rules — loosen them under <b>Guests like…</b> above.</div>
+            )}
+            {dishes.some((d) => d.hint) && (
+              <div className="tiny muted" style={{ marginTop: 10 }}>Marked dishes suit your party — <span className="gold">gold</span> is a great fit. Tap one to see why.</div>
+            )}
           </div>
         </div>
       )}
@@ -266,9 +313,9 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
       {/* ── Blinkit supplies ── */}
       <div className="section-head"><div><div className="kicker">Bar supplies</div><div className="h2">Mixers, ice & munchies</div></div><b className="gold-text">{fmt(groceryTotal)}</b></div>
       <div className="card flush fade-up">
-        <div className="provider-head provider-b">
-          <span className="logo logo-b">blinkit</span>
-          <span className="grow small muted">Delivered in minutes</span>
+        <div className={`provider-head ${grocerOf(grocer).cls.head}`}>
+          <span className={grocerOf(grocer).cls.logo}>{grocerOf(grocer).logo}</span>
+          <span className="grow small muted">Delivered in minutes · on your {grocerOf(grocer).name} list</span>
         </div>
         <div className="provider-body">
           {Object.entries(GROUPS).map(([gid, grp]) => {
@@ -298,7 +345,7 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
               </div>
             );
           })}
-          <button className="btn btn-blinkit btn-block" style={{ marginTop: 14 }} onClick={fillGroceries}>{!suppliesInCart ? <><Icon.plus size={16} /> Add all supplies to cart</> : staleGroceries.length ? <>Update cart · {staleGroceries.length} changed</> : <><Icon.check size={16} /> All supplies in your cart</>}</button>
+          <button className={`btn ${grocerOf(grocer).cls.btn} btn-block`} style={{ marginTop: 14 }} onClick={fillGroceries}>{!suppliesInCart ? <><Icon.plus size={16} /> Add all supplies to cart</> : staleGroceries.length ? <>Update cart · {staleGroceries.length} changed</> : <><Icon.check size={16} /> All supplies in your cart</>}</button>
           <div className="tiny dim" style={{ marginTop: 8, textAlign: "center" }}>
             {Object.keys(MIXERS).filter((k) => needs[k] > 0).map((k) => `${MIXERS[k].label} ${formatAmount(needs[k], "ml")}`).join(" · ") || "No mixers needed"} · prices ≈ MRP{neededGroceries.some((g) => chosen(g).live) ? ", live where marked" : ""}
           </div>
@@ -310,7 +357,7 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
           <span style={{ fontSize: 22 }}>🛒</span>
           <span className="grow" style={{ textAlign: "left" }}>
             <span className="h3">{foodItems} item{foodItems > 1 ? "s" : ""} ready to order</span><br />
-            <span className="tiny muted">≈ {fmt(foodTotal)} · Zomato, Bistro & Blinkit</span>
+            <span className="tiny muted">≈ {fmt(foodTotal)} · Zomato, Bistro & {grocerOf(grocer).name}</span>
           </span>
           <span className="btn btn-gold btn-sm">Checkout <Icon.chevron size={14} /></span>
         </button>
@@ -318,7 +365,7 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
 
       {dishOpen && (
         <DishSheet dish={dishOpen} city={city} loc={loc} suggested={suggestedServings(dishOpen)} inCart={restCount}
-          onClose={() => { setDishOpen(null); refreshPhotos(); }}
+          onClose={() => setDishOpen(null)}
           onQuickAdd={(r, n) => quickAdd(r, dishOpen, n)}
           onOpenMenu={(r) => setMenuOpen({ r, dish: dishOpen })} />
       )}
@@ -335,8 +382,8 @@ export default function FoodTab({ city, loc, locating, onLocate, party, setParty
           onClose={() => setMenuOpen(null)} />
       )}
       {groceryOpen && (
-        <GrocerySheet grocery={groceryOpen} loc={loc} need={needs[groceryOpen.id]} selectedId={chosen(groceryOpen).id} onClose={() => setGroceryOpen(null)}
-          onPick={(p, packs) => { upsertFood(groceryLine(groceryOpen, p, packs)); tap(); toast(`${groceryOpen.name} added to Blinkit list`); setGroceryOpen(null); }} />
+        <GrocerySheet grocery={groceryOpen} loc={loc} need={needs[groceryOpen.id]} selectedId={chosen(groceryOpen).id} onClose={() => setGroceryOpen(null)} grocer={grocer}
+          onPick={(p, packs) => { upsertFood(groceryLine(groceryOpen, p, packs)); tap(); toast(`${groceryOpen.name} added to your ${grocerOf(grocer).name} list`); setGroceryOpen(null); }} />
       )}
     </div>
   );

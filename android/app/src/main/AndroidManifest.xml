@@ -52,6 +52,10 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- Order checklist notification while you shop in Zomato / Bistro / Blinkit. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Party reminders on time: Android 14+ denies SCHEDULE_EXACT_ALARM by default and lets inexact
+         alarms slip by up to an hour. USE_EXACT_ALARM is granted at install (Android 13+); Play limits
+         it to alarm/calendar apps, but this app is sideloaded. Android 12 grants exact alarms anyway. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <!-- Floating order checklist over Zomato / Bistro / Blinkit ("Display over other apps", opt-in from the Plan tab). -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- The in-app browser library (Zomato sign-in) asks for camera and microphone for web pages that
@@ -65,6 +69,14 @@
         <package android:name="com.grofers.customerapp" />
         <package android:name="com.application.zomato" />
         <package android:name="com.blinkit.bistro" />
+        <!-- v1.4.1: rides home and other 10-minute grocery apps -->
+        <package android:name="com.ubercab" />
+        <package android:name="com.olacabs.customer" />
+        <package android:name="com.rapido.passenger" />
+        <package android:name="com.humblemobile.consumer" />
+        <package android:name="com.zeptoconsumerapp" />
+        <package android:name="in.swiggy.android" />
+        <package android:name="in.swiggy.android.instamart" />
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.BROWSABLE" />

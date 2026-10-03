@@ -86,9 +86,8 @@ export async function fetchDish(city, dish, { force = false, loc = null } = {}) 
     } else throw e;
   }
   await store.set(key, result);
-  // Remember a photo for the dish tile.
-  const photo = result.restaurants?.find((r) => r.img)?.img;
-  if (photo) store.set(`dishphoto:${dish.id}`, photo);
+  // (v1.2–v1.4 saved a restaurant photo here to replace the dish tile's illustration;
+  // the owner prefers the illustrations, so dish tiles never show Zomato photos now.)
   return { ...result, fromCache: false };
 }
 
@@ -104,10 +103,4 @@ export async function fetchMenu(restaurant, { force = false, loc = null } = {}) 
   const result = { ...menu, fetchedAt: Date.now() };
   await store.set(key, result);
   return { ...result, fromCache: false };
-}
-
-export async function dishPhotos(dishes) {
-  const out = {};
-  for (const d of dishes) { const p = await store.get(`dishphoto:${d.id}`); if (p) out[d.id] = p; }
-  return out;
 }

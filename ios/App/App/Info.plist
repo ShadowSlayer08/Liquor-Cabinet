@@ -75,6 +75,8 @@
 		<string>zomato</string>
 		<string>comgooglemaps</string>
 		<string>whatsapp</string>
+		<string>uber</string>
+		<string>olacabs</string>
 	</array>
 	<key>CFBundleURLTypes</key>
 	<array>

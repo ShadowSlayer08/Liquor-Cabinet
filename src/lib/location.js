@@ -56,7 +56,16 @@ export async function getPosition() {
     if (perm.location !== "granted" && perm.coarseLocation !== "granted") perm = await Geolocation.requestPermissions({ permissions: ["location", "coarseLocation"] });
     if (perm.location !== "granted" && perm.coarseLocation !== "granted") throw new Error("Location permission denied");
   }
-  const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: false, timeout: 15000, maximumAge: 10 * 60 * 1000 });
+  // A quick network fix first; if there isn't one (Wi-Fi scanning off, indoors without a cell fix,
+  // the Android emulator), ask the GPS too rather than giving up.
+  const opts = (high, timeout) => ({ enableHighAccuracy: high, timeout, maximumAge: 10 * 60 * 1000 });
+  let pos;
+  try {
+    pos = await Geolocation.getCurrentPosition(opts(false, 10000));
+  } catch (e) {
+    if (/denied|permission/i.test(e?.message || "")) throw e;
+    pos = await Geolocation.getCurrentPosition(opts(true, 20000));
+  }
   return { lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: pos.coords.accuracy };
 }
 
