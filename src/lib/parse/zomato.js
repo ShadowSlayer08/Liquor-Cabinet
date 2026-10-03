@@ -6,7 +6,10 @@
 //  pages.search[<path>].sections.SECTION_SEARCH_RESULT is the list of
 //  restaurants delivering that dish, each with rating, "₹200 for one", delivery
 //  time, the web order URL and a zomato://order/<resId> app deeplink.
+//  The going-out pages  /{city}/drinks-and-nightlife  and  /{city}/byob  use the
+//  same store for bars and BYOB places (parseVenueList, v1.5's Out tab).
 // ═══════════════════════════════════════════════════════════════════════════════
+import { fromZomatoUrl } from "./district.js";
 
 export const ZOMATO_BASE = "https://www.zomato.com";
 
@@ -160,3 +163,61 @@ export function parseMenuPage(html) {
     menus,
   };
 }
+
+// ── Places to go out  (/{city}/drinks-and-nightlife, /{city}/byob) ────────────
+// Same search store as the dish pages, but dine-out cards: cost for two, opening
+// time, a dine-out offer, and the card link /<zcity>/<slug>/info — the slug and
+// city segment District's venue page uses too (lib/parse/district.js). The city
+// comes from that link, not from our zone: Gurugram searches list Sohna places.
+// The result list also holds a collections rail and banners (skipped), and the
+// cards' order links are delivery links, so they're not used. Page titles are
+// templated junk ("Best Pubs & Bars in #Location") and aren't read either.
+
+// "540" / "1,190" / "15.6K" → 540 / 1190 / 15600
+export const parseVotes = (v) => {
+  const m = String(v ?? "").replace(/,/g, "").trim().match(/^([\d.]+)\s*([kKlL]?)/);
+  if (!m) return null;
+  const n = Math.round(parseFloat(m[1]) * ({ k: 1e3, l: 1e5 }[m[2].toLowerCase()] || 1));
+  return n > 0 ? n : null;
+};
+
+/**
+ * A venue list page: the cards plus Zomato's total (paging needs Zomato's own XHR, so it's one page of ~9).
+ * @returns {{ venues: import("../outModel.js").VenueListItem[], total: number|null, hasMore: boolean }|null}  null = not a search page
+ */
+export function parseVenueListPage(html) {
+  const search = parsePreloadedState(html)?.pages?.search;
+  if (!search) return null;
+  const key = Object.keys(search).find((k) => Array.isArray(search[k]?.sections?.SECTION_SEARCH_RESULT));
+  if (!key) return null;
+  const sec = search[key].sections;
+  const venues = [], seen = new Set();
+  for (const card of sec.SECTION_SEARCH_RESULT) {
+    const info = card?.info;
+    if (card?.type !== "restaurant" || !info?.resId || !info.name) continue;
+    const at = fromZomatoUrl(card.cardAction?.clickUrl);
+    const resId = Number(info.resId);
+    if (!at || seen.has(resId)) continue;
+    seen.add(resId);
+    const cft = parseRupees(info.cft?.text) ?? (parseRupees(info.cfo?.text) ? parseRupees(info.cfo.text) * 2 : null);
+    const rating = parseFloat(info.rating?.aggregate_rating) || null;
+    const meters = parseDistance(card.distance);
+    const gold = card.gold && !Array.isArray(card.gold) ? card.gold : {};
+    venues.push({
+      resId, name: String(info.name).trim(), zcity: at.zcity, slug: at.slug,
+      locality: info.locality?.name || "",
+      costForTwo: cft,
+      rating, votes: rating ? parseVotes(info.rating?.votes) : null,
+      distanceKm: meters == null ? null : Math.round(meters / 100) / 10,
+      timing: info.timing?.text || "",
+      offer: String(gold.offerValue || "").trim(),
+      promoted: !!card.isPromoted,
+      cuisines: (info.cuisine || []).map((c) => c?.name).filter(Boolean),
+    });
+  }
+  const meta = sec.SECTION_SEARCH_META_INFO?.searchMetaData || {};
+  return { venues, total: Number.isFinite(meta.totalResults) ? meta.totalResults : null, hasMore: !!meta.hasMore };
+}
+
+/** @returns {import("../outModel.js").VenueListItem[]} */
+export const parseVenueList = (html) => parseVenueListPage(html)?.venues || [];
