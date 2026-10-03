@@ -783,3 +783,109 @@ body:has(.share-ask) .toast { bottom: calc(var(--safe-bottom) + var(--nav-h) + 1
 .nav { padding: 5px; }
 .nav button { min-width: 0; font-size: 10px; letter-spacing: .2px; white-space: nowrap; }
 .nav .badge { right: calc(50% - 22px); }
+
+/* ── v1.5 Out tab ── */
+/* Plan card: home | out, the kind of night, the legal-age line, a nudge to locate */
+.ot-kinds { display: flex; flex-wrap: wrap; gap: 8px; }
+.ot-kinds .chip { padding: 8px 12px; }
+.ot-age { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 8px 11px; border-radius: 12px; background: rgba(0, 0, 0, .25); border: 1px solid var(--stroke); color: var(--soft); line-height: 1.45; }
+.ot-age svg { color: var(--gold); flex-shrink: 0; }
+.ot-locate { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 12px; border-radius: 14px; border: 1px dashed var(--stroke-2); }
+.ot-locate > svg, .ot-locate > .btn { flex-shrink: 0; }
+
+/* List cards: a lit illustration tile (never a photo), then name, place, cost and why it fits */
+.ot-card {
+  display: flex; align-items: flex-start; gap: 12px; width: 100%; min-width: 0; text-align: left; padding: 12px; margin-bottom: 10px;
+  border-radius: 20px; background: var(--panel); border: 1px solid var(--stroke); transition: transform .15s, border-color .25s;
+}
+.ot-card:active { transform: scale(.98); }
+.ot-card.on { border-color: rgba(231, 168, 70, .55); background: radial-gradient(90% 120% at 0% 0%, rgba(231, 168, 70, .12), transparent 70%), var(--panel); }
+.ot-card.off { opacity: .55; }
+.ot-card > svg, .ot-sheet-hero > svg, .ot-night-pick > svg:first-child { border-radius: 16px; box-shadow: 0 8px 18px rgba(0, 0, 0, .35); }
+.ot-card-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ot-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; min-width: 0; }
+.ot-name { font-family: var(--display); font-size: 15.5px; font-weight: 700; line-height: 1.2; color: var(--text); min-width: 0; }
+.ot-rate { display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0; font-size: 11px; font-weight: 700; color: #f5c04a; white-space: nowrap; }
+.ot-votes { color: var(--dim); font-weight: 500; }
+.ot-cost { font-size: 12.5px; color: var(--soft); font-weight: 600; margin-top: 2px; }
+.ot-when { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.ot-when svg { color: var(--gold); flex-shrink: 0; }
+.ot-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; min-width: 0; }
+.ot-tags:empty { display: none; }
+.ot-tags .pill { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.ot-pill-pick { background: var(--grad-gold); color: #231404; }
+.ot-pill-over { background: rgba(255, 93, 98, .14); color: #ff9a9d; }
+.ot-pill-offer { background: rgba(123, 92, 255, .16); color: #c9bcff; border: 1px solid rgba(123, 92, 255, .3); }
+.ot-pill-why { background: rgba(0, 0, 0, .28); color: var(--soft); border: 1px solid var(--stroke); font-weight: 500; white-space: normal; }
+.ot-pill-date { background: rgba(231, 168, 70, .16); color: var(--gold); }
+.ot-pill-kind { background: rgba(255, 255, 255, .08); color: var(--soft); }
+
+/* Above and below the list */
+.ot-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: -2px 0 12px; }
+.ot-filters .chip { padding: 7px 12px; font-size: 12px; }
+.ot-hint { margin: -4px 2px 10px; }
+.ot-list-foot { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.ot-list-foot > .tiny { flex: 1; min-width: 0; }
+.ot-list-foot > .btn { flex-shrink: 0; }
+
+/* District hand-off buttons, in District's violet */
+.ot-btn-district { background: linear-gradient(135deg, #a58cff, #7b5cff 55%, #5a3bd6); color: #fff; box-shadow: 0 10px 24px rgba(123, 92, 255, .28); }
+
+/* Venue & event sheets */
+.ot-foot { display: grid; gap: 8px; }
+.ot-sheet-hero { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.ot-sec { padding: 12px 0; border-top: 1px solid var(--stroke); }
+.ot-sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.ot-amen { display: flex; flex-wrap: wrap; gap: 6px; }
+.ot-amen .chip { padding: 6px 11px; font-size: 12px; white-space: normal; }
+.ot-amen .chip.ot-amen-hi { color: var(--gold); border-color: rgba(231, 168, 70, .4); background: rgba(231, 168, 70, .08); }
+.ot-offer { padding: 6px 0; border-bottom: 1px dashed var(--stroke); font-size: 13px; }
+.ot-offer:last-of-type { border-bottom: none; }
+.ot-big { display: flex; align-items: center; gap: 10px; margin: 4px 0 12px; }
+.ot-big > svg, .ot-big > .btn { flex-shrink: 0; }
+.ot-big > svg { color: var(--gold); }
+.ot-shows { margin: 0 -18px; padding: 2px 18px 6px; }
+.ot-rules { display: flex; flex-wrap: wrap; gap: 6px; }
+.ot-ticket { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--stroke); }
+.ot-ticket.off > .grow { opacity: .5; }
+.ot-ticket > .qty, .ot-ticket > .btn { flex-shrink: 0; }
+.ot-ticket-name { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ot-planned { display: grid; gap: 3px; margin-top: 10px; padding: 10px 12px; border-radius: 14px; background: rgba(231, 168, 70, .08); border: 1px solid rgba(231, 168, 70, .26); }
+.ot-about { margin-top: 4px; padding: 12px 0 4px; border-top: 1px solid var(--stroke); }
+.ot-about summary { cursor: pointer; font-weight: 600; list-style: none; }
+.ot-about summary::-webkit-details-marker { display: none; }
+.ot-about summary::after { content: " ›"; }
+.ot-about[open] summary::after { content: " ⌄"; }
+.ot-about > div { margin-top: 8px; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; }
+
+/* Bring your own: the bottles from the Cabinet and the corkage the venue quoted */
+.ot-byob { margin-top: 4px; padding: 13px 14px 14px; border-radius: 18px; background: rgba(52, 217, 143, .06); border: 1px solid rgba(52, 217, 143, .24); }
+.ot-byob-k { color: var(--green); margin-bottom: 10px; }
+.ot-bring { display: grid; gap: 3px; margin-top: 6px; }
+.ot-bring .between > .ellipsis { min-width: 0; }
+.ot-amt { position: relative; display: block; width: 104px; flex-shrink: 0; }
+.ot-amt > span { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-weight: 600; pointer-events: none; }
+.ot-amt .input { padding: 9px 12px 9px 26px; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Your night out: the pick, cost lines tagged exact / estimate / unknown, a head vs the budget */
+.ot-night { border-color: rgba(231, 168, 70, .32); background: radial-gradient(120% 90% at 100% 0%, rgba(231, 168, 70, .13), transparent 60%), linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .025)); }
+.ot-night-pick { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; color: var(--soft); }
+.ot-night-pick > svg:last-child { flex-shrink: 0; color: var(--muted); }
+.ot-lines { margin-top: 12px; border-top: 1px solid var(--stroke); }
+.ot-line { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px dashed var(--stroke); }
+.ot-amount { min-width: 58px; text-align: right; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.ot-kind { flex-shrink: 0; font-size: 9px; letter-spacing: .6px; text-transform: uppercase; font-weight: 700; padding: 2px 6px; border-radius: 6px; }
+.ot-kind-exact { background: rgba(52, 217, 143, .14); color: var(--green); }
+.ot-kind-estimate { background: rgba(231, 168, 70, .14); color: var(--gold); }
+.ot-kind-unknown { background: rgba(255, 255, 255, .07); color: var(--muted); }
+.ot-sum { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; margin-top: 12px; padding: 12px 14px; border-radius: 18px; background: rgba(0, 0, 0, .3); border: 1px solid var(--stroke); }
+.ot-go { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.ot-go > svg, .ot-go > .btn { flex-shrink: 0; }
+.ot-booked { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 12px; border-radius: 16px; background: rgba(0, 0, 0, .25); border: 1px solid var(--stroke); }
+.ot-booked-tick { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; text-align: left; }
+.ot-booked > .btn { flex-shrink: 0; }
+.ot-shortcuts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.ot-shortcuts .chip { padding: 7px 12px; font-size: 12px; }
+.ot-clear { margin-left: auto; color: var(--muted); }
+
+/* (end v1.5 out) */
