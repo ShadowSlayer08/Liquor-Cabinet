@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { AGE_LINE, RULES_CHECKED, RULES_NOTE, STATE_AGE, ageFor, ageText, ageLine, ageSummary, BYOB_RULES, byobRule, BAR_HOURS, usualClose } from "../src/lib/age.js";
-import { CITY_STATE } from "../src/lib/drydays.js";
+import { CITY_STATE, todayISO } from "../src/lib/drydays.js";
 import { CITIES } from "../src/lib/parse/livcheers.js";
 
 test("the age table: 10 states, each with an age, a source and a status", () => {
@@ -86,8 +86,11 @@ test("BYOB rules: Delhi rule 12(b), Haryana taverns, Maharashtra permit, a defau
   assert.match(hr.text, /doesn't sell or serve liquor/);
   assert.match(hr.text, /live music or dancing/);
   assert.equal(hr.until, "2027-03-31");
-  assert.equal(byobRule("faridabad", "2027-03-31").text, hr.text);
+  const inForce = byobRule("gurgaon", "2026-10-03").text;
+  assert.equal(byobRule("faridabad", "2027-03-31").text, inForce);
   assert.match(byobRule("gurgaon", "2027-04-01").text, /ran to 2027, so it may have changed/);
+  // Without a date it goes by today's, so an install that isn't updated still says so.
+  assert.equal(hr.text, byobRule("gurgaon", todayISO()).text);
   assert.match(byobRule("pune").text, /permit/);
   assert.match(byobRule("pune").text, /reportedly/);
   const def = byobRule("jaipur");

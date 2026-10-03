@@ -154,13 +154,18 @@ export const prettyDate = (iso, opts = { weekday: "short", day: "numeric", month
   iso ? new Date(`${iso}T12:00:00`).toLocaleDateString("en-IN", opts) : "";
 
 // "Buy by …": the last shopping day before `date` that isn't itself a dry day. A part-day
-// dry day (Haryana's "until 5 pm") still is one: the shops open in the evening.
+// dry day (Haryana's "until 5 pm") still is one: the shops open in the evening, so pair it
+// with shopsOpenAt() — "Buy by Tue, 26 Jan (after 5 pm)", and no noon reminder that day.
 export function lastShoppingDay(date, citySlug, custom = []) {
   const shutAllDay = (iso) => { const dry = dryDayOn(iso, citySlug, custom); return !!dry && !dry.until; };
   let d = addDays(date, -1);
   for (let i = 0; i < 7 && shutAllDay(d); i++) d = addDays(d, -1);
   return d;
 }
+
+// "17:00" when the shops are shut only until then that day (a part-day dry day), else null.
+// null also covers a day shut all day; lastShoppingDay() never returns one of those.
+export const shopsOpenAt = (iso, citySlug, custom = []) => dryDayOn(iso, citySlug, custom)?.until || null;
 
 export const confirmUrl = (date, citySlug) =>
   `https://www.google.com/search?q=${encodeURIComponent(`dry day ${prettyDate(date, { day: "numeric", month: "long", year: "numeric" })} ${stateOf(citySlug) || ""}`)}`;

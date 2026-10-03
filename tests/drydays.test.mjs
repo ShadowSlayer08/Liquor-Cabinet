@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { barsDryOn, barsDryText, clock, dryDayOn, dryDaysFor, lastShoppingDay, untilText, upcomingDryDays } from "../src/lib/drydays.js";
+import { barsDryOn, barsDryText, clock, dryDayOn, dryDaysFor, lastShoppingDay, shopsOpenAt, untilText, upcomingDryDays } from "../src/lib/drydays.js";
 
 const election = [{ date: "2026-10-10", name: "Election" }];
 
@@ -27,6 +27,26 @@ test("a dry-until-5-pm day is still a shopping day in the evening", () => {
   assert.equal(lastShoppingDay("2027-01-26", "gurgaon"), "2027-01-25");
   assert.equal(lastShoppingDay("2026-10-03", "gurgaon"), "2026-10-01");                       // 2 Oct: full day
   assert.equal(lastShoppingDay("2027-01-27", "gurgaon", [{ date: "2027-01-26", name: "Election" }]), "2027-01-25");
+});
+
+test("shopsOpenAt says when a part-day dry day opens, so 'buy by' can say 'after 5 pm'", () => {
+  const day = lastShoppingDay("2027-01-27", "gurgaon", [{ date: "2027-01-27", name: "Election" }]);
+  assert.equal(day, "2027-01-26");
+  assert.equal(shopsOpenAt(day, "gurgaon"), "17:00");
+  assert.equal(shopsOpenAt("2027-08-15", "faridabad"), "17:00");
+  assert.equal(shopsOpenAt("2027-01-26", "delhi"), null);                                    // shut all day
+  assert.equal(shopsOpenAt("2026-10-02", "gurgaon"), null);                                  // shut all day
+  assert.equal(shopsOpenAt("2026-10-03", "gurgaon"), null);                                  // not dry
+  assert.equal(shopsOpenAt("2027-01-26", "gurgaon", [{ date: "2027-01-26", name: "Election" }]), null);
+  // Whatever lastShoppingDay returns is open at some point: all day, or from shopsOpenAt.
+  for (const city of ["gurgaon", "delhi", "pune"]) {
+    for (let m = 1; m <= 12; m++) {
+      const date = `2027-${String(m).padStart(2, "0")}-${m === 1 ? "27" : m === 8 ? "16" : "10"}`;
+      const d = lastShoppingDay(date, city);
+      const dry = dryDayOn(d, city);
+      assert.ok(!dry || dry.until === shopsOpenAt(d, city), `${city} ${date}`);
+    }
+  }
 });
 
 test("lists carry until, so the Plan card can show it", () => {

@@ -10,7 +10,7 @@
 //         "likely"    = secondary sources only, so the copy says "reportedly".
 //  All 30 Livcheers cities fall in the 10 states below (CITY_STATE in drydays.js).
 // ═══════════════════════════════════════════════════════════════════════════════
-import { stateOf } from "./drydays.js";
+import { stateOf, todayISO } from "./drydays.js";
 
 export const AGE_LINE = "For adults of legal drinking age (18 to 25, depending on the state)";
 export const RULES_CHECKED = "2026-10";
@@ -83,10 +83,11 @@ export const BYOB_RULES = {
 const BYOB_DEFAULT = { text: "BYOB rules vary. Check with the venue that it's allowed.", source: "", status: "unknown" };
 
 /** @returns {{ state: string, text: string, source: string, status: string, checked: string, until?: string }|null} */
-export function byobRule(citySlug, on = null) {
+export function byobRule(citySlug, on = todayISO()) {
   const state = stateOf(citySlug) || "";
   const r = BYOB_RULES[state] || BYOB_DEFAULT;
-  // A rule with an end date (Haryana's policy year) gets a nudge once it may have changed.
+  // A rule with an end date (Haryana's policy year) gets a nudge once it may have changed —
+  // by today's date by default, so an install that isn't updated still says so.
   const stale = r.until && on && on > r.until;
   const text = stale ? `${r.text} That policy ran to ${r.until.slice(0, 4)}, so it may have changed.` : r.text;
   return { state, ...r, text, checked: RULES_CHECKED };
