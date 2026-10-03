@@ -30,6 +30,15 @@ Built as a foundation commit (`b15a143`: party `drivers`/`prefs`/`mix`, `settle`
 
 Also: location falls back to a GPS fix when there's no quick network fix (`aa1066e`, found on the emulator).
 
+**Reminders on time** (found on the emulator): `@capacitor/local-notifications` asks for exact alarms by default, so on Android 14+ "Set reminders" — and even the order checklist — opened the system "Alarms & reminders" screen unannounced, and declining it gave alarms a 1-hour delivery window. The manifest now declares `USE_EXACT_ALARM` (granted at install on Android 13+; Play would restrict it, but the app is sideloaded), reminders pass `isExactNotification` only when exact alarms are allowed, and the checklist passes `false`. A reminder tap that cold-starts the app now waits for the Plan tab before scrolling to its card (`focusCard` in App.jsx).
+
+### How v1.4.1 was checked
+
+- `npm test` — 168 tests (164 offline + 4 live parser tests skipped offline; the live ones pass). The legal test fails if a source host or the README table misses a service.
+- Browser (375×812): every new feature — Fill my bar (7 bottles, ₹7,410, ★5.0), 39 makeable cocktails / 22 mocktails with "Picked for your party", templates, drivers, guest prefs (Chinese → momos and chilli chicken first; "nobody eats mutton" removes mutton dishes), Getting home, settle-up, legal sheet; no console errors; dish tiles show no images.
+- **Android emulator** (AVD `LC_Pixel7`, Android 16, the signed release APK): welcome + legal sheet, GPS → Sector 57 Gurugram, Smart Sync (2,128 products), Fill my bar → 7 bottles added, Bar (cocktails + mocktails, picks), Food (templates, Driving tonight, dry-day banner), Plan → Getting home card, reminders scheduled as exact alarms (`dumpsys alarm`: window=0, `policy_permission`), a last-call reminder fired on the minute, and moving the party offered to move the reminders. The tap → Getting home on a cold start was fixed after that run and re-checked in the browser only (the emulator session ended).
+- iOS CI (Simulator): all tabs render with the v1.4.1 features; the Swift scheme mappings for the ride and grocer apps compile.
+
 ## v1.3 — what was built (HANDOFF items 1–10)
 
 1. **Cocktails** — 5th tab **Bar** (`BarTab.jsx`, `CocktailSheet.jsx`): makeable first, recipe sheet with servings → `cocktailMenu` in cfg → `planParty(…, menu)`; supplies land under Blinkit "Cocktail extras". Cabinet hero chip "🍸 N cocktails you can make".
