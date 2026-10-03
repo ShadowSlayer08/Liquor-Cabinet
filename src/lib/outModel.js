@@ -139,6 +139,31 @@ export const slimEvent = (e, url = "") => e && ({
   url, fetchedAt: e.fetchedAt || Date.now(),
 });
 
+// ── Shared maths (the Out tab, reminders and the split all use these) ─────────
+
+// Straight-line km (lib/location.js has the same, but imports Capacitor).
+export function kmBetween(a, b) {
+  if (a?.lat == null || a?.lon == null || b?.lat == null || b?.lon == null) return null;
+  const r = (d) => (d * Math.PI) / 180;
+  const h = Math.sin(r(b.lat - a.lat) / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(r(b.lon - a.lon) / 2) ** 2;
+  return 6371 * 2 * Math.asin(Math.sqrt(h));
+}
+
+// "About 25 min": roads are ~1.4× the straight line, city traffic ~20 km/h, plus 10 min to get
+// going; rounded up to 5. null without a distance.
+export const travelMinutes = (km) => (km == null ? null : Math.ceil((10 + ((km * 1.4) / 20) * 60) / 5) * 5);
+
+// What the outing itself costs, for the split and the summary: the venue's estimate
+// (cost for two ÷ 2 a head — an estimate, District has the bill) and the planned tickets
+// (exact as of when they were picked). null venue = no venue estimate.
+export function outSpend(out, people) {
+  if (!isOut(out)) return { venue: null, tickets: 0, total: 0 };
+  const p = out.pick;
+  const venue = p.type === "venue" && p.costForTwo ? Math.round((p.costForTwo / 2) * Math.max(1, people || 1)) : null;
+  const tickets = (out.tickets || []).reduce((s, t) => s + (t.price || 0) * (t.qty || 0), 0);
+  return { venue, tickets, total: (venue || 0) + tickets };
+}
+
 // The picked place as a ride pickup / invite venue: { lat, lon, label } or null.
 export const outPlace = (out) => (isOut(out) && out.pick.lat != null && out.pick.lon != null
   ? { lat: out.pick.lat, lon: out.pick.lon, label: out.pick.type === "event" ? out.pick.venue || out.pick.name : out.pick.name }
