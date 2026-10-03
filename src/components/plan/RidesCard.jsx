@@ -1,9 +1,11 @@
 // [v1.4.1 · track C] Getting home safely — who's driving (they stay sober), ride apps opened
 // with the party's location as the pickup, and the ride links for the guests' WhatsApp group.
 // The app never books or tracks a ride (lib/rides.js). The "winddown" reminder lands here.
+// v1.5: on a party out the pickup is the picked venue (ridePickup), never home.
 import { useMemo } from "react";
-import { RIDE, pickupOf, ridePrefills, driversOf, homeSafeMessage } from "../../lib/rides.js";
-import { lastCallAt } from "../../lib/reminderPlan.js";
+import { RIDE, pickupOf, ridePickup, ridePrefills, driversOf, homeSafeMessage, outVenueName } from "../../lib/rides.js";
+import { lastCallFor, closesAt } from "../../lib/reminderPlan.js";
+import { isOut } from "../../lib/outModel.js";
 import { prettyTime, clockOf } from "../../lib/when.js";
 import { whatsappUrl } from "../../lib/split.js";
 import { ageStr } from "../../lib/format.js";
@@ -13,15 +15,19 @@ import { Icon } from "../Art.jsx";
 
 const BUTTONS = ["uber", "ola", "rapido"];
 
-export default function RidesCard({ party, setParty, plan, loc, locating, onLocate, toast }) {
+export default function RidesCard({ party, setParty, plan, loc, locating, onLocate, toast, out }) {
   const guests = Math.max(1, plan?.guests ?? party?.guests ?? 1);
   const drivers = Math.min(guests, plan?.drivers ?? driversOf(party));
-  const pickup = pickupOf(loc);
-  const lastCall = useMemo(() => lastCallAt(party), [party]);
-  const title = (party?.name || "").trim() || "House party";
-  const message = () => homeSafeMessage({ party, loc, host: party?.host, drivers });
+  const away = isOut(out);
+  const venue = outVenueName(out);
+  const from = ridePickup(out, loc);
+  const pickup = pickupOf(from);
+  const lastCall = useMemo(() => lastCallFor(party, out), [party, out]);
+  const closing = away ? closesAt(party, out.pick.closes) : null;
+  const title = (party?.name || "").trim() || (away ? "Night out" : "House party");
+  const message = () => homeSafeMessage({ party, loc, host: party?.host, drivers, out });
 
-  const ride = (id) => { tap(); openRide(id, loc); };
+  const ride = (id) => { tap(); openRide(id, from); };
   const whatsapp = () => { tap(); openUrl(whatsappUrl(message())); };
   const shareAny = async () => { if ((await shareText(`${title} — getting home`, message())) === "copied") toast("Ride links copied to clipboard"); };
 
@@ -48,7 +54,12 @@ export default function RidesCard({ party, setParty, plan, loc, locating, onLoca
       <div className="out-pickup">
         <Icon.pin size={18} className="gold" />
         <div className="grow small">
-          {pickup ? (
+          {away ? (
+            <>
+              <div>Pickup: <b>{venue || "the venue"}</b></div>
+              <div className="tiny muted">{pickup ? "The venue you picked in the Out tab" : "The venue's location isn't known — set the pickup in the ride app."}</div>
+            </>
+          ) : pickup ? (
             <>
               <div>Pickup: <b>{pickup.named ? pickup.label : "your location pin"}</b></div>
               <div className="tiny muted">From your last location fix{loc?.at ? ` · ${ageStr(loc.at)}` : ""}</div>
@@ -57,9 +68,11 @@ export default function RidesCard({ party, setParty, plan, loc, locating, onLoca
             <span className="muted">Turn on location to fill in the pickup.</span>
           )}
         </div>
-        <button className="btn btn-ghost btn-xs" disabled={locating} onClick={() => { tap(); onLocate?.(); }}>
-          {locating ? <span className="spin">◌</span> : pickup ? "Update" : "Use my location"}
-        </button>
+        {!away && (
+          <button className="btn btn-ghost btn-xs" disabled={locating} onClick={() => { tap(); onLocate?.(); }}>
+            {locating ? <span className="spin">◌</span> : pickup ? "Update" : "Use my location"}
+          </button>
+        )}
       </div>
 
       <div className="out-rides">
@@ -67,7 +80,7 @@ export default function RidesCard({ party, setParty, plan, loc, locating, onLoca
           <button key={id} className={`out-ride out-ride-${id}`} onClick={() => ride(id)}>
             <span className="out-ride-emoji" aria-hidden="true">{RIDE[id].emoji}</span>
             <span className="small b">{RIDE[id].name}</span>
-            <span className="tiny muted">{ridePrefills(id, loc) ? "pickup filled in" : "set pickup in app"}</span>
+            <span className="tiny muted">{ridePrefills(id, from) ? "pickup filled in" : "set pickup in app"}</span>
           </button>
         ))}
       </div>
@@ -77,11 +90,11 @@ export default function RidesCard({ party, setParty, plan, loc, locating, onLoca
         <Icon.external size={14} />
       </button>
       <div className="tiny dim" style={{ marginTop: 8 }}>
-        Your location fills the pickup; the app asks where you're going. Liquor Cabinet doesn't book rides.
+        {away ? "The venue fills the pickup" : "Your location fills the pickup"}; the app asks where you're going. Liquor Cabinet doesn't book rides.
       </div>
       {lastCall && (
         <div className="tiny muted" style={{ marginTop: 6 }}>
-          <Icon.bell size={11} className="out-inline-icon" /> Last-call reminder at {prettyTime(clockOf(lastCall))} — switch it on under Reminders.
+          <Icon.bell size={11} className="out-inline-icon" /> Last-call reminder at {prettyTime(clockOf(lastCall))}{closing ? `, 45 min before ${venue || "the venue"} closes (listed hours)` : ""} — switch it on under Reminders.
         </div>
       )}
 

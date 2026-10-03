@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   splitBill, resolveSplit, shareRows, splitMessage, whatsappUrl, includedLabel, validVpa, upiLink,
 } from "../src/lib/split.js";
+import { splitParts } from "../src/lib/split.js";
+import { DEFAULT_OUT, slimVenue, slimEvent, outSpend } from "../src/lib/outModel.js";
 
 const totals = { liquor: 8000, food: 3000, supplies: 1000 };
 
@@ -93,4 +95,68 @@ test("labels & WhatsApp link", () => {
   assert.equal(includedLabel({ liquor: false }), "food & supplies");
   assert.equal(includedLabel({ food: false, supplies: false }), "liquor");
   assert.equal(whatsappUrl("a & b\nc"), "https://wa.me/?text=a%20%26%20b%0Ac");
+});
+
+// ── v1.5: a party out ────────────────────────────────────────────────────────
+const soi7 = slimVenue({ resId: 18383940, zcity: "ncr", slug: "soi-7", name: "Soi 7 Pub & Brewery", lat: 28.495, lon: 77.0895, costForTwo: 2400 });
+const xlive = slimEvent({ slug: "giada-brince-xlive", name: "Giada Brince at XLive", venue: "XLive" });
+const outAt = (pick, more = {}) => ({ ...DEFAULT_OUT, active: true, pick, ...more });
+const night = { liquor: 0, food: 0, supplies: 0 };
+
+test("out: the venue estimate and the tickets are split among everyone", () => {
+  const spend = outSpend(outAt(soi7, { tickets: [{ id: "t1", name: "Entry", price: 1000, qty: 6 }] }), 10);
+  assert.deepEqual([spend.venue, spend.tickets], [12000, 6000]);   // ₹2,400 for two → ₹1,200 a head × 10
+  const r = splitBill({ ...night, venue: spend.venue, tickets: spend.tickets, people: 10, drinkers: 8, mode: "fair" });
+  assert.deepEqual([r.total, r.venue, r.tickets, r.perDrinker, r.perNonDrinker], [18000, 12000, 6000, 1800, 1800]);
+  assert.deepEqual(shareRows(r).map((x) => [x.key, x.count, x.amount]), [["everyone", 10, 1800]]);
+  // BYOB: bottles you bring among the drinkers, the venue among everyone.
+  const byob = splitBill({ ...night, liquor: 4000, venue: 6000, people: 10, drinkers: 8, mode: "fair" });
+  assert.deepEqual([byob.perDrinker, byob.perNonDrinker], [1100, 600]);   // 600 + 4000 / 8
+  assert.equal(splitBill({ ...night, liquor: 4000, venue: 6000, people: 10, drinkers: 8, mode: "equal" }).perDrinker, 1000);
+  // Missing include keys count as on (App's DEFAULT_SPLIT has none); switched off, they're out.
+  assert.equal(splitBill({ ...night, venue: 12000, tickets: 6000, people: 10, include: { liquor: true, food: true, supplies: true } }).total, 18000);
+  const noVenue = splitBill({ ...night, venue: 12000, tickets: 6000, people: 10, include: { venue: false } });
+  assert.deepEqual([noVenue.total, noVenue.venue, noVenue.tickets], [6000, 0, 6000]);
+  assert.equal(splitBill({ ...night, venue: 12000, tickets: 6000, people: 10, include: { venue: false, tickets: false } }).total, 0);
+  // At home both are 0, so a home split is unchanged.
+  const home = splitBill({ ...totals, venue: outSpend(null, 10).venue || 0, tickets: outSpend(null, 10).tickets, people: 10, drinkers: 8 });
+  assert.deepEqual([home.total, home.perDrinker, home.perNonDrinker], [12000, 1400, 400]);
+});
+
+test("out: labels name only the parts with something in them; home labels are unchanged", () => {
+  const homeParts = splitParts({ liquor: true, food: false, supplies: true }, totals);
+  assert.deepEqual(homeParts, { liquor: true, food: false, supplies: true, venue: false, tickets: false });
+  assert.equal(includedLabel(homeParts), "liquor & supplies");
+  assert.equal(includedLabel(splitParts({}, { liquor: 0, food: 0, supplies: 0 })), "liquor, food & supplies");   // as v1.4.1
+  assert.equal(includedLabel(splitParts({}, { ...night, venue: 12000, tickets: 6000 })), "the venue & tickets");
+  assert.equal(includedLabel(splitParts({}, { ...night, liquor: 4000, venue: 6000 })), "liquor & the venue");
+  assert.equal(includedLabel(splitParts({ venue: false }, { ...night, venue: 12000, tickets: 6000 })), "tickets");
+  assert.equal(includedLabel({ venue: true }), "liquor, food, supplies & the venue");
+  assert.equal(includedLabel({ liquor: true, food: true, supplies: true }), "liquor, food & supplies");
+});
+
+test("out: the WhatsApp text lists the venue estimate and tickets, with no upi:// links", () => {
+  const party = { name: "", date: "2026-11-07", time: "20:30" };
+  const result = splitBill({ ...night, venue: 12000, tickets: 6000, people: 10, drinkers: 8, mode: "fair" });
+  const include = splitParts({}, { ...night, venue: 12000, tickets: 6000 });
+  const msg = splitMessage({ party, result, include, host: "Rish", vpa: "rish@okhdfc", venue: "Soi 7 Pub & Brewery" });
+  assert.match(msg, /^🎉 \*Night out\* — .*8:30 pm\n📍 Soi 7 Pub & Brewery\n/);
+  assert.match(msg, /Splitting about ₹18,000 \(the venue & tickets, at planned prices\) between 10 of us\./);
+  assert.match(msg, /🍽️ Venue: about ₹12,000, the venue's own estimate\. The real bill comes at the table\./);
+  assert.match(msg, /🎟️ Tickets: ₹6,000 as planned on District, before its fee\./);
+  assert.match(msg, /Everyone \(10\): \*₹1,800\* each/);
+  assert.doesNotMatch(msg, /Drinks/);
+  assert.doesNotMatch(msg, /upi:\/\//);
+  assert.match(msg, /Pay by UPI to rish@okhdfc \(Rish\)/);
+  // BYOB: the bottles go to the drinkers, and the text says who pays for what.
+  const byob = splitBill({ ...night, liquor: 4000, venue: 6000, people: 10, drinkers: 8, mode: "fair" });
+  const m2 = splitMessage({ party: { name: "Ebowla night" }, result: byob, include: splitParts({}, { ...night, liquor: 4000, venue: 6000 }), host: "", vpa: "", venue: "Ebowla" });
+  assert.match(m2, /\*Ebowla night\*\n📍 Ebowla\n/);
+  assert.match(m2, /\(liquor & the venue, at planned prices\)/);
+  assert.match(m2, /Drinks you bring are split among the drinkers; the venue among everyone\./);
+  assert.doesNotMatch(m2, /Tickets:/);
+  // A club night: tickets only.
+  const club = splitBill({ ...night, tickets: outSpend(outAt(xlive, { tickets: [{ price: 3000, qty: 2 }, { price: 1500, qty: 0 }] }), 4).tickets, people: 4, drinkers: 4 });
+  assert.equal(club.total, 6000);
+  assert.match(splitMessage({ party: {}, result: club, include: splitParts({}, { ...night, tickets: 6000 }), venue: "XLive" }), /\(tickets, at planned prices\)/);
 });

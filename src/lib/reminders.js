@@ -26,14 +26,16 @@ export async function scheduleReminders(reminders, enabled) {
         id: r.id, title: r.title, body: r.body, schedule: { at: r.at, allowWhileIdle: true }, isExactNotification: exact,
         smallIcon: "ic_stat_liquor", iconColor: "#D4872A",
         // Where a tap lands: the Cart's bottles list for the shopping reminder, Plan › Getting home
-        // for last call, the settle-up sheet the morning after, else the Food tab.
-        extra: reminderExtra(r.key),
+        // for last call, the settle-up sheet the morning after, the Out tab's night-out card for
+        // "Leave by" and free cancellation, else the Food tab (reminderPlan.js reminderExtra).
+        extra: r.extra || reminderExtra(r.key),
       })),
     });
   }
   return { scheduled: due.length, native: true };
 }
 
+// 12 notification ids from BASE_ID are ours: buildReminders makes at most 7 (a party out, at most 6).
 export async function cancelReminders() {
   if (!isNative()) return;
   const ids = Array.from({ length: 12 }, (_, i) => ({ id: BASE_ID + i }));
