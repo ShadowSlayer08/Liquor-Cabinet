@@ -88,3 +88,11 @@ export function parseEventList(html) { return []; }
 
 /** @returns {import("../outModel.js").EventDetails|null} */
 export function parseEventPage(html) { return null; }
+
+/**
+ * The venue's listed closing time on the night of `isoDate` ("2026-10-10"), as "HH:MM" (24 h),
+ * or "" when the hours don't say. A row after midnight filed under the same day (Mon 00:00–02:00
+ * next to Mon 13:00–23:59) is that night's late close → "02:00".
+ * @param {import("../outModel.js").VenueDetails["hours"]} hours
+ */
+export function closingTime(hours, isoDate) { return ""; }
