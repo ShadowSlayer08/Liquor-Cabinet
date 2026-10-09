@@ -11,6 +11,7 @@ import { isNative } from "./lib/http.js";
 import { onChecklistTap, tap } from "./lib/order.js";
 import { onBubbleToggle } from "./lib/bubble.js";
 import { DEFAULT_OUT, withOut } from "./lib/outModel.js";
+import { outForDate } from "./lib/out.js";
 import { AGE_LINE } from "./lib/age.js";
 import ScraperPanel from "./components/ScraperPanel.jsx";
 import CabinetTab from "./components/CabinetTab.jsx";
@@ -169,6 +170,9 @@ export default function App() {
     } else { setCartView(x?.view || "food"); setTab("cart"); }
     window.scrollTo({ top: 0 });
   }), []);
+  // A new party date (Food tab, a template…) redoes the picked venue's closing time for that
+  // night, so the last-call reminder follows it even when the Out tab isn't open.
+  useEffect(() => { setOut((o) => outForDate(o, party.date)); }, [party.date]);
   // A tap that starts the app arrives before the saved plan has loaded, so scroll only once
   // the card's tab is actually on screen (found on the emulator).
   useEffect(() => {
