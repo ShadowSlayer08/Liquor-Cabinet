@@ -1,12 +1,12 @@
 // [v1.5 · Out] The Out tab's plan card: is the party at home or out, what kind of night, how
 // many people, when, and the budget a head. People, date and time are the shared party's
 // (the Food tab edits the same ones); the rest lives in cfg.out. Below: bar dry days for the
-// date (DryDayBanner mode="bars") and the state's legal drinking age (lib/age.js).
+// date (DryDayBanner mode="bars") and the state's legal drinking age (lib/age.js ageLine),
+// with where those rules come from in small print.
 import DryDayBanner from "../DryDayBanner.jsx";
 import { Stepper } from "../Sheet.jsx";
 import { OUT_KINDS } from "../../lib/outModel.js";
-import { ageFor } from "../../lib/age.js";
-import { ageLine } from "../../lib/out.js";
+import { ageLine, RULES_NOTE } from "../../lib/age.js";
 import { todayISO } from "../../lib/drydays.js";
 import { cityName } from "../../lib/parse/livcheers.js";
 import { tap } from "../../lib/order.js";
@@ -15,7 +15,6 @@ import { Icon } from "../Art.jsx";
 export default function OutPlanCard({ city, loc, locating, onLocate, party, setParty, plan, out, setOut, customDry }) {
   const set = (k) => (v) => setParty((p) => ({ ...p, [k]: v }));
   const setO = (patch) => { tap(); setOut((o) => ({ ...o, ...patch })); };
-  const age = ageLine(ageFor(city));
   const drinking = plan ? `${plan.drinkers} drinking${plan.drivers ? ` · ${plan.drivers} driving` : ""}` : "";
 
   return (
@@ -69,12 +68,15 @@ export default function OutPlanCard({ city, loc, locating, onLocate, party, setP
       </button>
 
       <DryDayBanner mode="bars" date={party?.date} city={city} customDry={customDry} style={{ marginTop: 14 }} />
-      {age && <div className="ot-age tiny"><Icon.idcard size={15} /><span>{age}</span></div>}
+      <div className="ot-age tiny">
+        <Icon.idcard size={15} />
+        <span className="grow">{ageLine(city)}<span className="ot-age-note dim">{RULES_NOTE}</span></span>
+      </div>
 
       {!loc && (
         <div className="ot-locate">
           <Icon.pin size={18} className="gold" />
-          <span className="grow tiny muted">Use your location for places near you and when to leave. Without it, lists cover {cityName(city)}.</span>
+          <span className="grow tiny muted">Use your location for places near you and when to leave. Without it, the lists cover all of {cityName(city)}.</span>
           <button className="btn btn-ghost btn-xs" disabled={locating} onClick={() => { tap(); onLocate?.(); }}>
             {locating ? <span className="spin">◌</span> : <Icon.locate size={14} />} Locate
           </button>

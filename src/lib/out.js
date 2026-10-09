@@ -12,10 +12,12 @@
 //
 //  District lists times in UTC. India has one time zone (+05:30, no DST), so dates
 //  here are worked out in IST whatever the phone or the CI machine is set to.
+//  "Leave by" and last call are lib/reminderPlan.js's (leaveBy, closesAt, lastCallFor),
+//  so the card and the reminders always agree; the legal age is lib/age.js's ageLine.
 //  Pure (no Capacitor), so node --test covers it. Shapes: lib/outModel.js.
 // ═══════════════════════════════════════════════════════════════════════════════
 import { kmBetween, travelMinutes, outSpend, slimVenue, slimEvent } from "./outModel.js";
-import { venueUrl, eventUrl, closingTime } from "./parse/district.js";
+import { venueUrl, eventUrl, closingTime, cleanOffer } from "./parse/district.js";
 import { prettyTime } from "./when.js";
 import { prettyDate } from "./drydays.js";
 import { fmt } from "./format.js";
@@ -53,22 +55,6 @@ export function onNight(start, end, date) {
   return !!(w && s && s.from < w.to && s.to > w.from);
 }
 
-// "20:00" − 25 min → "19:35" (wraps past midnight).
-export function minusMinutes(hhmm, mins) {
-  const m = /^(\d{1,2}):(\d{2})/.exec(hhmm || "");
-  if (!m || !Number.isFinite(mins)) return "";
-  const t = ((((Number(m[1]) * 60 + Number(m[2]) - mins) % 1440) + 1440) % 1440);
-  return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
-}
-
-// When to set off from `from` (your location) to `to` (the pick) for the party's start:
-// { km, minutes, time } or null without both places.
-export function leaveBy({ party, from, to }) {
-  const km = kmBetween(from, to);
-  const minutes = travelMinutes(km);
-  return minutes == null ? null : { km, minutes, time: minusMinutes(party?.time || "20:00", minutes) };
-}
-
 // Google Maps directions to the pick (the Maps app on the phone, the website otherwise).
 export const directionsUrl = (lat, lon) => (lat == null || lon == null ? null : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`);
 
@@ -94,9 +80,9 @@ export function eventWhenText(start, end) {
     : `${prettyDate(istDate(start))} · ${prettyTime(istClock(start))}`;
 }
 
-// Zomato and District shout their offers: "FLAT 20% OFF" → "Flat 20% off".
+// Zomato and District shout their offers: "FLAT \n20% OFF" → "Flat 20% off".
 export function offerText(s) {
-  const t = String(s || "").replace(/(?:\\n|\s)+/g, " ").trim();
+  const t = cleanOffer(s);
   return t && t === t.toUpperCase() ? t.charAt(0) + t.slice(1).toLowerCase() : t;
 }
 
@@ -105,11 +91,13 @@ export const eventPriceText = (p) => (p === 0 ? "Free" : p != null ? `from ${fmt
 const pctText = (f) => `${Math.round(f * 1000) / 10}%`;
 export const feeText = (feePct) => (feePct > 0 ? `+ District fee up to ${pctText(feePct)} + GST where charged` : "+ any District fee and GST, shown at checkout");
 
-// "Legal drinking age in Haryana: 21. Carry ID: bars and clubs check." — from lib/age.js ageFor().
-export function ageLine(a) {
-  if (!a?.age) return "";
-  const beer = a.beer && a.beer !== a.age ? ` (${a.beer} for beer)` : "";
-  return `Legal drinking age in ${a.state}: ${a.age}${beer}. Carry ID: bars and clubs check.`;
+// A note over the venue list, or "" — when Zomato has no such page for the city, or (outside
+// Delhi NCR) when its BYOB page is thin: there it's a name match, not a BYOB tag, so it finds
+// one or two places at most.
+export function venueListNote({ kind, zcity, notFound = false } = {}) {
+  if (notFound) return `Zomato has no ${kind === "byob" ? "BYOB" : "bars"} page for this city.`;
+  if (kind === "byob" && zcity && zcity !== "ncr") return "Few BYOB places are listed for this city on Zomato.";
+  return "";
 }
 
 // ── Venues ────────────────────────────────────────────────────────────────────
@@ -120,7 +108,8 @@ export const venueKey = (v) => (v?.zcity && v?.slug ? `${v.zcity}/${v.slug}` : S
 export const isByobTags = (tags) => (tags || []).some((t) => /\bbyob\b/i.test(t));
 const BIG = /large group|private dining/i;
 export const bigGroupTags = (tags) => (tags || []).filter((t) => BIG.test(t));
-export const isByobPick = (pick) => pick?.type === "venue" && (pick.outKind === "byob" || isByobTags(pick.tags));
+// A BYOB night: picked off the BYOB list (pick.kind, the outing type), or District lists it as BYOB.
+export const isByobPick = (pick) => pick?.type === "venue" && (pick.kind === "byob" || isByobTags(pick.tags));
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 export const weekday = (iso) => { const t = Date.parse(`${iso}T12:00:00Z`); return Number.isNaN(t) ? "" : DAYS[new Date(t).getUTCDay()]; };
@@ -185,15 +174,29 @@ export function rankVenues(list, { budgetPerHead = null, people = 1, bigGroup = 
   return rows.filter((r) => !fitsOnly || r.fit !== "over").map(({ _i, ...r }) => r);
 }
 
-// "Make this the party" for a venue: its list card, plus what its District page said.
+// "Make this the party" for a venue: its list card (or the pick being refreshed), plus what
+// its District page said. On top of slimVenue: `kind` (the outing type — reminderPlan's
+// byobNight and the art read it), the listed `hours`, and `closes` ("HH:MM", district.js
+// closingTime) for the night of `closesFor`, so a new party date can redo it (pickForDate).
 export function venuePick(v, d, { kind = "bar", date = null } = {}) {
+  const hours = d?.hours?.length ? d.hours : Array.isArray(v.hours) ? v.hours : [];
   const merged = {
     ...v, ...(d || {}),
-    zcity: v.zcity, slug: v.slug, locality: v.locality || "", name: d?.name || v.name,
+    zcity: v.zcity || d?.zcity || "", slug: v.slug || d?.slug || "",
+    locality: v.locality || d?.locality || "", name: d?.name || v.name,
+    phone: d?.phones?.[0] || d?.phone || v.phone || "",
     resId: d?.resId ?? v.resId ?? null, costForTwo: d?.costForTwo ?? v.costForTwo ?? null, rating: d?.rating ?? v.rating ?? null,
-    closes: d?.hours?.length && date ? closingTime(d.hours, date) : "",
+    closes: date && hours.length ? closingTime(hours, date) : (v.closes || ""),
   };
-  return { ...slimVenue(merged, venueUrl(v)), outKind: kind };
+  const url = merged.zcity && merged.slug ? venueUrl(merged) : v.url || "";
+  return { ...slimVenue(merged, url), kind, hours, closesFor: date && hours.length ? date : (v.closesFor || null) };
+}
+
+// The pick, its closing time redone for a new party date from the hours it keeps — the same
+// object when nothing changes (so App's setOut can bail out), or when it has no hours.
+export function pickForDate(pick, date) {
+  if (pick?.type !== "venue" || !date || pick.closesFor === date || !pick.hours?.length) return pick;
+  return { ...pick, closes: closingTime(pick.hours, date), closesFor: date };
 }
 
 // ── Events ────────────────────────────────────────────────────────────────────
@@ -232,11 +235,15 @@ export function eventsForDate(list, date, origin, maxKm = 25, { now = Date.now()
   return rows.map(({ _i, _t, ...r }) => r);
 }
 
-// Which of an event's shows to preselect: the one on the party's night, else the next one
-// still to come, else the first. -1 when it lists none.
-export function showFor(shows, date, now = Date.now()) {
+// Which of an event's shows to preselect: the one already picked (`picked` = the pick's start),
+// else the one on the party's night, else the next one still to come, else the first. -1 when
+// it lists none.
+export function showFor(shows, date, now = Date.now(), picked = "") {
   const list = shows || [];
   if (!list.length) return -1;
+  const p = picked ? Date.parse(picked) : NaN;
+  const k = Number.isNaN(p) ? -1 : list.findIndex((s) => Date.parse(s.start) === p);
+  if (k >= 0) return k;
   const i = list.findIndex((s) => onNight(s.start, s.end, date));
   if (i >= 0) return i;
   const j = list.findIndex((s) => (span(s.start, s.end)?.to ?? 0) >= now);
@@ -252,29 +259,43 @@ export function alignParty(show, party) {
   return { date: istDate(show.start), time: istClock(show.start) };
 }
 
-// "Make this the party" for an event (a show of it, when its page could be read).
+// "Make this the party" for an event (a show of it, when its page could be read). On top of
+// slimEvent: `kind` (club | events) and District's fee, for the night-out sums.
 export function eventPick(e, d, show, { kind = "club" } = {}) {
-  const merged = { ...e, ...(d || {}), locality: e?.locality || "", slug: e?.slug || d?.slug || "" };
+  const merged = { ...e, ...(d || {}), locality: e?.locality || d?.locality || "", slug: e?.slug || d?.slug || "" };
   if (show) { merged.start = show.start; merged.end = show.end || ""; }
-  return { ...slimEvent(merged, eventUrl(merged.slug)), outKind: kind, feePct: d?.feePct || 0 };
+  return { ...slimEvent(merged, merged.slug ? eventUrl(merged.slug) : ""), kind, feePct: d?.feePct || e?.feePct || 0 };
 }
 
 // The picked event, refreshed from a newer read of its page — the chosen show stays.
 export const freshEventPick = (pick, d) => (!d ? pick : {
   ...pick,
-  name: d.name || pick.name, venue: d.venue || pick.venue,
+  name: d.name || pick.name, venue: d.venue || pick.venue, locality: pick.locality || d.locality || "",
   lat: d.lat ?? pick.lat, lon: d.lon ?? pick.lon, priceFrom: d.priceFrom ?? pick.priceFrom,
   ageEntry: d.rules?.ageEntry ?? pick.ageEntry, stag: d.rules?.stag || pick.stag,
   feePct: d.feePct || pick.feePct || 0, fetchedAt: d.fetchedAt || Date.now(),
 });
 
+// What's off about the pick for the party's date, or "": an event whose show is another
+// night (the date changed after picking it), or a venue whose listed hours skip that day.
+export function pickNote(pick, date) {
+  if (!pick || !date) return "";
+  if (pick.type === "event" && pick.start && !onNight(pick.start, pick.end, date)) {
+    return `This show is on ${eventWhenText(pick.start, pick.end)}, not the party's date. Open it to pick another show.`;
+  }
+  if (pick.type === "venue" && closedOn(pick.hours, date)) return `Closed on ${weekday(date)}s, going by its listed hours.`;
+  return "";
+}
+
 // The organiser's door rules, ready to show (the legal age is shown separately).
 export function doorRules(rules) {
   const r = rules || {};
   const say = (label, re, x) => { const t = String(x || "").trim(); return !t ? "" : re.test(t) ? t : `${label}: ${t}`; };
+  const stag = String(r.stag || "").trim() ? say("Stag entry", /stag/i, r.stag)
+    : r.stagAllowed === false ? "Stag entry not allowed" : r.stagAllowed === true ? "Stags allowed" : "";
   return [
     r.ageEntry ? `Entry ${r.ageEntry}+ (organiser's rule)` : "",
-    say("Stag entry", /stag/i, r.stag),
+    stag,
     say("ID", /\bid\b/i, r.id),
     say("Dress code", /dress/i, r.dress),
     say("Re-entry", /re-?entry/i, r.reentry),
@@ -307,6 +328,11 @@ export const planTicket = (t, qty) => ({
   id: t.id, name: t.name, price: t.price || 0, qty, kind: t.kind || "general",
   service: t.service ?? null, gateCover: t.gateCover ?? null, groupSize: t.groupSize ?? null,
 });
+
+// The plan for one show: its tickets (district.js ticketsForShow) that are on sale, with the
+// quantities chosen in the sheet ({ [id]: qty }). A ticket another show sells drops out.
+export const plannedTickets = (showTickets, qty) => (showTickets || [])
+  .filter((t) => t?.buyable && (qty?.[t.id] || 0) > 0).map((t) => planTicket(t, qty[t.id]));
 
 // A qty stepper inside District's per-order limits: 0 (none), or min…max.
 export function clampQty(t, want, cur = 0) {

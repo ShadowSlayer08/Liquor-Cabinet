@@ -1,28 +1,36 @@
 // [v1.5 · Out] "Your night out": the picked place, when, for how many, and what it costs —
 // each line tagged exact, estimate or unknown (lib/out.js outingCost) — the share a head
-// against the budget, when to leave (straight-line distance, lib/outModel.js travelMinutes),
-// a "Booked on District" tick, and shortcuts to the Plan cards that use the venue.
+// against the budget, when to leave and last call (lib/reminderPlan.js leaveBy / closesAt /
+// lastCallFor, the same sums the reminders use, so the two never disagree), a "Booked on
+// District" tick, and shortcuts to the Plan cards that use the venue.
 // Reminders and Plan links scroll here by its id, "night-out".
 import { useMemo } from "react";
-import { outingCost, leaveBy, kmText, isByobPick } from "../../lib/out.js";
+import { outingCost, kmText, isByobPick, pickNote } from "../../lib/out.js";
+import { leaveBy, closesAt, lastCallFor, LEAVE_MAX_KM } from "../../lib/reminderPlan.js";
 import { prettyTime, prettyWhen, clockOf } from "../../lib/when.js";
 import { fmt, ageStr } from "../../lib/format.js";
 import { openDistrict, tap } from "../../lib/order.js";
 import { Icon, VenueArt } from "../Art.jsx";
 
-const KIND_TAG = { exact: "exact", estimate: "estimate", unknown: "unknown" };
 const SHORTCUTS = [["invite", "💌", "Invite"], ["split", "🧾", "Split"], ["rides", "🚕", "Getting home"]];
+const at = (d) => prettyTime(clockOf(d));
 
 export default function NightOutCard({ out, setOut, party, loc, locating, onLocate, liquorLines, goPlanCard, onOpen, toast }) {
   const pick = out.pick;
   const cost = useMemo(() => outingCost({ out, party, liquorLines }), [out, party, liquorLines]);
   if (!pick) return null;
-  const go = leaveBy({ party, from: loc, to: pick });
-  const hasGeo = pick.lat != null && pick.lon != null;
-  const art = pick.type === "event" ? (pick.outKind === "events" ? "events" : "club") : isByobPick(pick) ? "byob" : "bar";
+  // Worked out as if the party were out, so a pick saved while the party is at home still shows them.
+  const asOut = out.active ? out : { ...out, active: true };
+  const go = leaveBy(party, asOut, loc);
+  const km = go ? kmText(go.km) : "";
+  const tooFar = !go && loc?.lat != null && pick.lat != null && pick.lon != null;
+  const close = closesAt(party, pick.closes);
+  const lastCall = close ? lastCallFor(party, asOut) : null;
+  const art = pick.type === "event" ? (pick.kind === "events" ? "events" : "club") : isByobPick(pick) ? "byob" : "bar";
   const cap = out.perHead;
   const over = cap > 0 && cost.perHead > cap;
   const where = pick.type === "event" ? [pick.venue, pick.locality].filter(Boolean).join(" · ") : pick.locality;
+  const note = pickNote(pick, party?.date);
   const exactTickets = cost.lines.some((l) => l.id === "tickets" && l.kind === "exact" && l.amount > 0);
   const asOf = pick.fetchedAt ? (Date.now() - pick.fetchedAt < 12 * 3600000 ? prettyTime(clockOf(new Date(pick.fetchedAt))) : ageStr(pick.fetchedAt)) : "";
 
@@ -48,6 +56,7 @@ export default function NightOutCard({ out, setOut, party, loc, locating, onLoca
         </span>
         <Icon.chevron size={16} />
       </button>
+      {note && <div className="note note-warn ot-night-note">{note}</div>}
       {!out.active && (
         <button className="btn btn-gold btn-sm btn-block" style={{ marginTop: 10 }} onClick={() => { tap(); setOut((o) => ({ ...o, active: true })); }}>
           Make it the party
@@ -58,7 +67,7 @@ export default function NightOutCard({ out, setOut, party, loc, locating, onLoca
         {cost.lines.map((l) => (
           <div key={l.id} className="ot-line">
             <span className="grow small soft">{l.label}</span>
-            <span className={`ot-kind ot-kind-${KIND_TAG[l.kind]}`}>{l.kind}</span>
+            <span className={`ot-kind ot-kind-${l.kind}`}>{l.kind}</span>
             <b className="small ot-amount">{l.amount == null ? "?" : fmt(l.amount)}</b>
           </div>
         ))}
@@ -81,24 +90,34 @@ export default function NightOutCard({ out, setOut, party, loc, locating, onLoca
       <div className="ot-go">
         <Icon.route size={18} className="gold" />
         {go ? (
-          <span className="grow small">Leave by <b className="gold">{prettyTime(go.time)}</b> <span className="muted">· about {go.minutes} min for {kmText(go.km)}</span></span>
-        ) : !loc && hasGeo ? (
+          <span className="grow small">Leave by <b className="gold">{at(go.at)}</b> <span className="muted">· about {go.minutes} min{km ? ` for ${km}` : ""}</span></span>
+        ) : pick.lat == null || pick.lon == null ? (
+          <span className="grow tiny muted">No map pin for this place yet — open it to load one.</span>
+        ) : tooFar ? (
+          <span className="grow tiny muted">You're more than {LEAVE_MAX_KM} km from here — when to leave shows once you're nearer.</span>
+        ) : (
           <>
             <span className="grow tiny muted">Use your location to see when to leave.</span>
             <button className="btn btn-ghost btn-xs" disabled={locating} onClick={() => { tap(); onLocate?.(); }}>{locating ? <span className="spin">◌</span> : "Locate"}</button>
           </>
-        ) : (
-          <span className="grow tiny muted">No map pin for this place yet — open it to load one.</span>
         )}
       </div>
-      {pick.closes && <div className="tiny muted" style={{ marginTop: 4 }}><Icon.clock size={11} className="out-inline-icon" /> Closes {prettyTime(pick.closes)} (listed hours)</div>}
+      {close && (
+        <div className="tiny muted ot-close">
+          <Icon.clock size={11} className="out-inline-icon" /> Closes {at(close)} (listed hours){lastCall ? ` · last call ${at(lastCall)}` : ""}
+        </div>
+      )}
 
       <div className="ot-booked">
         <button className="ot-booked-tick" role="checkbox" aria-checked={!!out.booked} onClick={() => { tap(); setOut((o) => ({ ...o, booked: !o.booked })); }}>
           <span className={`check ${out.booked ? "on" : ""}`}>{out.booked && <Icon.check size={14} />}</span>
           <span className="grow">
             <span className="small b">Booked on District</span><br />
-            <span className="tiny muted">{out.booked ? "Changes and refunds go through District." : pick.type === "event" ? "Tick it once the tickets are bought" : "Tick it once the table is booked"}</span>
+            <span className="tiny muted">
+              {out.booked
+                ? pick.type === "event" ? "Refunds and changes go through District." : "Cancel in District at least 24 h ahead for a refund (not the fee)."
+                : pick.type === "event" ? "Tick it once the tickets are bought" : "Tick it once the table is booked"}
+            </span>
           </span>
         </button>
         {pick.url && (

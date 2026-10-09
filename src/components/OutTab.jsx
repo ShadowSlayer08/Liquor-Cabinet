@@ -17,8 +17,9 @@ import EventSheet from "./out/EventSheet.jsx";
 import { OUT_KIND } from "../lib/outModel.js";
 import { fetchVenueList, fetchEventList } from "../lib/outSources.js";
 import { eventListUrls } from "../lib/parse/district.js";
+import { zomatoCity } from "../lib/parse/zomato.js";
 import { byobRule } from "../lib/age.js";
-import { rankVenues, eventsForDate, venueKey, venuePick, freshEventPick, refreshTickets } from "../lib/out.js";
+import { rankVenues, eventsForDate, venueKey, venuePick, pickForDate, freshEventPick, refreshTickets, venueListNote } from "../lib/out.js";
 import { CITY_COORDS } from "../lib/location.js";
 import { cityName } from "../lib/parse/livcheers.js";
 import { prettyDate } from "../lib/drydays.js";
@@ -34,43 +35,54 @@ export default function OutTab({
 }) {
   const kind = OUT_KIND[out?.kind] ? out.kind : "bar";
   const K = OUT_KIND[kind];
-  const [state, setState] = useState({ loading: true });
-  const [seen, setSeen] = useState({});          // venueKey → VenueDetails read this session (group seating, bookings, hours)
-  const [venueOpen, setVenueOpen] = useState(null); // { v, kind }
-  const [eventOpen, setEventOpen] = useState(null); // { e, kind }
-  const [fitsOnly, setFitsOnly] = useState(false);
-  const [wide, setWide] = useState(false);         // events farther than MAX_KM too
-  const req = useRef(0);
   const zone = loc?.zomato?.entityId || null;
+  const zcity = loc?.zomato?.city || zomatoCity(city);   // the same city segment outSources reads
+  const listKey = `${kind}|${city}|${K.source === "zomato" ? zone : ""}`;
+  const [state, setState] = useState({ key: null });     // { key, loading | venues | events | error }
+  const [seen, setSeen] = useState({});                  // venueKey → VenueDetails read this session (group seating, bookings, hours)
+  const [seenEvents, setSeenEvents] = useState({});      // slug → EventDetails read this session
+  const [venueOpen, setVenueOpen] = useState(null);      // { v, kind }
+  const [eventOpen, setEventOpen] = useState(null);      // { e, kind }
+  const [fitsOnly, setFitsOnly] = useState(false);
+  const [wide, setWide] = useState(false);               // events farther than MAX_KM too
+  const req = useRef(0);
   const noPages = K.source === "district" && !eventListUrls(city, K.genres).length;
 
   // One list read per outing type, city and Zomato zone (cached by lib/outSources.js).
   const load = useCallback(async (force = false) => {
     const id = ++req.current;
-    if (noPages) { setState({ events: { events: [], urls: [] } }); return; }
-    setState({ loading: true });
+    if (noPages) { setState({ key: listKey, events: { events: [], urls: [] } }); return; }
+    setState({ key: listKey, loading: true });
     try {
       const data = K.source === "district"
         ? { events: await fetchEventList(K.genres, { city, force }) }
         : { venues: await fetchVenueList(kind, { city, loc, force }) };
-      if (id === req.current) setState(data);
+      if (id === req.current) setState({ key: listKey, ...data });
     } catch (e) {
-      if (id === req.current) setState({ error: e?.message || String(e) });
+      if (id === req.current) setState({ key: listKey, error: e?.message || String(e) });
     }
-  }, [kind, city, zone, noPages]);
+  }, [listKey, noPages]);
   useEffect(() => { load(false); }, [load]);
+  // Until this kind's list is in, show it loading (not the last kind's list for a frame).
+  const list = state.key === listKey ? state : { loading: true };
+
+  // A new party date: the picked venue's closing time is redone from the hours it keeps, so
+  // last call and the "closes" line follow the date (lib/out.js pickForDate).
+  useEffect(() => {
+    setOut((o) => { const p = pickForDate(o.pick, party?.date); return p === o.pick ? o : { ...o, pick: p }; });
+  }, [party?.date, out.pick?.closesFor, setOut]);
 
   const people = Math.max(1, party?.guests || 1);
-  const venues = useMemo(() => rankVenues(state.venues?.venues || [], {
+  const venues = useMemo(() => rankVenues(list.venues?.venues || [], {
     budgetPerHead: out.perHead, people, bigGroup: out.bigGroup, kind, details: seen, date: party?.date, fitsOnly,
     extraPerHead: kind === "byob" ? (liquorTotal || 0) / people : 0,
-  }), [state.venues, out.perHead, people, out.bigGroup, kind, seen, party?.date, fitsOnly, liquorTotal]);
+  }), [list.venues, out.perHead, people, out.bigGroup, kind, seen, party?.date, fitsOnly, liquorTotal]);
 
   // Distances from you, or from the city's centre without GPS.
   const centre = CITY_COORDS[city];
   const origin = loc?.lat != null ? { lat: loc.lat, lon: loc.lon, label: "you" } : centre ? { lat: centre[0], lon: centre[1], label: `${cityName(city)}'s centre` } : null;
-  const allEvents = useMemo(() => eventsForDate(state.events?.events || [], party?.date, origin, null, { budgetPerHead: out.perHead }),
-    [state.events, party?.date, origin?.lat, origin?.lon, out.perHead]);
+  const allEvents = useMemo(() => eventsForDate(list.events?.events || [], party?.date, origin, null, { budgetPerHead: out.perHead }),
+    [list.events, party?.date, origin?.lat, origin?.lon, out.perHead]);
   const nearEvents = allEvents.filter((e) => e.km == null || e.km <= MAX_KM);
   const events = wide ? allEvents : nearEvents;
   const farCount = allEvents.length - nearEvents.length;
@@ -80,28 +92,32 @@ export default function OutTab({
   const onVenueLoaded = useCallback((v, d) => {
     setSeen((s) => ({ ...s, [venueKey(v)]: d }));
     setOut((o) => (o.pick?.type === "venue" && venueKey(o.pick) === venueKey(v)
-      ? { ...o, pick: venuePick({ ...o.pick, ...v }, d, { kind: o.pick.outKind || kind, date: party?.date }) }
+      ? { ...o, pick: venuePick(o.pick, d, { kind: o.pick.kind || kind, date: party?.date }) }
       : o));
   }, [setOut, kind, party?.date]);
   const onEventLoaded = useCallback((e, d) => {
+    setSeenEvents((s) => ({ ...s, [e.slug]: d }));
     setOut((o) => (o.pick?.type === "event" && o.pick.slug === e.slug
       ? { ...o, pick: freshEventPick(o.pick, d), tickets: refreshTickets(o.tickets, d.tickets) }
       : o));
   }, [setOut]);
   const openPick = (p) => {
-    if (p.type === "venue") setVenueOpen({ v: p, kind: p.outKind || "bar" });
-    else setEventOpen({ e: p, kind: p.outKind || "club" });
+    if (p.type === "venue") setVenueOpen({ v: p, kind: p.kind || "bar" });
+    else setEventOpen({ e: p, kind: p.kind || "club" });
   };
   const pickedVenue = (v) => out.pick?.type === "venue" && venueKey(out.pick) === venueKey(v);
   const pickedEvent = (e) => out.pick?.type === "event" && out.pick.slug === e.slug;
 
-  const listed = state.venues || state.events;
-  const fresh = listed && (
+  const listed = list.venues || list.events;
+  const fresh = listed && !noPages && (
     <button className="link" onClick={() => { tap(); load(true); }}>↻ {listed.fromCache ? ageStr(listed.fetchedAt) : "Refresh"}</button>
   );
   const rule = kind === "byob" ? byobRule(city) : null;
-  const where = state.venues?.local && loc ? (loc.label || "you") : cityName(city);
+  const note = K.source === "zomato" && list.venues ? venueListNote({ kind, zcity, notFound: list.venues.notFound }) : "";
+  const where = list.venues?.local && loc ? (loc.label || "you") : cityName(city);
   const bigHint = out.bigGroup && K.source === "zomato" && venues.length > 0 && !venues.some((v) => v.big);
+  const total = list.venues?.total;
+  const shown = list.venues?.venues?.length || 0;
 
   return (
     <div>
@@ -128,10 +144,11 @@ export default function OutTab({
       </div>
 
       {rule?.text && <div className="note note-warn" style={{ marginBottom: 12 }}>{rule.text}</div>}
+      {note && <div className="note note-info" style={{ marginBottom: 12 }}>{note}</div>}
 
-      {!state.loading && ((out.perHead > 0 && K.source === "zomato") || (K.source === "district" && farCount > 0)) && (
+      {!list.loading && ((out.perHead > 0 && K.source === "zomato" && shown > 0) || (K.source === "district" && farCount > 0)) && (
         <div className="ot-filters">
-          {out.perHead > 0 && K.source === "zomato" && (
+          {out.perHead > 0 && K.source === "zomato" && shown > 0 && (
             <button className={`chip ${fitsOnly ? "on" : ""}`} onClick={() => { tap(); setFitsOnly((f) => !f); }}>Within budget only</button>
           )}
           {K.source === "district" && farCount > 0 && (
@@ -142,17 +159,17 @@ export default function OutTab({
         </div>
       )}
 
-      {state.loading && <Skeleton h={104} n={4} />}
+      {list.loading && <Skeleton h={104} n={4} />}
 
-      {state.error && (
+      {list.error && (
         <div className="empty">
           <div className="t">Couldn't reach {K.source === "district" ? "District" : "Zomato"}</div>
-          <div className="small" style={{ marginBottom: 14 }}>{state.error}</div>
-          <button className="btn btn-ghost" onClick={() => load(true)}>↻ Try again</button>
+          <div className="small" style={{ marginBottom: 14 }}>{list.error}</div>
+          <button className="btn btn-ghost" onClick={() => { tap(); load(true); }}>↻ Try again</button>
         </div>
       )}
 
-      {K.source === "zomato" && state.venues && (
+      {K.source === "zomato" && list.venues && (
         <>
           {bigHint && <div className="tiny muted ot-hint">Open a few places — the ones District lists with group seating or private dining move up.</div>}
           {venues.map((v, i) => (
@@ -161,18 +178,24 @@ export default function OutTab({
           ))}
           {!venues.length && (
             <div className="empty">
-              <div className="t">{fitsOnly && state.venues.venues?.length ? "Nothing within your budget" : "No places on this list"}</div>
-              <div className="small">{fitsOnly && state.venues.venues?.length ? "Turn off “Within budget only” to see them all." : `Zomato didn't list any ${kind === "byob" ? "BYOB places" : "bars"} for ${where} just now.`}</div>
+              <div className="t">{fitsOnly && shown ? "Nothing within your budget" : "No places on this list"}</div>
+              <div className="small">
+                {fitsOnly && shown ? "Turn off “Within budget only” to see them all."
+                  : list.venues.notFound ? `Zomato doesn't have this list for ${cityName(city)} — try it on Zomato, or pick another kind of night.`
+                    : `Zomato didn't list any ${kind === "byob" ? "BYOB places" : "bars"} for ${where} just now.`}
+              </div>
             </div>
           )}
           <div className="ot-list-foot">
-            <span className="tiny dim">Costs are each venue's "for two" estimate. Offers apply when you pay through District.</span>
-            {state.venues.url && <button className="btn btn-ghost btn-sm" onClick={() => { tap(); openUrl(state.venues.url); }}>More on Zomato <Icon.external size={14} /></button>}
+            <span className="tiny dim">
+              {total > shown ? `${shown} of ${total.toLocaleString("en-IN")} on Zomato. ` : ""}Costs are each venue's "for two" estimate. Offers apply when you pay through District.
+            </span>
+            {list.venues.url && <button className="btn btn-ghost btn-sm" onClick={() => { tap(); openUrl(list.venues.url); }}>More on Zomato <Icon.external size={14} /></button>}
           </div>
         </>
       )}
 
-      {K.source === "district" && state.events && (
+      {K.source === "district" && list.events && (
         noPages ? (
           <div className="empty">
             <div className="t">No {K.label.toLowerCase()} listed here</div>
@@ -193,7 +216,7 @@ export default function OutTab({
             )}
             <div className="ot-list-foot">
               <span className="tiny dim">"From" is the cheapest ticket District lists now; fees and GST come at checkout. Distances from {origin?.label || "the city"}.</span>
-              <button className="btn btn-ghost btn-sm" onClick={() => { tap(); openDistrict({ web: state.events.urls?.[0] }); }}>More in District <Icon.external size={14} /></button>
+              <button className="btn btn-ghost btn-sm" onClick={() => { tap(); openDistrict({ web: list.events.urls?.[0] }); }}>More in District <Icon.external size={14} /></button>
             </div>
           </>
         )
@@ -201,11 +224,13 @@ export default function OutTab({
 
       {venueOpen && (
         <VenueSheet key={venueKey(venueOpen.v)} v={venueOpen.v} kind={venueOpen.kind} city={city} party={party} out={out} setOut={setOut}
-          liquorLines={liquorLines} customDry={customDry} openFill={openFill} toast={toast} onLoaded={onVenueLoaded} onClose={() => setVenueOpen(null)} />
+          liquorLines={liquorLines} customDry={customDry} openFill={openFill} toast={toast} initial={seen[venueKey(venueOpen.v)] || null}
+          onLoaded={onVenueLoaded} onClose={() => setVenueOpen(null)} />
       )}
       {eventOpen && (
         <EventSheet key={eventOpen.e.slug} e={eventOpen.e} kind={eventOpen.kind} city={city} party={party} setParty={setParty} origin={origin}
-          out={out} setOut={setOut} customDry={customDry} toast={toast} onLoaded={onEventLoaded} onClose={() => setEventOpen(null)} />
+          out={out} setOut={setOut} customDry={customDry} toast={toast} initial={seenEvents[eventOpen.e.slug] || null}
+          onLoaded={onEventLoaded} onClose={() => setEventOpen(null)} />
       )}
     </div>
   );

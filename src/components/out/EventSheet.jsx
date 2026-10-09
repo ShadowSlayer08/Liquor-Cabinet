@@ -1,63 +1,67 @@
 // [v1.5 · Out] A club night or food & drink event, read from its District page when you open it
-// (lib/outSources.js fetchEvent): its shows (the party's night preselected), the organiser's
-// door rules — kept apart from the state's legal age — and the tickets District sells, exact
-// as of now, with what each name says (couple, group of 5…), cover vs entry fee and any gate
-// cover the event's text mentions. You plan how many of each here; you buy them in District.
+// (lib/outSources.js fetchEvent): its shows (the picked one, else the party's night, preselected),
+// the organiser's door rules — kept apart from the state's legal age — and the tickets District
+// sells for the chosen show (district.js ticketsForShow: a weekly night lists each ticket once),
+// exact as of now, with what each name says (couple, group of 5…), cover vs entry fee and any
+// gate cover the event's text mentions. You plan how many of each here; you buy them in District.
 import { useEffect, useMemo, useState } from "react";
 import Sheet, { Qty, Skeleton } from "../Sheet.jsx";
 import DryDayBanner from "../DryDayBanner.jsx";
 import { fetchEvent } from "../../lib/outSources.js";
-import { eventUrl } from "../../lib/parse/district.js";
-import { ageFor } from "../../lib/age.js";
+import { eventUrl, ticketsForShow } from "../../lib/parse/district.js";
+import { ageLine } from "../../lib/age.js";
 import {
   showFor, alignParty, eventPick, eventWhenText, eventPriceText, doorRules, ticketKindLabel, serviceText, gateCoverText,
-  ticketPeople, gateCoverTotal, planTicket, clampQty, feeText, ageLine, kmText, kmBetween, istDate, directionsUrl,
+  ticketPeople, gateCoverTotal, plannedTickets, clampQty, feeText, kmText, kmBetween, onNight, directionsUrl,
 } from "../../lib/out.js";
 import { prettyTime, clockOf } from "../../lib/when.js";
 import { fmt, ageStr } from "../../lib/format.js";
 import { openDistrict, openUrl, tap } from "../../lib/order.js";
 import { Icon, VenueArt } from "../Art.jsx";
 
-export default function EventSheet({ e, kind, city, party, setParty, origin, out, setOut, customDry, toast, onLoaded, onClose }) {
-  const [state, setState] = useState({ loading: true });
-  const [show, setShow] = useState(-1);
+export default function EventSheet({ e, kind, city, party, setParty, origin, out, setOut, customDry, toast, initial = null, onLoaded, onClose }) {
   const isPick = out.pick?.type === "event" && out.pick.slug === e.slug;
+  const pickedStart = isPick ? out.pick.start : "";
+  const [state, setState] = useState(() => (initial ? { d: initial } : { loading: true }));
+  const [show, setShow] = useState(() => (initial ? showFor(initial.shows, party?.date, Date.now(), pickedStart) : -1));
   const [qty, setQty] = useState(() => (isPick ? Object.fromEntries((out.tickets || []).map((t) => [t.id, t.qty])) : {}));
 
   const load = (force = false) => {
-    setState({ loading: true });
+    setState((s) => (s.d ? s : { loading: true }));
     fetchEvent(e.slug, { force })
       .then((d) => {
         if (!d) throw new Error("Nothing readable on the page");
         setState({ d });
-        setShow((cur) => (cur >= 0 && cur < (d.shows?.length || 0) ? cur : showFor(d.shows, party?.date)));
+        setShow((cur) => (cur >= 0 && cur < (d.shows?.length || 0) ? cur : showFor(d.shows, party?.date, Date.now(), pickedStart)));
         onLoaded?.(e, d);
       })
-      .catch((err) => setState({ error: err?.message || "Couldn't read the page" }));
+      .catch((err) => setState((s) => (s.d ? s : { error: err?.message || "Couldn't read the page" })));
   };
   useEffect(() => { load(false); }, [e.slug]);
 
   const d = state.d;
-  const tickets = d?.tickets || [];
-  const s = d?.shows?.[show] || null;
-  const planned = useMemo(() => tickets.filter((t) => (qty[t.id] || 0) > 0).map((t) => planTicket(t, qty[t.id])), [tickets, qty]);
+  const shows = d?.shows || [];
+  const s = shows[show] || null;
+  const tickets = useMemo(() => (d ? ticketsForShow(d, show) : []), [d, show]);
+  const planned = useMemo(() => plannedTickets(tickets, qty), [tickets, qty]);
   const plannedCost = planned.reduce((sum, t) => sum + t.price * t.qty, 0);
   const plannedGate = planned.reduce((sum, t) => sum + gateCoverTotal(t), 0);
   const plannedHeads = planned.reduce((sum, t) => sum + ticketPeople(t) * t.qty, 0);
+  const plannedCount = planned.reduce((x, t) => x + t.qty, 0);
   const people = Math.max(1, party?.guests || 1);
   const place = { lat: d?.lat ?? e.lat, lon: d?.lon ?? e.lon };
   const km = e.km ?? kmBetween(origin, place);
   const directions = directionsUrl(place.lat, place.lon);
   const rules = doorRules(d?.rules);
-  const legal = ageLine(ageFor(city));
   const move = s ? alignParty(s, party) : null;
+  const soldOut = !!(s?.soldOut || (d?.soldOut && !tickets.some((t) => t.buyable)));
   const asOf = d?.fetchedAt ? (Date.now() - d.fetchedAt < 12 * 3600000 ? prettyTime(clockOf(new Date(d.fetchedAt))) : ageStr(d.fetchedAt)) : "";
 
   const setQ = (t, want) => {
     const next = { ...qty, [t.id]: clampQty(t, want, qty[t.id] || 0) };
     setQty(next);
     tap();
-    if (isPick) setOut((o) => ({ ...o, tickets: tickets.filter((x) => next[x.id] > 0).map((x) => planTicket(x, next[x.id])) }));
+    if (isPick) setOut((o) => ({ ...o, tickets: plannedTickets(tickets, next) }));
   };
 
   const makeParty = () => {
@@ -71,6 +75,7 @@ export default function EventSheet({ e, kind, city, party, setParty, origin, out
     onClose();
   };
 
+  const where = d?.address || [d?.venue || e.venue, d?.locality || e.locality].filter(Boolean).join(", ");
   return (
     <Sheet title={d?.name || e.name} subtitle={[d?.venue || e.venue, kmText(km)].filter(Boolean).join(" · ") || null} onClose={onClose} footer={
       <div className="ot-foot">
@@ -79,7 +84,7 @@ export default function EventSheet({ e, kind, city, party, setParty, origin, out
         </button>
         <div className="row">
           {directions && <button className="btn btn-ghost btn-sm" onClick={() => openUrl(directions)}><Icon.route size={15} /> Directions</button>}
-          <button className={`btn btn-sm grow ${isPick ? "btn-ghost" : "btn-gold"}`} disabled={state.loading} onClick={makeParty}>
+          <button className={`btn btn-sm grow ${isPick ? "btn-ghost" : "btn-gold"}`} disabled={!!state.loading} onClick={makeParty}>
             {isPick ? <><Icon.check size={14} /> The party · update</> : "Make this the party"}
           </button>
         </div>
@@ -88,9 +93,10 @@ export default function EventSheet({ e, kind, city, party, setParty, origin, out
       <div className="ot-sheet-hero">
         <VenueArt kind={kind === "club" ? "club" : "events"} size={64} />
         <div className="grow">
-          <div className="h3">{eventPriceText(d?.priceFrom ?? e.priceFrom)}</div>
-          <div className="tiny muted">{d?.address || [e.venue, e.locality].filter(Boolean).join(", ")}</div>
+          <div className="h3">{eventPriceText(d?.priceFrom ?? e.priceFrom)}{soldOut && <span className="pill ot-pill-over ot-pill-inline">Sold out</span>}</div>
+          {where && <div className="tiny muted">{where}</div>}
           {km != null && <div className="tiny dim">{kmText(km)} from {origin?.label || "you"}</div>}
+          {d?.organizer && <div className="tiny dim">By {d.organizer}</div>}
         </div>
       </div>
 
@@ -110,30 +116,35 @@ export default function EventSheet({ e, kind, city, party, setParty, origin, out
       {d && (
         <>
           <div className="ot-sec">
-            <div className="ot-sec-head"><span className="kicker">{(d.shows?.length || 0) > 1 ? "Pick a show" : "When"}</span>{s && istDate(s.start) === party?.date && <span className="tiny gold">your date</span>}</div>
-            {(d.shows?.length || 0) > 1 ? (
+            <div className="ot-sec-head">
+              <span className="kicker">{shows.length > 1 ? "Pick a show" : "When"}</span>
+              {s && onNight(s.start, s.end, party?.date) && <span className="tiny gold">your date</span>}
+            </div>
+            {shows.length > 1 ? (
               <div className="chips ot-shows">
-                {d.shows.map((x, i) => (
-                  <button key={`${x.start}-${i}`} className={`chip ${i === show ? "on" : ""}`} onClick={() => setShow(i)}>{eventWhenText(x.start, x.end)}</button>
+                {shows.map((x, i) => (
+                  <button key={`${x.start}-${i}`} className={`chip ${i === show ? "on" : ""} ${x.soldOut ? "ot-show-out" : ""}`} onClick={() => { tap(); setShow(i); }}>
+                    {eventWhenText(x.start, x.end)}{x.soldOut ? " · sold out" : ""}
+                  </button>
                 ))}
               </div>
             ) : <div className="small soft">{s ? eventWhenText(s.start, s.end) : eventWhenText(e.start, e.end) || "Date on District"}</div>}
             {move && <div className="tiny gold" style={{ marginTop: 6 }}>Not on your party date — making it the party moves the date to {eventWhenText(s.start, s.end)}.</div>}
           </div>
 
-          <DryDayBanner mode="bars" date={move?.date || party?.date} city={city} customDry={customDry} style={{ marginBottom: 12 }} />
+          <DryDayBanner mode="bars" date={move?.date || party?.date} city={city} customDry={customDry} compact style={{ marginBottom: 12 }} />
 
-          {(rules.length > 0 || legal) && (
-            <div className="ot-sec">
-              <div className="ot-sec-head"><span className="kicker">At the door</span><span className="tiny dim">organiser's rules</span></div>
-              {rules.length > 0 && <div className="ot-rules">{rules.map((r) => <span key={r} className="pill ot-pill-why">{r}</span>)}</div>}
-              {legal && <div className="tiny muted" style={{ marginTop: 6 }}>{legal}</div>}
-            </div>
-          )}
+          <div className="ot-sec">
+            <div className="ot-sec-head"><span className="kicker">At the door</span>{rules.length > 0 && <span className="tiny dim">organiser's rules</span>}</div>
+            {rules.length > 0
+              ? <div className="ot-rules">{rules.map((r) => <span key={r} className="pill ot-pill-why">{r}</span>)}</div>
+              : <div className="small muted">The organiser lists no door rules — the venue still decides entry.</div>}
+            <div className="tiny muted" style={{ marginTop: 6 }}><Icon.idcard size={12} className="out-inline-icon" /> {ageLine(city)}</div>
+          </div>
 
           <div className="ot-sec">
             <div className="ot-sec-head"><span className="kicker">Tickets</span>{asOf && <span className="tiny dim">as of {asOf}</span>}</div>
-            {!tickets.length && <div className="small muted">District doesn't show tickets for this one right now — open it in District.</div>}
+            {!tickets.length && <div className="small muted">District doesn't show tickets for this {shows.length > 1 ? "show" : "one"} right now — open it in District.</div>}
             {tickets.map((t) => {
               const n = qty[t.id] || 0, kindLabel = ticketKindLabel(t);
               return (
@@ -147,7 +158,7 @@ export default function EventSheet({ e, kind, city, party, setParty, origin, out
                       <b className="gold">{t.price ? fmt(t.price) : "Free"}</b>
                       {serviceText(t.service) && <span className="muted"> · {serviceText(t.service)}</span>}
                     </div>
-                    {t.gateCover && <div className="tiny" style={{ color: "#f6d9a8" }}>{gateCoverText(t.gateCover)}</div>}
+                    {t.gateCover && <div className="tiny ot-gate">{gateCoverText(t.gateCover)}</div>}
                     {!t.buyable && <div className="tiny red">Sold out or not on sale</div>}
                     {t.description && <div className="tiny dim clamp2">{t.description}</div>}
                   </div>
@@ -159,7 +170,7 @@ export default function EventSheet({ e, kind, city, party, setParty, origin, out
             })}
             {planned.length > 0 && (
               <div className="ot-planned">
-                <div className="between small"><span className="soft">Planned: {planned.reduce((x, t) => x + t.qty, 0)} ticket(s) · lets in {plannedHeads} of {people}</span><b>{fmt(plannedCost)}</b></div>
+                <div className="between small"><span className="soft">Planned: {plannedCount} ticket{plannedCount === 1 ? "" : "s"} · lets in {plannedHeads} of {people}</span><b>{fmt(plannedCost)}</b></div>
                 {plannedGate > 0 && <div className="between tiny"><span className="muted">+ at the gate (event's text)</span><span>{fmt(plannedGate)}</span></div>}
               </div>
             )}
