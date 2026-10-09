@@ -112,6 +112,13 @@ export const Icon = {
   glass: (p) => <I {...p}><path d="M6 4h12l-1.5 7a4.5 4.5 0 0 1-9 0z" /><path d="M12 15.5V20M8.5 20h7" /></I>,
   cocktail: (p) => <I {...p}><path d="M4 5h16l-8 8.5z" /><path d="M12 13.5V20M8.5 20h7" /><path d="M13.5 9.5L18 3.5" /><circle cx="15.2" cy="7.2" r="1.1" /></I>,
   clock: (p) => <I {...p}><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></I>,
+  // v1.5 Out tab
+  ticket: (p) => <I {...p}><path d="M4 7.5A1.5 1.5 0 0 1 5.5 6h13A1.5 1.5 0 0 1 20 7.5V10a2 2 0 0 0 0 4v2.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 16.5V14a2 2 0 0 0 0-4z" /><path d="M14.5 6.5v11" strokeDasharray="1.6 2" /></I>,
+  phone: (p) => <I {...p}><path d="M6.5 3.5h3l1.5 4-2 1.3a10 10 0 0 0 6.2 6.2l1.3-2 4 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.5 5.7a2 2 0 0 1 2-2.2z" /></I>,
+  route: (p) => <I {...p}><circle cx="6" cy="18" r="2.2" /><circle cx="18" cy="6" r="2.2" /><path d="M8.2 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.8" /></I>,
+  users: (p) => <I {...p}><circle cx="9" cy="8.5" r="3.2" /><path d="M3.5 19.5a5.5 5.5 0 0 1 11 0" /><path d="M15.5 5.6a3.2 3.2 0 0 1 0 5.8M17 14.4a5.5 5.5 0 0 1 3.5 5.1" /></I>,
+  calendar: (p) => <I {...p}><rect x="4" y="5.5" width="16" height="14.5" rx="2.5" /><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" /></I>,
+  idcard: (p) => <I {...p}><rect x="3" y="5.5" width="18" height="13" rx="2.5" /><circle cx="8.5" cy="11" r="2" /><path d="M5.8 15.5a2.8 2.8 0 0 1 5.4 0M14 10h4.5M14 13.5h3" /></I>,
   star: (p) => <svg width={p?.size || 12} height={p?.size || 12} viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.8l2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17.1l-5.7 3.2 1.2-6.4L2.8 9.5l6.4-.8z" /></svg>,
 };
 
@@ -133,6 +140,74 @@ export function Ring({ value, size = 96, stroke = 9, label, sub, color }) {
         style={{ transition: "stroke-dashoffset 1s cubic-bezier(.2,.8,.2,1)", filter: "drop-shadow(0 0 6px rgba(231,168,70,.45))" }} />
       <text x={c} y={c + (sub ? -2 : 5)} textAnchor="middle" fill="#f8f0e3" fontSize={size * 0.22} fontWeight="700" fontFamily="Outfit Variable, system-ui">{label}</text>
       {sub && <text x={c} y={c + size * 0.16} textAnchor="middle" fill="#a39581" fontSize={size * 0.1} letterSpacing="1.5" fontFamily="Outfit Variable, system-ui">{sub}</text>}
+    </svg>
+  );
+}
+
+// ── Out tab: one illustration per outing type ───────────────────────────────
+// Venues and events never show photos (no image hosts, and the owner's choice), so each
+// card gets a small lit tile instead: a pint for bars, a mirror ball for club nights, a
+// bottle and glass for BYOB, a ticket for food & drink events.
+const VENUE_TINT = { bar: ["#c97a22", "#3a2008"], club: ["#8a3bb8", "#1d0a2b"], byob: ["#2f9e6a", "#0b2a1b"], events: ["#cc4762", "#33101a"] };
+
+export function VenueArt({ kind = "bar", size = 56 }) {
+  const id = useId().replace(/:/g, "");
+  const [c1, c2] = VENUE_TINT[kind] || VENUE_TINT.bar;
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true" style={{ flexShrink: 0, display: "block" }}>
+      <defs>
+        <linearGradient id={`v${id}`} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={c1} /><stop offset="1" stopColor={c2} /></linearGradient>
+        <radialGradient id={`h${id}`} cx=".5" cy=".28" r=".7"><stop offset="0" stopColor="#fff" stopOpacity=".26" /><stop offset="1" stopColor="#fff" stopOpacity="0" /></radialGradient>
+        <clipPath id={`b${id}`}><circle cx="32" cy="34" r="15" /></clipPath>
+      </defs>
+      <rect width="64" height="64" rx="16" fill={`url(#v${id})`} />
+      <rect width="64" height="64" rx="16" fill={`url(#h${id})`} />
+      {kind === "bar" && (
+        <g>
+          <path d="M40 28h4.5a4.5 4.5 0 0 1 4.5 4.5v6a4.5 4.5 0 0 1-4.5 4.5H40" fill="none" stroke="#fff3da" strokeWidth="3.4" />
+          <rect x="17" y="23" width="24" height="28" rx="3.5" fill="#f2b33d" />
+          <rect x="20.5" y="27" width="3" height="20" rx="1.5" fill="#fff" opacity=".35" />
+          <circle cx="31" cy="40" r="1.3" fill="#fff6dc" opacity=".6" /><circle cx="35" cy="33" r="1" fill="#fff6dc" opacity=".6" /><circle cx="28" cy="45" r=".9" fill="#fff6dc" opacity=".6" />
+          <circle cx="20.5" cy="22" r="5" fill="#fff8ea" /><circle cx="29" cy="19.5" r="6.2" fill="#fff8ea" /><circle cx="37.5" cy="22" r="5" fill="#fff8ea" />
+          <rect x="16" y="21" width="26" height="4" fill="#fff8ea" />
+        </g>
+      )}
+      {kind === "club" && (
+        <g>
+          <path d="M32 8v11" stroke="#efe4ff" strokeWidth="1.6" />
+          <circle cx="32" cy="34" r="15" fill="#d8d2ec" />
+          <g clipPath={`url(#b${id})`} stroke="#7d6fa6" strokeWidth="1" fill="none" opacity=".75">
+            <path d="M17 27h30M17 34h30M17 41h30" />
+            <ellipse cx="32" cy="34" rx="5.5" ry="15" /><ellipse cx="32" cy="34" rx="11" ry="15" />
+          </g>
+          <circle cx="32" cy="34" r="15" fill="none" stroke="#fff" strokeOpacity=".35" />
+          <circle cx="26.5" cy="28" r="3.2" fill="#fff" opacity=".85" />
+          <path d="M12 13l1.2 3.2 3.2 1.2-3.2 1.2L12 21.8l-1.2-3.2-3.2-1.2 3.2-1.2z" fill="#fff" opacity=".9" />
+          <path d="M52 44l.9 2.4 2.4.9-2.4.9-.9 2.4-.9-2.4-2.4-.9 2.4-.9z" fill="#fff" opacity=".85" />
+          <path d="M51 12l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" fill="#fff" opacity=".7" />
+        </g>
+      )}
+      {kind === "byob" && (
+        <g>
+          <rect x="20" y="10" width="7" height="5" rx="1.2" fill="#c9924f" />
+          <path d="M20 14.5h7V21c0 2 3 3.5 3 7.5V50a3 3 0 0 1-3 3h-7a3 3 0 0 1-3-3V28.5c0-4 3-5.5 3-7.5z" fill="#3fbf83" />
+          <path d="M20 14.5h7V21c0 2 3 3.5 3 7.5V50a3 3 0 0 1-3 3h-7a3 3 0 0 1-3-3V28.5c0-4 3-5.5 3-7.5z" fill="#000" opacity=".18" />
+          <rect x="18.5" y="33" width="10" height="11" rx="1.5" fill="#fff6e3" />
+          <rect x="20.5" y="36.5" width="6" height="1.6" rx=".8" fill="#2f9e6a" />
+          <rect x="19.5" y="24" width="2" height="24" rx="1" fill="#fff" opacity=".3" />
+          <path d="M35 29h15c0 7.5-3.4 11.5-7.5 11.5S35 36.5 35 29z" fill="#e0567a" />
+          <path d="M35 29h15c0 7.5-3.4 11.5-7.5 11.5S35 36.5 35 29z" fill="none" stroke="#fff3da" strokeWidth="1.4" />
+          <path d="M42.5 40.5V50M38 50.5h9" stroke="#fff3da" strokeWidth="1.8" strokeLinecap="round" />
+        </g>
+      )}
+      {kind === "events" && (
+        <g transform="rotate(-12 32 32)">
+          <path d="M11 21h42v7.5a3.5 3.5 0 0 0 0 7V43H11v-7.5a3.5 3.5 0 0 0 0-7z" fill="#ffe6b8" />
+          <path d="M42 22.5v19" stroke="#cc4762" strokeWidth="1.4" strokeDasharray="2 2.2" />
+          <path d="M26.5 25.5l1.9 3.9 4.3.6-3.1 3 .7 4.3-3.8-2-3.8 2 .7-4.3-3.1-3 4.3-.6z" fill="#cc4762" />
+          <rect x="45" y="27" width="4" height="10" rx="1" fill="#cc4762" opacity=".35" />
+        </g>
+      )}
     </svg>
   );
 }
