@@ -75,10 +75,15 @@ export default function OutTab({
   }, [party?.date, out.pick?.closesFor, setOut]);
 
   const people = Math.max(1, party?.guests || 1);
-  const venues = useMemo(() => rankVenues(list.venues?.venues || [], {
+  // Without a zone, Zomato answers with its default area (central Delhi for NCR) and measures
+  // distances from there: they say nothing about you, so they're dropped rather than shown.
+  const local = !!(list.venues?.local && loc);
+  const listVenues = useMemo(() => (local ? list.venues?.venues || [] : (list.venues?.venues || []).map((v) => ({ ...v, distanceKm: null }))),
+    [list.venues, local]);
+  const venues = useMemo(() => rankVenues(listVenues, {
     budgetPerHead: out.perHead, people, bigGroup: out.bigGroup, kind, details: seen, date: party?.date, fitsOnly,
     extraPerHead: (liquorTotal || 0) / people,   // counted only at BYOB places
-  }), [list.venues, out.perHead, people, out.bigGroup, kind, seen, party?.date, fitsOnly, liquorTotal]);
+  }), [listVenues, out.perHead, people, out.bigGroup, kind, seen, party?.date, fitsOnly, liquorTotal]);
 
   // Distances from you, or from the city's centre without GPS.
   const centre = CITY_COORDS[city];
@@ -117,7 +122,7 @@ export default function OutTab({
   const rule = kind === "byob" ? byobRule(city) : null;
   const notFound = !!list.venues?.notFound;   // Zomato has no such page for the city (the empty state says so)
   const note = K.source === "zomato" && list.venues && !notFound ? venueListNote({ kind, zcity }) : "";
-  const where = list.venues?.local && loc ? (loc.label || "you") : cityName(city);
+  const where = local ? (loc.label || "you") : zcity === "ncr" ? "Delhi NCR" : cityName(city);
   const bigHint = out.bigGroup && K.source === "zomato" && venues.length > 0 && !venues.some((v) => v.big);
   const total = list.venues?.total;
   const shown = list.venues?.venues?.length || 0;
@@ -140,7 +145,7 @@ export default function OutTab({
         <div className="grow" style={{ minWidth: 0 }}>
           <div className="kicker">{K.emoji} {K.label}</div>
           <div className="h2 ellipsis">
-            {K.source === "zomato" ? <>Near <em>{where}</em></> : onDate ? <>{onDate} on <em>{prettyDate(party?.date)}</em></> : <>Coming <em>up</em></>}
+            {K.source === "zomato" ? <>{local ? "Near" : "Across"} <em>{where}</em></> : onDate ? <>{onDate} on <em>{prettyDate(party?.date)}</em></> : <>Coming <em>up</em></>}
           </div>
         </div>
         {fresh}
