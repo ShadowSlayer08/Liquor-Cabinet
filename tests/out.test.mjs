@@ -6,12 +6,12 @@ import {
   istDate, istClock, onNight, dayHours, hoursText, closedOn, weekday, showFor, showOver, alignParty, venuePick, pickForDate, eventPick, timingText,
   doorRules, stagText, ticketKindLabel, serviceText, gateCoverText, ticketPeople, gateCoverTotal, planTicket, plannedTickets, clampQty,
   refreshTickets, bottlesOf, isByobPick, venueKey, costForTwoText, eventPriceText, feeText, venueListNote, pickNote,
-  offerText, eventWhenText, freshEventPick, directionsUrl,
+  offerText, eventWhenText, freshEventPick, directionsUrl, ticketKey, matchTicket, qtyFromPlan, ticketsForStart, outForDate, RUN_REASON,
 } from "../src/lib/out.js";
 import { DEFAULT_OUT } from "../src/lib/outModel.js";
 import { leaveBy, closesAt, lastCallFor, LEAVE_MAX_KM } from "../src/lib/reminderPlan.js";
 import { clockOf } from "../src/lib/when.js";
-import { parseVenuePage, parseEventPage, parseEventList, ticketsForShow } from "../src/lib/parse/district.js";
+import { parseVenuePage, parseEventPage, parseEventList, parseEventData, ticketsForShow } from "../src/lib/parse/district.js";
 import { parseVenueListPage } from "../src/lib/parse/zomato.js";
 
 const fx = (f) => readFileSync(new URL(`./fixtures/district/${f}`, import.meta.url), "utf8");
@@ -64,6 +64,11 @@ test("venues: bottles you bring count against a BYOB budget", () => {
   assert.equal(ebowla.perHead, 1100);
   assert.equal(ebowla.fit, "over");
   assert.ok(ebowla.reasons.includes("BYOB: bring your Cabinet"));
+  // on the bars list the bottles count only where District lists BYOB, as in the night's cost lines
+  const details = { "ncr/club-ebowla-byob-sector-30-gurgaon": { amenities: ["BYOB"], hours: [] } };
+  const bars = rankVenues(VENUES, { budgetPerHead: 1000, kind: "bar", extraPerHead: 600, details });
+  assert.equal(bars.find((r) => r.resId === 5).perHead, 1100);
+  assert.equal(bars.find((r) => r.resId === 2).perHead, 600, "a bar that isn't BYOB: no bottles to bring");
 });
 
 test("venues: reasons say why — budget, distance, BYOB, bookings", () => {
@@ -194,6 +199,14 @@ test("pickForDate redoes a venue's closing time for a new date, and leaves every
   assert.equal(pickForDate(ev, "2026-10-12"), ev);
   assert.equal(pickForDate(null, party.date), null);
   assert.equal(pickForDate(p, null), p);
+  // the whole cfg.out, for App's setOut: the same object when nothing changes
+  const out = { ...DEFAULT_OUT, active: true, pick: p };
+  assert.equal(outForDate(out, party.date), out);
+  const moved = outForDate(out, "2026-10-12");
+  assert.deepEqual([moved.pick.closes, moved.active], ["02:00", true]);
+  assert.equal(outForDate(DEFAULT_OUT, party.date), DEFAULT_OUT);
+  // the reminders follow: a Monday party's last call is 1:15 am, not Saturday's 2:15
+  assert.equal(clockOf(lastCallFor({ ...party, date: "2026-10-12" }, moved)), "01:15");
 });
 
 // ── Events ──────────────────────────────────────────────────────────────────
@@ -228,22 +241,28 @@ test("events: the 25 km cut, events already over dropped, the party's night firs
   assert.ok(kmBetween(SEC57, EVENTS[2]) > 25);
   assert.ok(!slugs.includes("over"), "already over");
   assert.ok(slugs.includes("no-pin"), "no map pin: can't tell, so it stays");
-  assert.deepEqual(rows.filter((r) => r.onDate).map((r) => r.slug).sort(), ["month-run", "sat-night", "sat-pricey"]);
-  assert.ok(rows.slice(0, 3).every((r) => r.onDate), "the party's night comes first");
-  // on the night: nearest first; other nights: soonest first
-  assert.deepEqual(slugs, ["sat-pricey", "month-run", "sat-night", "fri-late", "no-pin"]);
+  assert.deepEqual(rows.filter((r) => r.onDate).map((r) => r.slug).sort(), ["sat-night", "sat-pricey"]);
+  assert.ok(rows.slice(0, 2).every((r) => r.onDate), "the party's night comes first");
+  // on the night: nearest first; then the month-long run that takes in the date; other nights: soonest first
+  assert.deepEqual(slugs, ["sat-pricey", "sat-night", "month-run", "fri-late", "no-pin"]);
   const sat = rows.find((r) => r.slug === "sat-night");
   assert.ok(sat.km > 5 && sat.km < 10);
   assert.deepEqual(sat.reasons, ["On your date", kmText(sat.km)]);
+  assert.deepEqual([sat.run, sat.onRun], [false, false]);
+  const run = rows.find((r) => r.slug === "month-run");
+  assert.deepEqual([run.onDate, run.run, run.onRun], [false, true, true]);
+  assert.equal(run.reasons[0], "Runs through your date: check its nights");
+  assert.ok(!run.reasons.includes("On your date"));
   assert.equal(rows.find((r) => r.slug === "no-pin").km, null);
 });
 
 test("events: within the budget a head before the ones over it, on the night", () => {
   const rows = eventsForDate(EVENTS, party.date, SEC57, 25, { now: NOW, budgetPerHead: 2000 });
-  assert.deepEqual(rows.filter((r) => r.onDate).map((r) => r.slug), ["month-run", "sat-night", "sat-pricey"]);
-  assert.deepEqual(rows.map((r) => r.fit).slice(0, 3), ["fits", "fits", "over"]);
-  assert.ok(rows[0].reasons.includes("Free"));
-  assert.ok(rows[1].reasons.includes("Fits ₹2,000 a head"));
+  assert.deepEqual(rows.filter((r) => r.onDate).map((r) => r.slug), ["sat-night", "sat-pricey"]);
+  assert.deepEqual(rows.map((r) => r.fit).slice(0, 3), ["fits", "over", "fits"]);
+  assert.ok(rows[0].reasons.includes("Fits ₹2,000 a head"));
+  assert.equal(rows[2].slug, "month-run", "a free run still comes after the nights that are on the date");
+  assert.ok(rows[2].reasons.includes("Free"));
 });
 
 test("events: no location = no distance cut; a wider radius lets Noida in", () => {
@@ -375,7 +394,7 @@ test("tickets: the qty stepper stays inside District's per-order limits", () => 
   assert.equal(clampQty(t, 0, 3), 0);
 });
 
-test("tickets: planned ones keep their shape and take fresh prices by id", () => {
+test("tickets: planned ones keep their shape and take fresh prices — by id, by name and price, or by a name only one has", () => {
   const t = { id: "a", name: "Couple Entry", price: 2000, min: 1, max: 4, buyable: true, kind: "couple", groupSize: 2, service: "cover", gateCover: null, description: "" };
   const p = planTicket(t, 2);
   assert.deepEqual(p, { id: "a", name: "Couple Entry", price: 2000, qty: 2, kind: "couple", service: "cover", gateCover: null, groupSize: 2 });
@@ -383,6 +402,53 @@ test("tickets: planned ones keep their shape and take fresh prices by id", () =>
   assert.equal(fresh[0].price, 2200);
   assert.equal(fresh[0].qty, 2);
   assert.equal(fresh[1].price, 100);
+  // next week's show: a new id, same name and price
+  const nextWeek = refreshTickets([p], [{ ...t, id: "b" }]);
+  assert.deepEqual([nextWeek[0].id, nextWeek[0].price, nextWeek[0].qty], ["b", 2000, 2]);
+  // a new id and a new price: the only "Couple Entry" there is
+  const moved = refreshTickets([p], [{ ...t, id: "c", name: "COUPLE  ENTRY ", price: 2400 }, { ...t, id: "d", name: "Stag", price: 1500 }]);
+  assert.deepEqual([moved[0].id, moved[0].price], ["c", 2400]);
+  // two of that name at other prices: can't tell which, so the plan stays as it was
+  const two = [{ ...t, id: "e", price: 2400 }, { ...t, id: "f", price: 2600 }];
+  assert.equal(refreshTickets([p], two)[0], p);
+  assert.equal(matchTicket(p, two), null);
+  assert.equal(matchTicket(null, two), null);
+  assert.equal(matchTicket(p, null), null);
+  assert.equal(ticketKey({ name: " Couple  Entry", price: 2000 }), "couple entry|2000");
+  assert.equal(ticketKey({ name: "Guestlist" }), "guestlist|0");
+});
+
+test("tickets: a weekly night's plan survives its first show dropping off the page", () => {
+  // The Inner Room: 7 weekly shows, each with its own ticket ids. A plan made for the third
+  // show (21 Oct) holds the ids of the first (7 Oct), which district.js lists the tickets under.
+  const raw = JSON.parse(fx("event_inner-room.json")).data;
+  const before = parseEventData(raw);
+  const third = before.shows[2].start;
+  const tix = ticketsForStart(before, third);
+  const couple = tix.find((t) => t.name === "COUPLE");
+  const plan = plannedTickets(tix, { [ticketKey(couple)]: 2 });
+  assert.deepEqual(plan.map((t) => [t.name, t.qty, t.price]), [["COUPLE", 2, 2999]]);
+  // a week on, 7 Oct is over and gone: the ticket's id is now the 14 Oct show's
+  const first = Math.min(...raw.venue.shows.map((s) => s.start_utc_timestamp));
+  const after = parseEventData({ ...raw, venue: { ...raw.venue, shows: raw.venue.shows.filter((s) => s.start_utc_timestamp !== first) } });
+  assert.equal(after.shows.length, 6);
+  const now = ticketsForStart(after, third);
+  const again = now.find((t) => t.name === "COUPLE");
+  assert.notEqual(again.id, couple.id, "District's ids moved on");
+  // the sheet still shows the plan, the night-out card's prices still refresh
+  const qty = qtyFromPlan(now, plan);
+  assert.deepEqual(qty, { [ticketKey(again)]: 2 });
+  assert.deepEqual(plannedTickets(now, qty).map((t) => [t.id, t.qty]), [[again.id, 2]]);
+  assert.deepEqual(refreshTickets(plan, now).map((t) => [t.id, t.qty, t.price]), [[again.id, 2, 2999]]);
+  // the picked show, found by its start: it's now the second in the list, not the third
+  assert.equal(showFor(after.shows, "2026-10-03", NOW, third), 1);
+  assert.equal(after.shows[1].start, third);
+  // a show that's no longer listed has no tickets to refresh from; no shows listed = all of them
+  assert.deepEqual(ticketsForStart(after, "2026-10-07T14:30:00.000Z"), []);
+  assert.deepEqual(ticketsForStart({ shows: [], tickets: [couple] }, third), [couple]);
+  assert.deepEqual(ticketsForStart(null, third), []);
+  assert.deepEqual(qtyFromPlan(now, null), {});
+  assert.deepEqual(qtyFromPlan([], plan), { [ticketKey(plan[0])]: 2 }, "nothing to match yet: the plan's own keys");
 });
 
 test("tickets: the plan for a show keeps only what that show sells, with a qty", () => {
@@ -395,12 +461,13 @@ test("tickets: the plan for a show keeps only what that show sells, with a qty",
       { id: "early", name: "Early bird", price: 999, min: 1, max: 10, buyable: true, kind: "general", groupSize: null, shows: [0], buyableIn: [0] },
     ],
   };
-  const qty = { stag: 2, couple: 1, early: 3 };
+  const qty = { "stag|1500": 2, "couple|2500": 1, "early bird|999": 3 };
   assert.deepEqual(plannedTickets(ticketsForShow(details, 1), qty).map((t) => [t.id, t.qty]), [["stag", 2], ["couple", 1]],
     "the early-bird ticket isn't sold for the 10th");
   assert.deepEqual(plannedTickets(ticketsForShow(details, 0), qty).map((t) => t.id), ["couple", "early"],
     "stag is sold out for the 3rd");
-  assert.deepEqual(plannedTickets(ticketsForShow(details, 1), { couple: 0 }), []);
+  assert.deepEqual(plannedTickets(ticketsForShow(details, 1), { "couple|2500": 0 }), []);
+  assert.deepEqual(plannedTickets(ticketsForShow(details, 1), { couple: 1 }), [], "quantities go by name and price, not id");
   assert.deepEqual(plannedTickets(null, qty), []);
   assert.deepEqual(plannedTickets(ticketsForShow(details, 1), null), []);
 });
@@ -416,7 +483,8 @@ test("cost: a bar is the venue's estimate a head, nothing to bring", () => {
   const out = { ...DEFAULT_OUT, active: true, pick: venuePick(VENUES[0], null, { kind: "bar" }) };
   const c = outingCost({ out, party, liquorLines: lines });
   assert.deepEqual(c.lines.map((l) => [l.id, l.kind, l.amount]), [["venue", "estimate", 14000]]);
-  assert.equal(c.lines[0].label, "₹2,800 for two × 10 (the venue's estimate)");
+  // the label multiplies what the amount multiplies: ₹1,400 × 10 = ₹14,000
+  assert.equal(c.lines[0].label, "About ₹1,400 a head × 10 (the venue's ₹2,800 for two, an estimate)");
   assert.equal(c.total, 14000);
   assert.equal(c.perHead, 1400);
   assert.equal(c.unknown, false);
@@ -625,8 +693,8 @@ test("fixtures: making Club Ebowla the party, and what the night costs", () => {
 test("fixtures: an X LIVE night — couple and male passes, the gate cover, the organiser's rules", () => {
   const d = parseEventPage(fx("event_xlive.html"));
   const tix = ticketsForShow(d, 0);
-  const id = (kind) => tix.find((t) => t.kind === kind).id;
-  const planned = plannedTickets(tix, { [id("couple")]: 2, [id("male")]: 1 });
+  const key = (kind) => ticketKey(tix.find((t) => t.kind === kind));
+  const planned = plannedTickets(tix, { [key("couple")]: 2, [key("male")]: 1 });
   const pick = eventPick({ slug: d.slug, name: d.name }, d, d.shows[0], { kind: "club" });
   assert.equal(pick.url, "https://www.district.in/events/giada-brince-xlive-saturday-oct3-2026-buy-tickets");
   assert.deepEqual([pick.ageEntry, pick.stag, pick.venue], [21, "Stag entry is not allowed at this event", "X LIVE"]);
@@ -663,4 +731,23 @@ test("fixtures: Gurugram's club nights near Sector 57, the party's night first",
   const firstOther = rows.findIndex((r) => !r.onDate);
   assert.ok(rows[0].onDate);
   assert.ok(firstOther === -1 || rows.slice(firstOther).every((r) => !r.onDate), "no event on the date after one that isn't");
+});
+
+test("fixtures: Gonzo's karaoke, listed 3 Oct – 16 Dec, isn't 'on your date' for a Saturday", () => {
+  const list = parseEventList(fx("events_nightlife-in-gurgaon.html"));
+  const sat = "2026-10-03";
+  const rows = eventsForDate(list, sat, SEC57, 25, { now: Date.parse("2026-10-02T12:00:00Z") });
+  const karaoke = rows.find((r) => r.slug === "karaoke-night-at-gonzo-oct15-2025");
+  assert.ok(karaoke, "it's within 25 km");
+  assert.deepEqual([karaoke.onDate, karaoke.run, karaoke.onRun], [false, true, true]);
+  assert.equal(karaoke.reasons[0], RUN_REASON);
+  // every single night on the 3rd comes before every run that takes it in
+  const nights = rows.filter((r) => r.onDate), runs = rows.filter((r) => r.onRun);
+  assert.ok(nights.length >= 4 && runs.length >= 1);
+  assert.ok(nights.every((r) => !r.run));
+  const last = Math.max(...nights.map((r) => rows.indexOf(r)));
+  assert.ok(runs.every((r) => rows.indexOf(r) > last));
+  // a run that doesn't take the date in is just another night
+  const corporate = rows.find((r) => r.slug === "corporate-night-feb23-2026");
+  if (corporate) assert.deepEqual([corporate.run, corporate.onRun, corporate.onDate], [true, false, false]);
 });

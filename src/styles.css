@@ -818,6 +818,7 @@ body:has(.share-ask) .toast { bottom: calc(var(--safe-bottom) + var(--nav-h) + 1
 .ot-pill-offer { background: rgba(123, 92, 255, .16); color: #c9bcff; border: 1px solid rgba(123, 92, 255, .3); }
 .ot-pill-why { background: rgba(0, 0, 0, .28); color: var(--soft); border: 1px solid var(--stroke); font-weight: 500; white-space: normal; }
 .ot-pill-date { background: rgba(231, 168, 70, .16); color: var(--gold); }
+.ot-pill-run { background: transparent; color: var(--gold); border: 1px dashed rgba(231, 168, 70, .45); font-weight: 500; }
 .ot-pill-kind { background: rgba(255, 255, 255, .08); color: var(--soft); }
 
 /* Above and below the list */

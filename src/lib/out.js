@@ -18,7 +18,7 @@
 //  Pure (no Capacitor), so node --test covers it. Shapes: lib/outModel.js.
 // ═══════════════════════════════════════════════════════════════════════════════
 import { kmBetween, travelMinutes, outSpend, slimVenue, slimEvent } from "./outModel.js";
-import { venueUrl, eventUrl, closingTime, cleanOffer } from "./parse/district.js";
+import { venueUrl, eventUrl, closingTime, cleanOffer, ticketsForShow } from "./parse/district.js";
 import { leaveBy, closesAt, lastCallFor } from "./reminderPlan.js";
 import { prettyTime, partyStart } from "./when.js";
 import { prettyDate } from "./drydays.js";
@@ -52,6 +52,10 @@ function span(start, end) {
   return { from: s, to: Number.isNaN(e) || e <= s ? s + 4 * HOUR : e };
 }
 
+// A run over several days — a weekly night District lists once for the season, a festival —
+// rather than one night.
+const isRun = (s) => !!s && s.to - s.from > DAY;
+
 export function onNight(start, end, date) {
   const w = nightWindow(date), s = span(start, end);
   return !!(w && s && s.from < w.to && s.to > w.from);
@@ -77,8 +81,8 @@ export function eventWhenText(start, end) {
   const s = span(start, end);
   if (!s) return "";
   const short = { day: "numeric", month: "short" };
-  return s.to - s.from > DAY
-    ? `${prettyDate(istDate(start), short)} – ${prettyDate(istDate(new Date(s.to).toISOString()), short)}`
+  return isRun(s)
+    ?`${prettyDate(istDate(start), short)} – ${prettyDate(istDate(new Date(s.to).toISOString()), short)}`
     : `${prettyDate(istDate(start))} · ${prettyTime(istClock(start))}`;
 }
 
@@ -115,7 +119,8 @@ export const venueKey = (v) => (v?.zcity && v?.slug ? `${v.zcity}/${v.slug}` : S
 export const isByobTags = (tags) => (tags || []).some((t) => /\bbyob\b/i.test(t));
 const BIG = /large group|private dining/i;
 export const bigGroupTags = (tags) => (tags || []).filter((t) => BIG.test(t));
-// A BYOB night: picked off the BYOB list (pick.kind, the outing type), or District lists it as BYOB.
+// A BYOB night: a venue picked off the BYOB list (pick.kind — not the "Going to" chip, which
+// moves on as you browse) or one District lists as BYOB. An event is never one.
 export const isByobPick = (pick) => pick?.type === "venue" && (pick.kind === "byob" || isByobTags(pick.tags));
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -145,7 +150,8 @@ export const closedOn = (hours, isoDate) => !!(hours?.length && weekday(isoDate)
  * places District lists with large-group seating or private dining, then within the budget
  * a head, then nearest, then best rated. Details (amenities, bookings, hours) are only known
  * for places whose District page has been opened — `details` maps venueKey → VenueDetails.
- * For BYOB, `extraPerHead` adds the bottles you bring to each head's share.
+ * At a BYOB place (the BYOB list, or District lists it as BYOB — the same rule as the night's
+ * cost lines), `extraPerHead` adds the bottles you bring to each head's share.
  * @returns {(import("./outModel.js").VenueListItem & { perHead: number|null, partyCost: number|null,
  *   fit: "fits"|"over"|"unknown"|null, byob: boolean, big: boolean, bookable: boolean|null, closed: boolean, reasons: string[] })[]}
  */
@@ -156,9 +162,9 @@ export function rankVenues(list, { budgetPerHead = null, people = 1, bigGroup = 
     const d = details?.[venueKey(v)] || null;
     const tags = d?.amenities || [];
     const cost = v.costForTwo ?? d?.costForTwo ?? null;
-    const perHead = cost ? Math.round(cost / 2) + Math.round(extraPerHead || 0) : null;
-    const fit = !cap ? null : perHead == null ? "unknown" : perHead <= cap ? "fits" : "over";
     const byob = kind === "byob" || isByobTags(tags);
+    const perHead = cost ? Math.round(cost / 2) + (byob ? Math.round(extraPerHead || 0) : 0) : null;
+    const fit = !cap ? null : perHead == null ? "unknown" : perHead <= cap ? "fits" : "over";
     const big = bigGroupTags(tags);
     const bookable = d ? !!d.bookable : null;
     const closed = !!(date && d && closedOn(d.hours, date));
@@ -206,6 +212,13 @@ export function pickForDate(pick, date) {
   return { ...pick, closes: closingTime(pick.hours, date), closesFor: date };
 }
 
+// cfg.out with that done, for setOut((o) => outForDate(o, party.date)) — the same object when
+// nothing changes. Reminders read pick.closes, so this has to run whatever tab is open.
+export const outForDate = (out, date) => {
+  const pick = pickForDate(out?.pick, date);
+  return pick === out?.pick ? out : { ...out, pick };
+};
+
 /**
  * The night-out card's times, from lib/reminderPlan.js so they match the reminders: when to
  * set off (leaveBy: start − travel time from `loc`, on a 5-minute mark), the venue's listed
@@ -229,13 +242,18 @@ export function nightTimes(party, out, loc) {
 
 // ── Events ────────────────────────────────────────────────────────────────────
 
+export const RUN_REASON = "Runs through your date: check its nights";
+
 /**
  * District's listings are city-wide (all of NCR for Gurugram) and run weeks ahead: keep those
  * within `maxKm` of `origin` (events without a map pin stay; no origin = no cut) and drop the
- * ones already over. The party's night comes first — within the budget a head, then nearest —
- * and the other nights follow, soonest first.
- * @returns {(import("./outModel.js").EventListItem & { km: number|null, onDate: boolean,
- *   fit: "fits"|"over"|"unknown"|null, reasons: string[] })[]}
+ * ones already over. Single nights on the party's night come first (`onDate`) — within the
+ * budget a head, then nearest. Runs over several days that take in the date follow (`onRun`):
+ * District lists a weekly karaoke night as one item from October to December, which is most
+ * likely on another weekday, so it isn't "on your date" until its page shows a show that is.
+ * The other nights come last, soonest first.
+ * @returns {(import("./outModel.js").EventListItem & { km: number|null, onDate: boolean, run: boolean,
+ *   onRun: boolean, fit: "fits"|"over"|"unknown"|null, reasons: string[] })[]}
  */
 export function eventsForDate(list, date, origin, maxKm = 25, { now = Date.now(), budgetPerHead = null } = {}) {
   const cap = budgetPerHead > 0 ? budgetPerHead : null;
@@ -246,21 +264,24 @@ export function eventsForDate(list, date, origin, maxKm = 25, { now = Date.now()
     if (s && now != null && s.to < now) return;
     const km = kmBetween(origin, e);
     if (km != null && maxKm != null && km > maxKm) return;
-    const onDate = !!date && onNight(e.start, e.end, date);
+    const run = isRun(s);
+    const that = !!date && onNight(e.start, e.end, date);
+    const onDate = that && !run, onRun = that && run;
     const fit = !cap ? null : e.priceFrom == null ? "unknown" : e.priceFrom <= cap ? "fits" : "over";
     const reasons = [];
     if (onDate) reasons.push("On your date");
+    else if (onRun) reasons.push(RUN_REASON);
     if (fit === "fits") reasons.push(e.priceFrom === 0 ? "Free" : `Fits ${fmt(cap)} a head`);
     else if (e.priceFrom === 0) reasons.push("Free");
     if (km != null) reasons.push(kmText(km));
-    rows.push({ ...e, km, onDate, fit, reasons, _i: i, _t: s ? s.from : Infinity });
+    rows.push({ ...e, km, onDate, run, onRun, fit, reasons, _i: i, _t: s ? s.from : Infinity, _g: onDate ? 0 : onRun ? 1 : 2 });
   });
   const FIT = { fits: 0, unknown: 1, over: 2 };
   const near = (a, b) => (a.km ?? 1e9) - (b.km ?? 1e9);
-  rows.sort((a, b) => (b.onDate - a.onDate)
-    || (a.onDate ? ((FIT[a.fit] ?? 0) - (FIT[b.fit] ?? 0)) || near(a, b) || (a._t - b._t) : (a._t - b._t) || near(a, b))
+  rows.sort((a, b) => (a._g - b._g)
+    || (a._g < 2 ? ((FIT[a.fit] ?? 0) - (FIT[b.fit] ?? 0)) || near(a, b) || (a._t - b._t) : (a._t - b._t) || near(a, b))
     || (a._i - b._i));
-  return rows.map(({ _i, _t, ...r }) => r);
+  return rows.map(({ _i, _t, _g, ...r }) => r);
 }
 
 // Which of an event's shows to preselect: the one already picked (`picked` = the pick's start),
@@ -290,7 +311,7 @@ export function showOver(show, now = Date.now()) {
 // day), or when it's over.
 export function alignParty(show, party, now = Date.now()) {
   const s = span(show?.start, show?.end);
-  if (!s || s.to - s.from > DAY || s.to < now) return null;
+  if (!s || isRun(s) || s.to < now) return null;
   const at = { date: istDate(show.start), time: istClock(show.start) };
   return at.date === party?.date && at.time === party?.time ? null : at;
 }
@@ -368,10 +389,52 @@ export const planTicket = (t, qty) => ({
   service: t.service ?? null, gateCover: t.gateCover ?? null, groupSize: t.groupSize ?? null,
 });
 
+// Tickets are matched by name and price, not by id. District gives each weekly show's ticket
+// its own id, and district.js lists one ticket for all the shows under the first show's id, so
+// once that show is over and drops off the page, the id changes. Name + price is what
+// district.js merges them on, so it holds within a read and across reads. A plan keeps the
+// name and the price, so its key needs no storing.
+const nameKey = (t) => String(t?.name || "").trim().toLowerCase().replace(/\s+/g, " ");
+export const ticketKey = (t) => `${nameKey(t)}|${t?.price || 0}`;
+
+// The ticket in `list` a planned one stands for: the same id, else the same name and price,
+// else the only one with that name (its price moved since the plan was made). null if none.
+export function matchTicket(p, list) {
+  const l = (list || []).filter(Boolean);
+  if (!p) return null;
+  const byId = p.id != null ? l.find((t) => t.id === p.id) : null;
+  if (byId) return byId;
+  const k = ticketKey(p), byKey = l.find((t) => ticketKey(t) === k);
+  if (byKey) return byKey;
+  const same = l.filter((t) => nameKey(t) === nameKey(p));
+  return same.length === 1 ? same[0] : null;
+}
+
+// The event sheet's quantities ({ [ticketKey]: qty }) for a saved plan, against the tickets of
+// the show on screen. A planned ticket that show doesn't sell keeps its own key.
+export function qtyFromPlan(showTickets, plan) {
+  const q = {};
+  for (const p of plan || []) {
+    if (!(p?.qty > 0)) continue;
+    q[ticketKey(matchTicket(p, showTickets) || p)] = p.qty;
+  }
+  return q;
+}
+
 // The plan for one show: its tickets (district.js ticketsForShow) that are on sale, with the
-// quantities chosen in the sheet ({ [id]: qty }). A ticket another show sells drops out.
+// quantities chosen in the sheet ({ [ticketKey]: qty }). A ticket another show sells drops out.
 export const plannedTickets = (showTickets, qty) => (showTickets || [])
-  .filter((t) => t?.buyable && (qty?.[t.id] || 0) > 0).map((t) => planTicket(t, qty[t.id]));
+  .filter((t) => t?.buyable && (qty?.[ticketKey(t)] || 0) > 0).map((t) => planTicket(t, qty[ticketKey(t)]));
+
+// The tickets District sells for the show starting at `start` (the pick's): [] when that show
+// is no longer on the page; all of them when the page lists no shows.
+export function ticketsForStart(d, start) {
+  const shows = d?.shows || [];
+  if (!shows.length) return d?.tickets || [];
+  const t = Date.parse(start || "");
+  const i = Number.isNaN(t) ? -1 : shows.findIndex((s) => Date.parse(s.start) === t);
+  return i >= 0 ? ticketsForShow(d, i) : [];
+}
 
 // A qty stepper inside District's per-order limits: 0 (none), or min…max.
 export function clampQty(t, want, cur = 0) {
@@ -381,10 +444,10 @@ export function clampQty(t, want, cur = 0) {
   return want < min ? 0 : Math.min(max, want);
 }
 
-// Ticket prices refreshed from a newer read of the event page (same ids); others kept as they were.
+// Ticket prices (and ids) refreshed from a newer read of the event page — `fresh` = the picked
+// show's tickets (ticketsForStart); one that can't be matched is kept as it was.
 export function refreshTickets(planned, fresh) {
-  const byId = new Map((fresh || []).map((t) => [t.id, t]));
-  return (planned || []).map((p) => (byId.has(p.id) ? planTicket(byId.get(p.id), p.qty) : p));
+  return (planned || []).map((p) => { const t = matchTicket(p, fresh); return t ? planTicket(t, p.qty) : p; });
 }
 
 // ── The night out's cost ──────────────────────────────────────────────────────
@@ -413,7 +476,7 @@ export function outingCost({ out, party, liquorLines = [] } = {}) {
     if (tickets.length) admits = tickets.reduce((s, t) => s + ticketPeople(t) * t.qty, 0);
     if (pick.type === "venue") {
       lines.push(spend.venue != null
-        ? { id: "venue", label: `${fmt(pick.costForTwo)} for two × ${people} (the venue's estimate)`, amount: spend.venue, kind: "estimate" }
+        ? { id: "venue", label: `About ${fmt(Math.round(pick.costForTwo / 2))} a head × ${people} (the venue's ${fmt(pick.costForTwo)} for two, an estimate)`, amount: spend.venue, kind: "estimate" }
         : { id: "venue", label: "The venue's bill (not listed)", amount: null, kind: "unknown" });
     }
     if (tickets.length) {

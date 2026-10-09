@@ -19,7 +19,7 @@ import { fetchVenueList, fetchEventList } from "../lib/outSources.js";
 import { eventListUrls } from "../lib/parse/district.js";
 import { zomatoCity } from "../lib/parse/zomato.js";
 import { byobRule } from "../lib/age.js";
-import { rankVenues, eventsForDate, venueKey, venuePick, pickForDate, freshEventPick, refreshTickets, venueListNote } from "../lib/out.js";
+import { rankVenues, eventsForDate, venueKey, venuePick, outForDate, freshEventPick, refreshTickets, ticketsForStart, venueListNote } from "../lib/out.js";
 import { CITY_COORDS } from "../lib/location.js";
 import { cityName } from "../lib/parse/livcheers.js";
 import { prettyDate } from "../lib/drydays.js";
@@ -67,15 +67,16 @@ export default function OutTab({
   const list = state.key === listKey ? state : { loading: true };
 
   // A new party date: the picked venue's closing time is redone from the hours it keeps, so
-  // last call and the "closes" line follow the date (lib/out.js pickForDate).
+  // last call and the "closes" line follow the date (lib/out.js outForDate). This only runs
+  // while the tab is open; App.jsx should run it too, since the reminders read pick.closes.
   useEffect(() => {
-    setOut((o) => { const p = pickForDate(o.pick, party?.date); return p === o.pick ? o : { ...o, pick: p }; });
+    setOut((o) => outForDate(o, party?.date));
   }, [party?.date, out.pick?.closesFor, setOut]);
 
   const people = Math.max(1, party?.guests || 1);
   const venues = useMemo(() => rankVenues(list.venues?.venues || [], {
     budgetPerHead: out.perHead, people, bigGroup: out.bigGroup, kind, details: seen, date: party?.date, fitsOnly,
-    extraPerHead: kind === "byob" ? (liquorTotal || 0) / people : 0,
+    extraPerHead: (liquorTotal || 0) / people,   // counted only at BYOB places
   }), [list.venues, out.perHead, people, out.bigGroup, kind, seen, party?.date, fitsOnly, liquorTotal]);
 
   // Distances from you, or from the city's centre without GPS.
@@ -98,7 +99,7 @@ export default function OutTab({
   const onEventLoaded = useCallback((e, d) => {
     setSeenEvents((s) => ({ ...s, [e.slug]: d }));
     setOut((o) => (o.pick?.type === "event" && o.pick.slug === e.slug
-      ? { ...o, pick: freshEventPick(o.pick, d), tickets: refreshTickets(o.tickets, d.tickets) }
+      ? { ...o, pick: freshEventPick(o.pick, d), tickets: refreshTickets(o.tickets, ticketsForStart(d, o.pick.start)) }
       : o));
   }, [setOut]);
   const openPick = (p) => {

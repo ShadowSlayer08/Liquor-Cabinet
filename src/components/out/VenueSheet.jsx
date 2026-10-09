@@ -2,7 +2,8 @@
 // what District lists (BYOB, full bar, DJ, group seating…), the listed hours on the party's
 // day, its offers as of now, the party's estimate, and the hand-offs — booking a table only
 // where District takes bookings, else the venue page. If the page can't be read, the sheet
-// still offers the place by name and opens it in District. A page already read this session
+// still offers the place by name and opens it in District (District's home page when the list
+// gave no link to the venue's own). A page already read this session
 // (`initial`) shows at once while the read (usually from the cache) catches up.
 import { useEffect, useState } from "react";
 import Sheet, { Skeleton } from "../Sheet.jsx";
@@ -13,6 +14,7 @@ import { venueUrl, bookUrl, closingTime } from "../../lib/parse/district.js";
 import { usualClose } from "../../lib/age.js";
 import {
   venuePick, venueKey, dayHours, hoursText, weekday, isByobTags, bigGroupTags, kmText, countText, offerText, costForTwoText, directionsUrl, timingText,
+  bottlesOf,
 } from "../../lib/out.js";
 import { prettyTime, clockOf } from "../../lib/when.js";
 import { fmt, ageStr } from "../../lib/format.js";
@@ -29,6 +31,7 @@ export default function VenueSheet({ v, kind, city, party, out, setOut, liquorLi
   const [corkage, setCorkageHere] = useState(isPick ? out.corkage : null);
   const setCorkage = (c) => { setCorkageHere(c); if (isPick) setOut((o) => ({ ...o, corkage: c })); };
   const load = (force = false) => {
+    if (!(v.zcity && v.slug)) { setState((s) => (s.d ? s : { error: "District's link for this place isn't known" })); return; }
     setState((s) => (s.d ? s : { loading: true }));
     fetchVenue({ zcity: v.zcity, slug: v.slug }, { force })
       .then((d) => { if (!d) throw new Error("Nothing readable on the page"); setState({ d }); onLoaded?.(v, d); })
@@ -44,6 +47,9 @@ export default function VenueSheet({ v, kind, city, party, out, setOut, liquorLi
   const tags = d?.amenities || [];
   const big = bigGroupTags(tags);
   const byob = kind === "byob" || isByobTags(tags);
+  // At a BYOB place the bottles you bring count against the budget a head, as on its list card.
+  const bringHead = byob ? Math.round(bottlesOf(liquorLines).total / people) : 0;
+  const headAll = perHead != null ? perHead + bringHead : null;
   const page = v.zcity && v.slug ? venueUrl(v) : null;
   const rows = d ? dayHours(d.hours, party?.date) : [];
   const closes = d ? closingTime(d.hours, party?.date) : "";
@@ -71,7 +77,7 @@ export default function VenueSheet({ v, kind, city, party, out, setOut, liquorLi
       <div className="ot-foot">
         {d?.bookable && page
           ? <button className="btn ot-btn-district btn-block" onClick={() => { tap(); openDistrict({ web: bookUrl(v) }); }}>Book a table on District <Icon.external size={15} /></button>
-          : page && <button className="btn ot-btn-district btn-block" onClick={() => { tap(); openDistrict({ web: page }); }}>Open in District <Icon.external size={15} /></button>}
+          : <button className="btn ot-btn-district btn-block" onClick={() => { tap(); openDistrict(page ? { web: page } : {}); }}>Open in District <Icon.external size={15} /></button>}
         <div className="row">
           {directions && <button className="btn btn-ghost btn-sm" onClick={() => openUrl(directions)}><Icon.route size={15} /> Directions</button>}
           <button className={`btn btn-sm grow ${isPick ? "btn-ghost" : "btn-gold"}`} disabled={!!state.loading} onClick={makeParty}>
@@ -99,7 +105,7 @@ export default function VenueSheet({ v, kind, city, party, out, setOut, liquorLi
       {state.error && (
         <div className="empty" style={{ padding: "22px 8px" }}>
           <div className="t">Couldn't read this place on District</div>
-          <div className="small" style={{ marginBottom: 14 }}>{state.error}. {page ? "District's own page has everything." : ""}</div>
+          <div className="small" style={{ marginBottom: 14 }}>{state.error}. {page ? "District's own page has everything." : `Look for ${v.name || "it"} by name in District.`}</div>
           {page && <button className="btn btn-ghost btn-sm" onClick={() => load(true)}>↻ Try again</button>}
         </div>
       )}
@@ -147,8 +153,9 @@ export default function VenueSheet({ v, kind, city, party, out, setOut, liquorLi
             </div>
             <div className="tiny muted">{fmt(cost)} for two is the venue's estimate — the bill is in District.</div>
             {cap > 0 && (
-              <div className={`tiny ${perHead > cap ? "red" : "green"}`} style={{ marginTop: 3 }}>
-                {perHead > cap ? `${fmt(perHead - cap)} a head over your ${fmt(cap)}` : `Within your ${fmt(cap)} a head`}
+              <div className={`tiny ${headAll > cap ? "red" : "green"}`} style={{ marginTop: 3 }}>
+                {headAll > cap ? `${fmt(headAll - cap)} a head over your ${fmt(cap)}` : `Within your ${fmt(cap)} a head`}
+                {bringHead > 0 ? `, counting the bottles you bring (${fmt(bringHead)} a head)` : ""}
               </div>
             )}
           </>
