@@ -13,6 +13,7 @@ import { onBubbleToggle } from "./lib/bubble.js";
 import { DEFAULT_OUT, withOut } from "./lib/outModel.js";
 import { outForDate } from "./lib/out.js";
 import { AGE_LINE } from "./lib/age.js";
+import { normalizeQuiz } from "./lib/barQuiz.js";
 import ScraperPanel from "./components/ScraperPanel.jsx";
 import CabinetTab from "./components/CabinetTab.jsx";
 import BarTab from "./components/BarTab.jsx";
@@ -70,6 +71,7 @@ export default function App() {
   const [settle, setSettle] = useState(null);           // settle-up after the party (lib/settle.js); survives the date roll-over
   const [grocer, setGrocer] = useState("blinkit");      // which 10-minute app the supplies run uses (lib/grocers.js)
   const [showFill, setShowFill] = useState(false);      // budget optimiser sheet
+  const [barQuiz, setBarQuiz] = useState(null);         // Fill my bar answers (lib/barQuiz.js); null = never asked
   const [showSettle, setShowSettle] = useState(false);
   const [showLegal, setShowLegal] = useState(false);
   const [barKind, setBarKind] = useState("cocktails");  // Bar tab: cocktails | mocktails
@@ -103,6 +105,7 @@ export default function App() {
       if (cfg.settle) setSettle(cfg.settle);
       if (cfg.grocer) setGrocer(cfg.grocer);
       if (cfg.out) setOut(withOut(cfg.out));
+      if (cfg.barQuiz) setBarQuiz(normalizeQuiz(cfg.barQuiz));
       if (cfg.syncIds) setSyncIds(cfg.syncIds);
       if (cfg.activeCat) setActiveCat(cfg.activeCat);
       if (cfg.loc) setLoc(cfg.loc);
@@ -118,10 +121,10 @@ export default function App() {
   useEffect(() => {
     if (ready) store.set("cfg", {
       city, loc, budget, liquor, batches, activeBatch, food, party, syncIds, activeCat, onboarded,
-      cocktailMenu, customDry, reminders, split, bubble, zomatoExact, settle, grocer, out,
+      cocktailMenu, customDry, reminders, split, bubble, zomatoExact, settle, grocer, out, barQuiz,
     });
   }, [ready, city, loc, budget, liquor, batches, activeBatch, food, party, syncIds, activeCat, onboarded,
-    cocktailMenu, customDry, reminders, split, bubble, zomatoExact, settle, grocer, out]);
+    cocktailMenu, customDry, reminders, split, bubble, zomatoExact, settle, grocer, out, barQuiz]);
 
   // ── Android back button + notification taps ──────────────────────────────
   useEffect(() => {
@@ -431,7 +434,8 @@ export default function App() {
       {showFill && (
         <FillBarSheet catalog={catalog} city={city} plan={plan} party={party} budget={budget} spent={spent} cocktailMenu={cocktailMenu}
           batchName={batches[activeBatch]?.name} addItems={addItems} toast={toast} onClose={() => setShowFill(false)}
-          openScraper={() => setShowScraper(true)} openScraperWith={openScraperWith} />
+          openScraper={() => setShowScraper(true)} openScraperWith={openScraperWith}
+          quiz={barQuiz} setQuiz={setBarQuiz} goBar={(kind) => { setShowFill(false); goBar(kind); }} />
       )}
       {showSettle && (
         <SettleSheet settle={settle} setSettle={setSettle} party={party} split={split} plan={plan} out={out}

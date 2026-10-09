@@ -5,10 +5,13 @@
 //  full product list for the city inside the React Server Components "flight"
 //  payload: a series of  self.__next_f.push([1,"…"])  script tags. Concatenated,
 //  that payload contains an  "items":[ … ]  array whose rows look like
-//    { city_liquors:{price,priceCategory}, liquors:{displayName,size,slug,code,
+//    { city_liquors:{price,priceCategory,rank}, liquors:{displayName,size,slug,code,
 //      tastingNotes,description}, liquor_groups:{averageOverallRating,…},
 //      brands:{name}, country:{name,code}, liquor_types:{name}, category:{…} }
 //  We pull that array out and normalise each row into the planner's item shape.
+//  `rank` is Livcheers' popularity (1 = most popular). It's one all-India list —
+//  the same number in every city — with gaps, and most bottles have none (null).
+//  Ratings carry no vote counts, so Fill my bar leans on it (lib/barScore.js).
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const LC_BASE = "https://www.livcheers.com";
@@ -136,6 +139,7 @@ export function normalizeRow(row, citySlug) {
   if (!price || !val(L.displayName)) return null;
   const rating = Number(val(G.averageOverallRating)) || 0;
   const priceCategory = val(C.priceCategory) || null;
+  const rank = parseInt(val(C.rank), 10);
   const country = row.country || {};
   return {
     id: String(L.id),
@@ -156,6 +160,7 @@ export function normalizeRow(row, citySlug) {
     origin: val(country.name) || "",
     flag: flagEmoji(val(country.code)),
     priceCategory,
+    rank: rank > 0 ? rank : null,
     tier: tierFor(rating, priceCategory),
     notes: val(L.tastingNotes) || "",
     description: val(L.description) || "",
