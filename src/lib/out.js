@@ -9,6 +9,7 @@
 //                when it was read), estimate (a venue's "for two", indicative bottle
 //                prices, a gate cover from the event's text) or unknown (corkage
 //                nobody has quoted yet) — the app never passes an estimate off as a price
+//  nightTimes    "Leave by" and last call for the night-out card
 //
 //  District lists times in UTC. India has one time zone (+05:30, no DST), so dates
 //  here are worked out in IST whatever the phone or the CI machine is set to.
@@ -18,7 +19,8 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 import { kmBetween, travelMinutes, outSpend, slimVenue, slimEvent } from "./outModel.js";
 import { venueUrl, eventUrl, closingTime, cleanOffer } from "./parse/district.js";
-import { prettyTime } from "./when.js";
+import { leaveBy, closesAt, lastCallFor } from "./reminderPlan.js";
+import { prettyTime, partyStart } from "./when.js";
 import { prettyDate } from "./drydays.js";
 import { fmt } from "./format.js";
 
@@ -86,18 +88,23 @@ export function offerText(s) {
   return t && t === t.toUpperCase() ? t.charAt(0) + t.slice(1).toLowerCase() : t;
 }
 
+// Zomato's card timing: "Opens at 5pm" stays true, but a countdown ("Opens in 14 minutes")
+// is stale within the 12 hours a list is kept, so that kind isn't shown.
+export const timingText = (t) => {
+  const s = String(t || "").trim();
+  return /\bin\s+\d+\s*(?:mins?|minutes?|hrs?|hours?)\b/i.test(s) ? "" : s;
+};
+
 export const costForTwoText = (c) => (c ? `${fmt(c)} for two (estimate)` : "Cost not listed");
 export const eventPriceText = (p) => (p === 0 ? "Free" : p != null ? `from ${fmt(p)}` : "Price on District");
 const pctText = (f) => `${Math.round(f * 1000) / 10}%`;
 export const feeText = (feePct) => (feePct > 0 ? `+ District fee up to ${pctText(feePct)} + GST where charged` : "+ any District fee and GST, shown at checkout");
 
-// A note over the venue list, or "" — when Zomato has no such page for the city, or (outside
-// Delhi NCR) when its BYOB page is thin: there it's a name match, not a BYOB tag, so it finds
-// one or two places at most.
-export function venueListNote({ kind, zcity, notFound = false } = {}) {
-  if (notFound) return `Zomato has no ${kind === "byob" ? "BYOB" : "bars"} page for this city.`;
-  if (kind === "byob" && zcity && zcity !== "ncr") return "Few BYOB places are listed for this city on Zomato.";
-  return "";
+// A note over the venue list, or "": outside Delhi NCR, Zomato's BYOB page is thin (a name
+// match, not a BYOB tag), so it finds one or two places at most. `zcity` is the Zomato city
+// segment the list was read for (lib/outSources.js fetchVenueList).
+export function venueListNote({ kind, zcity } = {}) {
+  return kind === "byob" && zcity && zcity !== "ncr" ? "Few BYOB places are listed for this city on Zomato." : "";
 }
 
 // ── Venues ────────────────────────────────────────────────────────────────────
@@ -199,6 +206,27 @@ export function pickForDate(pick, date) {
   return { ...pick, closes: closingTime(pick.hours, date), closesFor: date };
 }
 
+/**
+ * The night-out card's times, from lib/reminderPlan.js so they match the reminders: when to
+ * set off (leaveBy: start − travel time from `loc`, on a 5-minute mark), the venue's listed
+ * closing time on the party's night and last call 45 min before it. Worked out as if the
+ * party were out (a pick saved while the party is at home still shows them), with the closing
+ * time redone for the party's date (pickForDate). `noLeave` says why there's no "Leave by":
+ * "pin" (the pick has no map pin), "locate" (no location fix), "date" (no party date) or
+ * "far" (the fix is too far off to be where you'll set off from).
+ * @returns {{ go: { at: Date, minutes: number, km: number, place: string }|null, close: Date|null,
+ *   lastCall: Date|null, noLeave: ""|"pin"|"locate"|"date"|"far" }}
+ */
+export function nightTimes(party, out, loc) {
+  const pick = pickForDate(out?.pick, party?.date);
+  if (!pick) return { go: null, close: null, lastCall: null, noLeave: "" };
+  const asOut = { ...out, active: true, pick };
+  const go = leaveBy(party, asOut, loc);
+  const close = closesAt(party, pick.closes);
+  const noLeave = go ? "" : pick.lat == null || pick.lon == null ? "pin" : loc?.lat == null || loc?.lon == null ? "locate" : !partyStart(party) ? "date" : "far";
+  return { go, close, lastCall: close ? lastCallFor(party, asOut) : null, noLeave };
+}
+
 // ── Events ────────────────────────────────────────────────────────────────────
 
 /**
@@ -250,13 +278,21 @@ export function showFor(shows, date, now = Date.now(), picked = "") {
   return j >= 0 ? j : 0;
 }
 
-// Picking a show on another night moves the party to it: { date, time } — or null when the
-// show is on the party's night already, or is a run over several days (a festival).
-export function alignParty(show, party) {
+// A show that has ended (no end given = four hours after it starts).
+export function showOver(show, now = Date.now()) {
   const s = span(show?.start, show?.end);
-  if (!s || onNight(show.start, show.end, party?.date)) return null;
-  if (s.to - s.from > DAY) return null;
-  return { date: istDate(show.start), time: istClock(show.start) };
+  return !!s && s.to < now;
+}
+
+// Making a show the party moves the party to it — its date and its start time, so "Leave by"
+// and the reminders count back from when the doors open: { date, time }. null when the party
+// is set for it already, when it's a run over several days (a festival: keep the party's own
+// day), or when it's over.
+export function alignParty(show, party, now = Date.now()) {
+  const s = span(show?.start, show?.end);
+  if (!s || s.to - s.from > DAY || s.to < now) return null;
+  const at = { date: istDate(show.start), time: istClock(show.start) };
+  return at.date === party?.date && at.time === party?.time ? null : at;
 }
 
 // "Make this the party" for an event (a show of it, when its page could be read). On top of
@@ -264,6 +300,7 @@ export function alignParty(show, party) {
 export function eventPick(e, d, show, { kind = "club" } = {}) {
   const merged = { ...e, ...(d || {}), locality: e?.locality || d?.locality || "", slug: e?.slug || d?.slug || "" };
   if (show) { merged.start = show.start; merged.end = show.end || ""; }
+  if (d?.rules) merged.rules = { ...d.rules, stag: stagText(d.rules) };
   return { ...slimEvent(merged, merged.slug ? eventUrl(merged.slug) : ""), kind, feePct: d?.feePct || e?.feePct || 0 };
 }
 
@@ -272,7 +309,7 @@ export const freshEventPick = (pick, d) => (!d ? pick : {
   ...pick,
   name: d.name || pick.name, venue: d.venue || pick.venue, locality: pick.locality || d.locality || "",
   lat: d.lat ?? pick.lat, lon: d.lon ?? pick.lon, priceFrom: d.priceFrom ?? pick.priceFrom,
-  ageEntry: d.rules?.ageEntry ?? pick.ageEntry, stag: d.rules?.stag || pick.stag,
+  ageEntry: d.rules?.ageEntry ?? pick.ageEntry, stag: stagText(d.rules) || pick.stag,
   feePct: d.feePct || pick.feePct || 0, fetchedAt: d.fetchedAt || Date.now(),
 });
 
@@ -288,14 +325,16 @@ export function pickNote(pick, date) {
 }
 
 // The organiser's door rules, ready to show (the legal age is shown separately).
+const say = (label, re, x) => { const t = String(x || "").trim(); return !t ? "" : re.test(t) ? t : `${label}: ${t}`; };
+// The stag policy: the organiser's words, else what District's flag says, else "".
+export const stagText = (r) => (String(r?.stag || "").trim() ? say("Stag entry", /stag/i, r.stag)
+  : r?.stagAllowed === false ? "Stag entry not allowed" : r?.stagAllowed === true ? "Stags allowed" : "");
+
 export function doorRules(rules) {
   const r = rules || {};
-  const say = (label, re, x) => { const t = String(x || "").trim(); return !t ? "" : re.test(t) ? t : `${label}: ${t}`; };
-  const stag = String(r.stag || "").trim() ? say("Stag entry", /stag/i, r.stag)
-    : r.stagAllowed === false ? "Stag entry not allowed" : r.stagAllowed === true ? "Stags allowed" : "";
   return [
     r.ageEntry ? `Entry ${r.ageEntry}+ (organiser's rule)` : "",
-    stag,
+    stagText(r),
     say("ID", /\bid\b/i, r.id),
     say("Dress code", /dress/i, r.dress),
     say("Re-entry", /re-?entry/i, r.reentry),
@@ -360,15 +399,18 @@ export function bottlesOf(liquorLines) {
  * The night out as cost lines: [{ id, label, amount, kind }] where kind is "exact" | "estimate" |
  * "unknown" (amount null), plus the total and the share a head (unknown lines count as 0).
  * Bottles you bring and corkage only count at a BYOB place; corkage only once the host typed
- * the venue's quote.
+ * the venue's quote. `admits` = people the planned tickets let in (by their names), null when
+ * none are planned — fewer than the party means the share a head is low.
  */
 export function outingCost({ out, party, liquorLines = [] } = {}) {
   const people = Math.max(1, Number(party?.guests) || 1);
   const pick = out?.pick || null;
   const lines = [];
+  let admits = null;
   if (pick) {
     const spend = outSpend({ ...out, active: true }, people);
     const tickets = (out.tickets || []).filter((t) => t?.qty > 0);
+    if (tickets.length) admits = tickets.reduce((s, t) => s + ticketPeople(t) * t.qty, 0);
     if (pick.type === "venue") {
       lines.push(spend.venue != null
         ? { id: "venue", label: `${fmt(pick.costForTwo)} for two × ${people} (the venue's estimate)`, amount: spend.venue, kind: "estimate" }
@@ -400,5 +442,5 @@ export function outingCost({ out, party, liquorLines = [] } = {}) {
     }
   }
   const total = lines.reduce((s, l) => s + (l.amount || 0), 0);
-  return { lines, total, perHead: Math.round(total / people), people, unknown: lines.some((l) => l.kind === "unknown") };
+  return { lines, total, perHead: Math.round(total / people), people, admits, unknown: lines.some((l) => l.kind === "unknown") };
 }

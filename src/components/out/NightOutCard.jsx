@@ -1,12 +1,12 @@
 // [v1.5 · Out] "Your night out": the picked place, when, for how many, and what it costs —
 // each line tagged exact, estimate or unknown (lib/out.js outingCost) — the share a head
-// against the budget, when to leave and last call (lib/reminderPlan.js leaveBy / closesAt /
-// lastCallFor, the same sums the reminders use, so the two never disagree), a "Booked on
-// District" tick, and shortcuts to the Plan cards that use the venue.
-// Reminders and Plan links scroll here by its id, "night-out".
+// against the budget, when to leave and last call (lib/out.js nightTimes, which uses
+// lib/reminderPlan.js leaveBy / closesAt / lastCallFor, the same sums the reminders use, so
+// the two never disagree), a "Booked on District" tick, and shortcuts to the Plan cards
+// that use the venue. Reminders and Plan links scroll here by its id, "night-out".
 import { useMemo } from "react";
-import { outingCost, kmText, isByobPick, pickNote } from "../../lib/out.js";
-import { leaveBy, closesAt, lastCallFor, LEAVE_MAX_KM } from "../../lib/reminderPlan.js";
+import { outingCost, nightTimes, kmText, isByobPick, pickNote } from "../../lib/out.js";
+import { LEAVE_MAX_KM } from "../../lib/reminderPlan.js";
 import { prettyTime, prettyWhen, clockOf } from "../../lib/when.js";
 import { fmt, ageStr } from "../../lib/format.js";
 import { openDistrict, tap } from "../../lib/order.js";
@@ -19,13 +19,8 @@ export default function NightOutCard({ out, setOut, party, loc, locating, onLoca
   const pick = out.pick;
   const cost = useMemo(() => outingCost({ out, party, liquorLines }), [out, party, liquorLines]);
   if (!pick) return null;
-  // Worked out as if the party were out, so a pick saved while the party is at home still shows them.
-  const asOut = out.active ? out : { ...out, active: true };
-  const go = leaveBy(party, asOut, loc);
+  const { go, close, lastCall, noLeave } = nightTimes(party, out, loc);
   const km = go ? kmText(go.km) : "";
-  const tooFar = !go && loc?.lat != null && pick.lat != null && pick.lon != null;
-  const close = closesAt(party, pick.closes);
-  const lastCall = close ? lastCallFor(party, asOut) : null;
   const art = pick.type === "event" ? (pick.kind === "events" ? "events" : "club") : isByobPick(pick) ? "byob" : "bar";
   const cap = out.perHead;
   const over = cap > 0 && cost.perHead > cap;
@@ -86,15 +81,22 @@ export default function NightOutCard({ out, setOut, party, loc, locating, onLoca
         </div>
       </div>
       {exactTickets && asOf && <div className="tiny dim" style={{ marginTop: 6 }}>Ticket prices as on District at {asOf}; any fee and GST are added at checkout.</div>}
+      {cost.admits != null && cost.admits < cost.people && (
+        <div className="tiny gold" style={{ marginTop: 6 }}>
+          The tickets planned let in {cost.admits} of {cost.people} (going by their names), so the share a head is low. Open the event to add more.
+        </div>
+      )}
 
       <div className="ot-go">
         <Icon.route size={18} className="gold" />
         {go ? (
           <span className="grow small">Leave by <b className="gold">{at(go.at)}</b> <span className="muted">· about {go.minutes} min{km ? ` for ${km}` : ""}</span></span>
-        ) : pick.lat == null || pick.lon == null ? (
+        ) : noLeave === "pin" ? (
           <span className="grow tiny muted">No map pin for this place yet — open it to load one.</span>
-        ) : tooFar ? (
+        ) : noLeave === "far" ? (
           <span className="grow tiny muted">You're more than {LEAVE_MAX_KM} km from here — when to leave shows once you're nearer.</span>
+        ) : noLeave === "date" ? (
+          <span className="grow tiny muted">Set the party's date and time to see when to leave.</span>
         ) : (
           <>
             <span className="grow tiny muted">Use your location to see when to leave.</span>

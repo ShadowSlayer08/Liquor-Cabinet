@@ -113,7 +113,8 @@ export default function OutTab({
     <button className="link" onClick={() => { tap(); load(true); }}>↻ {listed.fromCache ? ageStr(listed.fetchedAt) : "Refresh"}</button>
   );
   const rule = kind === "byob" ? byobRule(city) : null;
-  const note = K.source === "zomato" && list.venues ? venueListNote({ kind, zcity, notFound: list.venues.notFound }) : "";
+  const notFound = !!list.venues?.notFound;   // Zomato has no such page for the city (the empty state says so)
+  const note = K.source === "zomato" && list.venues && !notFound ? venueListNote({ kind, zcity }) : "";
   const where = list.venues?.local && loc ? (loc.label || "you") : cityName(city);
   const bigHint = out.bigGroup && K.source === "zomato" && venues.length > 0 && !venues.some((v) => v.big);
   const total = list.venues?.total;
@@ -181,7 +182,7 @@ export default function OutTab({
               <div className="t">{fitsOnly && shown ? "Nothing within your budget" : "No places on this list"}</div>
               <div className="small">
                 {fitsOnly && shown ? "Turn off “Within budget only” to see them all."
-                  : list.venues.notFound ? `Zomato doesn't have this list for ${cityName(city)} — try it on Zomato, or pick another kind of night.`
+                  : notFound ? `Zomato has no ${kind === "byob" ? "BYOB" : "bars"} page for ${cityName(city)}. Look on Zomato, or try another kind of night.`
                     : `Zomato didn't list any ${kind === "byob" ? "BYOB places" : "bars"} for ${where} just now.`}
               </div>
             </div>

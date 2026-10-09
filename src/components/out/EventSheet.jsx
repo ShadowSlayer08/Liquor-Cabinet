@@ -11,7 +11,7 @@ import { fetchEvent } from "../../lib/outSources.js";
 import { eventUrl, ticketsForShow } from "../../lib/parse/district.js";
 import { ageLine } from "../../lib/age.js";
 import {
-  showFor, alignParty, eventPick, eventWhenText, eventPriceText, doorRules, ticketKindLabel, serviceText, gateCoverText,
+  showFor, showOver, alignParty, eventPick, eventWhenText, eventPriceText, doorRules, ticketKindLabel, serviceText, gateCoverText,
   ticketPeople, gateCoverTotal, plannedTickets, clampQty, feeText, kmText, kmBetween, onNight, directionsUrl,
 } from "../../lib/out.js";
 import { prettyTime, clockOf } from "../../lib/when.js";
@@ -53,15 +53,22 @@ export default function EventSheet({ e, kind, city, party, setParty, origin, out
   const km = e.km ?? kmBetween(origin, place);
   const directions = directionsUrl(place.lat, place.lon);
   const rules = doorRules(d?.rules);
-  const move = s ? alignParty(s, party) : null;
+  // The show the party would be: the chosen one, or the list card's own date when the page couldn't be read.
+  const at = s || (!d && e.start ? { start: e.start, end: e.end || "" } : null);
+  const over = !!at && showOver(at);
+  const move = at ? alignParty(at, party) : null;        // the party's new date and/or time, or null
+  const moveDate = !!move && move.date !== party?.date;
   const soldOut = !!(s?.soldOut || (d?.soldOut && !tickets.some((t) => t.buyable)));
   const asOf = d?.fetchedAt ? (Date.now() - d.fetchedAt < 12 * 3600000 ? prettyTime(clockOf(new Date(d.fetchedAt))) : ageStr(d.fetchedAt)) : "";
 
+  // Already the party, on the picked show: the plan follows the stepper straight away. On
+  // another show it waits for "update", which moves the pick to that show too.
+  const pickedShow = isPick && !!s && Date.parse(s.start) === Date.parse(out.pick.start);
   const setQ = (t, want) => {
     const next = { ...qty, [t.id]: clampQty(t, want, qty[t.id] || 0) };
     setQty(next);
     tap();
-    if (isPick) setOut((o) => ({ ...o, tickets: plannedTickets(tickets, next) }));
+    if (pickedShow) setOut((o) => ({ ...o, tickets: plannedTickets(tickets, next) }));
   };
 
   const makeParty = () => {
@@ -70,7 +77,7 @@ export default function EventSheet({ e, kind, city, party, setParty, origin, out
     setOut((o) => ({ ...o, active: true, pick, tickets: d ? planned : [], booked: isPick ? o.booked : false, corkage: null }));
     if (move) {
       setParty((p) => ({ ...p, ...move }));
-      toast?.(`${pick.name} is the party — moved to ${eventWhenText(s.start, s.end)}`);
+      toast?.(`${pick.name} is the party — ${moveDate ? `moved to ${eventWhenText(at.start, at.end)}` : `starting ${prettyTime(move.time)}`}`);
     } else toast?.(`${pick.name} is the party`);
     onClose();
   };
@@ -84,7 +91,7 @@ export default function EventSheet({ e, kind, city, party, setParty, origin, out
         </button>
         <div className="row">
           {directions && <button className="btn btn-ghost btn-sm" onClick={() => openUrl(directions)}><Icon.route size={15} /> Directions</button>}
-          <button className={`btn btn-sm grow ${isPick ? "btn-ghost" : "btn-gold"}`} disabled={!!state.loading} onClick={makeParty}>
+          <button className={`btn btn-sm grow ${isPick ? "btn-ghost" : "btn-gold"}`} disabled={!!state.loading || over} onClick={makeParty}>
             {isPick ? <><Icon.check size={14} /> The party · update</> : "Make this the party"}
           </button>
         </div>
@@ -104,7 +111,7 @@ export default function EventSheet({ e, kind, city, party, setParty, origin, out
 
       {state.error && (
         <>
-          <div className="small soft" style={{ marginBottom: 8 }}><Icon.calendar size={13} className="out-inline-icon" /> {eventWhenText(e.start, e.end)}</div>
+          <div className="small soft" style={{ marginBottom: 8 }}><Icon.calendar size={13} className="out-inline-icon" /> {eventWhenText(e.start, e.end)}{over ? " · over" : ""}</div>
           <div className="empty" style={{ padding: "22px 8px" }}>
             <div className="t">Couldn't read this event on District</div>
             <div className="small" style={{ marginBottom: 14 }}>{state.error}. Its District page has the tickets.</div>
@@ -129,7 +136,10 @@ export default function EventSheet({ e, kind, city, party, setParty, origin, out
                 ))}
               </div>
             ) : <div className="small soft">{s ? eventWhenText(s.start, s.end) : eventWhenText(e.start, e.end) || "Date on District"}</div>}
-            {move && <div className="tiny gold" style={{ marginTop: 6 }}>Not on your party date — making it the party moves the date to {eventWhenText(s.start, s.end)}.</div>}
+            {over ? <div className="tiny red" style={{ marginTop: 6 }}>This show is over{shows.length > 1 ? " — pick another one." : "."}</div>
+              : moveDate ? <div className="tiny gold" style={{ marginTop: 6 }}>Not on your party date — making it the party moves the party to {eventWhenText(at.start, at.end)}.</div>
+                : move ? <div className="tiny gold" style={{ marginTop: 6 }}>Starts at {prettyTime(move.time)} — making it the party sets the party's time to match.</div>
+                  : null}
           </div>
 
           <DryDayBanner mode="bars" date={move?.date || party?.date} city={city} customDry={customDry} compact style={{ marginBottom: 12 }} />
@@ -162,7 +172,7 @@ export default function EventSheet({ e, kind, city, party, setParty, origin, out
                     {!t.buyable && <div className="tiny red">Sold out or not on sale</div>}
                     {t.description && <div className="tiny dim clamp2">{t.description}</div>}
                   </div>
-                  {t.buyable && (n > 0
+                  {t.buyable && !over && (n > 0
                     ? <Qty value={n} onChange={(x) => setQ(t, x)} />
                     : <button className="btn btn-xs btn-ghost" onClick={() => setQ(t, 1)}><Icon.plus size={12} /> Plan</button>)}
                 </div>

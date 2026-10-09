@@ -12,7 +12,7 @@ import { fetchVenue } from "../../lib/outSources.js";
 import { venueUrl, bookUrl, closingTime } from "../../lib/parse/district.js";
 import { usualClose } from "../../lib/age.js";
 import {
-  venuePick, venueKey, dayHours, hoursText, weekday, isByobTags, bigGroupTags, kmText, countText, offerText, costForTwoText, directionsUrl,
+  venuePick, venueKey, dayHours, hoursText, weekday, isByobTags, bigGroupTags, kmText, countText, offerText, costForTwoText, directionsUrl, timingText,
 } from "../../lib/out.js";
 import { prettyTime, clockOf } from "../../lib/when.js";
 import { fmt, ageStr } from "../../lib/format.js";
@@ -69,7 +69,7 @@ export default function VenueSheet({ v, kind, city, party, out, setOut, liquorLi
   return (
     <Sheet title={d?.name || v.name} subtitle={subtitle} onClose={onClose} footer={
       <div className="ot-foot">
-        {d?.bookable
+        {d?.bookable && page
           ? <button className="btn ot-btn-district btn-block" onClick={() => { tap(); openDistrict({ web: bookUrl(v) }); }}>Book a table on District <Icon.external size={15} /></button>
           : page && <button className="btn ot-btn-district btn-block" onClick={() => { tap(); openDistrict({ web: page }); }}>Open in District <Icon.external size={15} /></button>}
         <div className="row">
@@ -88,7 +88,7 @@ export default function VenueSheet({ v, kind, city, party, out, setOut, liquorLi
             {typeof rating === "number" && rating > 0 ? <>★ {rating.toFixed(1)}{votes ? ` (${countText(votes)})` : ""} · </> : null}
             {d?.address || v.locality || ""}
           </div>
-          {v.timing && <div className="tiny dim">{v.timing}</div>}
+          {timingText(v.timing) && <div className="tiny dim">{timingText(v.timing)}</div>}
         </div>
       </div>
 
