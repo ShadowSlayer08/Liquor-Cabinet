@@ -14,7 +14,7 @@ import { getText, HttpError } from "./http.js";
 import { store } from "./store.js";
 import { zomatoCookie } from "./location.js";
 import { OUT_KIND } from "./outModel.js";
-import { ZOMATO_BASE, zomatoCity, parseVenueListPage } from "./parse/zomato.js";
+import { ZOMATO_BASE, zomatoCity, parseVenueListPage, isVenueList } from "./parse/zomato.js";
 import { venueUrl, bookUrl, eventUrl, eventListUrls, EVENT_CITY, parseVenuePage, parseEventList, parseEventPage } from "./parse/district.js";
 
 const H = 3600 * 1000;
@@ -54,7 +54,8 @@ async function page(url, site, opts = {}) {
  * Bars & pubs or BYOB places near the user, from Zomato's category page for the zone.
  * @param {"bar"|"byob"} kind
  * @returns {Promise<{ venues: import("./outModel.js").VenueListItem[], total: number|null, hasMore: boolean,
- *   url: string, local: boolean, fetchedAt: number, fromCache: boolean }>}  url = the Zomato page ("More on Zomato")
+ *   url: string, local: boolean, notFound?: boolean, fetchedAt: number, fromCache: boolean }>}
+ *   url = the Zomato page ("More on Zomato"); notFound = Zomato has no such list for the city (venues [])
  */
 export async function fetchVenueList(kind, { city, loc = null, force = false } = {}) {
   const k = OUT_KIND[kind];
@@ -67,16 +68,22 @@ export async function fetchVenueList(kind, { city, loc = null, force = false } =
   if (hit) return hit;
 
   const url = `${ZOMATO_BASE}/${zCity}/${k.path}`;
+  // No such list for this city: an empty list (cached like any other) and the link still works.
+  const notFound = () => save(key, { venues: [], total: 0, hasMore: false, url, local: !!loc?.zomato, notFound: true, fetchedAt: io.now() });
   let parsed;
   try {
     parsed = parseVenueListPage(await page(url, "Zomato", { cookie: zomatoCookie(loc) }));
   } catch (e) {
-    // No such page for this city: an empty list (cached like any other) and the link still works.
-    if (e.status === 404) return save(key, { venues: [], total: 0, hasMore: false, url, local: !!loc?.zomato, notFound: true, fetchedAt: io.now() });
+    if (e.status === 404) return notFound();
     throw e;
   }
-  if (!parsed) throw new Error("Zomato page format changed");
-  return save(key, { ...parsed, url, local: !!loc?.zomato, fetchedAt: io.now() });
+  // Most cities without the page get another list with a 200 (delivery kitchens, every dine-out place):
+  // never show those as bars or BYOB places.
+  const right = parsed && isVenueList(parsed, { zcity: zCity, path: k.path });
+  if (right == null) throw new Error("Zomato page format changed");
+  if (!right) return notFound();
+  const { venues, total, hasMore } = parsed;
+  return save(key, { venues, total, hasMore, url, local: !!loc?.zomato, fetchedAt: io.now() });
 }
 
 /**

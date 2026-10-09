@@ -4,6 +4,9 @@ import { buildReminders, reminderSig, reminderState, reminderExtra, isOn, lastCa
 import { partyStart, partyWhen, prettyTime, prettyWhen, clockOf } from "../src/lib/when.js";
 import { leaveBy, closesAt, lastCallFor, freeCancelUntil, placeKey, placeState, byobNight, LEAVE_MAX_KM } from "../src/lib/reminderPlan.js";
 import { DEFAULT_OUT, slimVenue, slimEvent } from "../src/lib/outModel.js";
+import { dryNote } from "../src/lib/reminderPlan.js";
+import { dryDayOn } from "../src/lib/drydays.js";
+import { templateToast } from "../src/lib/templates.js";
 
 const party = { date: "2027-06-12", time: "20:00", hours: 4, dinner: true };
 const mins = (list, key) => (list.find((r) => r.key === key).at - partyStart(party)) / 60000;
@@ -239,7 +242,7 @@ test("last call: 45 min before the venue's listed closing, after midnight too", 
 });
 
 test("a BYOB night keeps buying and chilling the bottles you bring", () => {
-  const out = outAt(soi7, { kind: "byob" });
+  const out = outAt({ ...soi7, kind: "byob" });   // picked off the BYOB list (venuePick sets pick.kind)
   assert.ok(byobNight(out));
   assert.ok(byobNight(outAt({ ...soi7, tags: ["BYOB", "DJ"] })));
   assert.ok(!byobNight(outAt(soi7)));
@@ -255,9 +258,69 @@ test("a BYOB night keeps buying and chilling the bottles you bring", () => {
   assert.equal(gj.at.getTime(), T("2027-10-01T12:00:00"));
   assert.match(gj.body, /Gandhi Jayanti/);
   // Everything a night out can have fits the 12 ids reminders.js cancels.
-  const all = outList(outAt(soi7, { kind: "byob", booked: true }));
+  const all = outList(outAt({ ...soi7, kind: "byob" }, { booked: true }));
   assert.equal(all.length, 6);
   assert.ok(all.every((r) => r.id < BASE_ID + 12));
+});
+
+test("BYOB comes from the pick, not the outing-type chip that's on now", () => {
+  // A club night stays a club night when the host taps the BYOB chip to browse.
+  const club = outAt(xlive, { kind: "byob" });
+  assert.ok(!byobNight(club));
+  assert.ok(!byobNight(outAt({ ...xlive, kind: "byob", tags: ["BYOB"] })));   // events never are
+  assert.deepEqual(outList(club).map((r) => r.key), ["leave", "winddown", "settle"]);
+  // A bar picked off the bars list: the chip changing doesn't add the bottle run (or dirty the reminders).
+  assert.ok(!byobNight(outAt({ ...soi7, kind: "bar" }, { kind: "byob" })));
+  assert.deepEqual(outList(outAt({ ...soi7, kind: "bar" }, { kind: "byob" })), outList(outAt({ ...soi7, kind: "bar" })));
+  // A BYOB place picked off the BYOB list keeps its bottles when the chip moves on.
+  const byob = outAt({ ...soi7, kind: "byob", tags: [] }, { kind: "club" });
+  assert.ok(byobNight(byob));
+  assert.deepEqual(outList(byob).map((r) => r.key), ["stock", "chill", "leave", "winddown", "settle"]);
+});
+
+// ── Dry days that end at 5 pm (Haryana's 26 Jan and 15 Aug) ──────────────────
+test("a part-day dry day: the 'buy today' nudge waits for the shops to open", () => {
+  const stock = (p, city = "gurgaon", custom = []) => buildReminders({ ...party, ...p }, city, custom, now).find((r) => r.key === "stock");
+  const election = [{ date: "2027-01-27", name: "Election" }];
+  // Party on an election day: the last open day is 26 Jan, shut until 5 pm → 5 pm, not noon.
+  const onDay = stock({ date: "2027-01-27", time: "13:00" }, "gurgaon", election);
+  assert.equal(onDay.at.getTime(), T("2027-01-26T17:00:00"));
+  assert.match(onDay.body, /27 Jan is a dry day \(Election\) — liquor shops will be shut\. Buy your bottles today after 5 pm\.$/);
+  // The day before is the election, with no time on the party morning → 26 Jan, after 5 pm.
+  const eve = stock({ date: "2027-01-28", time: "12:30" }, "gurgaon", election);
+  assert.equal(eve.at.getTime(), T("2027-01-26T17:00:00"));
+  assert.match(eve.body, /Buy your bottles today after 5 pm\.$/);
+  // In Delhi 26 Jan is shut all day, so it's the 25th at noon, as before.
+  const delhi = stock({ date: "2027-01-27", time: "13:00" }, "delhi", election);
+  assert.equal(delhi.at.getTime(), T("2027-01-25T12:00:00"));
+  assert.match(delhi.body, /Buy your bottles today\.$/);
+  // A party on 26 Jan itself: buy the day before, and the note says when the shops open.
+  const repDay = stock({ date: "2027-01-26" });
+  assert.equal(repDay.at.getTime(), T("2027-01-25T12:00:00"));
+  assert.match(repDay.body, /26 Jan is Republic Day — liquor shops in Haryana will be shut until 5 pm\. Buy your bottles today\.$/);
+  // The usual nudge the evening before (6 pm on 26 Jan) is after the shops open, so it stays.
+  const after = stock({ date: "2027-01-27" });
+  assert.equal(after.at.getTime(), T("2027-01-26T18:00:00"));
+  assert.equal(after.body, "Pick up the bottles on your Liquor Cabinet list.");
+  // …but at 4:30 pm they're still shut: the party morning instead.
+  const before = stock({ date: "2027-01-27", time: "18:30" });
+  assert.equal(before.at.getTime(), T("2027-01-27T11:00:00"));
+  assert.match(before.body, /26 Jan is Republic Day — liquor shops in Haryana will be shut until 5 pm\. Pick up your bottles this morning\.$/);
+  // The template toast names the same opening time for its "buy by" day.
+  assert.match(templateToast({ party: { name: "Election-day lunch", date: "2027-01-27" }, note: null }, "gurgaon", election),
+    /buy bottles by .*26 Jan \(after 5 pm\)$/);
+  assert.match(templateToast({ party: { name: "Election-day lunch", date: "2027-01-27" }, note: null }, "delhi", election),
+    /buy bottles by .*25 Jan$/);
+});
+
+test("dry-day notes: a part-day closure says when the shops open", () => {
+  const note = (date, city, custom = []) => dryNote(dryDayOn(date, city, custom), date, city);
+  assert.match(note("2027-01-26", "gurgaon"), /^.*26 Jan is Republic Day — liquor shops in Haryana will be shut until 5 pm\.$/);
+  assert.match(note("2027-08-15", "faridabad"), /Independence Day — liquor shops in Haryana will be shut until 5 pm\.$/);
+  assert.match(note("2026-10-02", "gurgaon"), /Gandhi Jayanti — liquor shops will be shut\.$/);   // 2 Oct: all day
+  assert.match(note("2027-01-26", "delhi"), /Republic Day — liquor shops will be shut\.$/);
+  // An election ban on 26 Jan outranks the part-day closure: shut all day.
+  assert.match(note("2027-01-26", "gurgaon", [{ date: "2027-01-26", name: "Election" }]), /a dry day \(Election\) — liquor shops will be shut\.$/);
 });
 
 test("taps on night-out reminders land on the Out tab", () => {

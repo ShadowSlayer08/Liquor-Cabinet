@@ -1,7 +1,8 @@
 // [v1.3 · item 2] Dry days ahead for the party's state, plus dry days you add yourself
 // (election bans and state notices the built-in list can't know about).
+// v1.5: a part-day closure (Haryana's 26 Jan / 15 Aug, until 5 pm) reads "Till 5 pm", not "Closed".
 import { useState } from "react";
-import { upcomingDryDays, prettyDate, stateOf, todayISO, addCustomDry, removeCustomDry, stateListUrl } from "../../lib/drydays.js";
+import { upcomingDryDays, prettyDate, stateOf, todayISO, addCustomDry, removeCustomDry, stateListUrl, clock } from "../../lib/drydays.js";
 import { cityName } from "../../lib/parse/livcheers.js";
 import { openUrl, tap } from "../../lib/order.js";
 import DryDayBanner from "../DryDayBanner.jsx";
@@ -40,7 +41,7 @@ export default function DryDaysCard({ party, city, customDry, setCustomDry, toas
 
       {rows.length === 0 && <div className="small muted">Nothing on our list for the coming months — your state may still notify some.</div>}
       {rows.map((d) => {
-        const lv = LEVEL[d.level] || LEVEL.often;
+        const lv = d.until ? { label: `Till ${clock(d.until)}`, cls: "bar-pill-amber" } : LEVEL[d.level] || LEVEL.often;
         const mine = d.date === party?.date;
         const sameYear = d.date.slice(0, 4) === today.slice(0, 4);
         return (

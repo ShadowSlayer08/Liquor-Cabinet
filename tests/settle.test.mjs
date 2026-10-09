@@ -223,15 +223,24 @@ test("startSettle on a night out: the venue estimate and planned tickets, flagge
   const now = new Date("2026-11-07T23:00:00").getTime();
   const plan = { guests: 10, drinkers: 8 };
   const foodCart = [{ kind: "zomato", unitPrice: 300, qty: 2, restaurant: { resId: 11, name: "Biryani Blues" } }];
-  const s = startSettle({ party, plan, liquorTotal: 3000, foodCart, out: outAt(soi7, { tickets: [{ price: 500, qty: 2 }] }) }, now);
+  const s = startSettle({ party, plan, liquorTotal: 3000, foodCart, blinkitTotal: 400, out: outAt(soi7, { tickets: [{ price: 500, qty: 2 }] }) }, now);
   assert.equal(s.title, "Night out");
+  // A bar night: the home carts (bottles, Zomato, supplies) stay home, as on the invite and the split card.
   assert.deepEqual(s.expenses.map((e) => [e.what, e.part, e.amount, e.planned]), [
     ["Soi 7 Pub & Brewery", "venue", 12000, true],   // ₹2,400 for two → ₹1,200 a head × 10
     ["Tickets", "tickets", 1000, true],
-    ["Bottles", "liquor", 3000, true],                // still switched on in the split card
-    ["Biryani Blues", "food", 600, true],
   ]);
   assert.ok(s.expenses.every((e) => e.paidBy === "p1"));
+  // A BYOB night: the bottles you bring come along; the food and supplies carts don't.
+  const byob = startSettle({ party, plan, liquorTotal: 3000, foodCart, blinkitTotal: 400, out: outAt({ ...soi7, kind: "byob" }) }, now);
+  assert.deepEqual(byob.expenses.map((e) => [e.what, e.part, e.amount, e.planned]), [
+    ["Soi 7 Pub & Brewery", "venue", 12000, true],
+    ["Bottles", "liquor", 3000, true],
+  ]);
+  assert.ok(!startSettle({ party, split: { include: { liquor: false } }, plan, liquorTotal: 3000, out: outAt({ ...soi7, kind: "byob" }) }, now).expenses.some((e) => e.part === "liquor"));
+  // The outing-type chip alone (BYOB tapped to browse) doesn't bring the bottles to a club night.
+  assert.deepEqual(startSettle({ party, plan, liquorTotal: 3000, foodCart, out: outAt(xlive, { kind: "byob", tickets: [{ price: 1500, qty: 2 }] }) }, now)
+    .expenses.map((e) => [e.part, e.amount]), [["tickets", 3000]]);
   // The venue estimate follows the split card's head count; switched off there, it's left out.
   assert.equal(startSettle({ party, split: { people: 4 }, plan, out: outAt(soi7) }, now).expenses[0].amount, 4800);
   assert.ok(!startSettle({ party, split: { include: { venue: false } }, plan, out: outAt(soi7) }, now).expenses.some((e) => e.part === "venue"));

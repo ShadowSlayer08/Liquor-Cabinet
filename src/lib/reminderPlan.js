@@ -16,8 +16,11 @@
 //  last call from the venue's listed closing time, and settle-up as at home. The home-only
 //  nudges (chill the beer, order mixers, starters and dinner on Zomato) are left out; a BYOB
 //  night keeps "buy the bottles" and "chill" because you're bringing them.
+//
+//  Part-day dry days (Haryana's 26 Jan and 15 Aug, shut until 5 pm — lib/drydays.js): the
+//  "buy today" nudge on such a day waits for the shops to open, and says so.
 // ═══════════════════════════════════════════════════════════════════════════════
-import { dryDayOn, lastShoppingDay, prettyDate, stateOf, todayISO } from "./drydays.js";
+import { clock, dryDayOn, lastShoppingDay, prettyDate, shopsOpenAt, stateOf, todayISO, untilText } from "./drydays.js";
 import { partyStart, partyWhen, prettyTime, clockOf } from "./when.js";
 import { driversOf, outVenueName } from "./rides.js";
 import { isOut, outPlace, kmBetween, travelMinutes } from "./outModel.js";
@@ -26,28 +29,35 @@ export const BASE_ID = 8100;
 
 // "Fri, 2 Oct is Gandhi Jayanti — liquor shops will be shut." Only national and
 // your own dry days are certain; festival/state days are "often" dry (lib/drydays.js).
+// A part-day closure says when the shops open: "… liquor shops in Haryana will be shut until 5 pm."
 export function dryNote(dry, date, citySlug) {
   const d = prettyDate(date);
+  const state = stateOf(citySlug);
+  if (dry.level === "national" && dry.until) return `${d} is ${dry.name} — liquor shops${state ? ` in ${state}` : ""} will be shut ${untilText(dry)}.`;
   if (dry.level === "national") return `${d} is ${dry.name} — liquor shops will be shut.`;
   if (dry.level === "custom") return `${d} is a dry day${dry.name && dry.name !== "Dry day" ? ` (${dry.name})` : ""} — liquor shops will be shut.`;
-  return `${d} is ${dry.name} — often a dry day in ${stateOf(citySlug) || "many states"}, so shops may be shut.`;
+  return `${d} is ${dry.name} — often a dry day in ${state || "many states"}, so shops may be shut.`;
+}
+
+// "Buy your bottles today" on the last open day: at noon, or when the shops open on a part-day
+// dry day (a noon nudge on Haryana's 26 Jan would find them shut until 5 pm).
+function buyOn(day, note, citySlug, customDry) {
+  const opens = shopsOpenAt(day, citySlug, customDry);
+  return { at: new Date(`${day}T${opens || "12:00"}:00`), body: `${note} Buy your bottles today${opens ? ` after ${clock(opens)}` : ""}.` };
 }
 
 // When to buy the bottles: the day before, unless the party day or the day before is dry.
+// A part-day closure the day before that's over by then (shut until 5 pm, nudge at 6) is no bar.
 function stockReminder(party, citySlug, customDry, at) {
   const dry = dryDayOn(party.date, citySlug, customDry);
-  if (dry) {
-    const day = lastShoppingDay(party.date, citySlug, customDry);
-    return { at: new Date(`${day}T12:00:00`), body: `${dryNote(dry, party.date, citySlug)} Buy your bottles today.` };
-  }
+  if (dry) return buyOn(lastShoppingDay(party.date, citySlug, customDry), dryNote(dry, party.date, citySlug), citySlug, customDry);
   const eveAt = at(-24 * 60 - 120), eve = todayISO(eveAt);
   const eveDry = eve !== party.date ? dryDayOn(eve, citySlug, customDry) : null;
-  if (!eveDry) return { at: eveAt, body: "Pick up the bottles on your Liquor Cabinet list." };
+  if (!eveDry || (eveDry.until && clockOf(eveAt) >= eveDry.until)) return { at: eveAt, body: "Pick up the bottles on your Liquor Cabinet list." };
   // Shops are shut the day before: buy on the party morning if there's time, else the last open day.
   const morning = new Date(`${party.date}T11:00:00`);
   if (morning <= at(-180)) return { at: morning, body: `${dryNote(eveDry, eve, citySlug)} Pick up your bottles this morning.` };
-  const day = lastShoppingDay(eve, citySlug, customDry);
-  return { at: new Date(`${day}T12:00:00`), body: `${dryNote(eveDry, eve, citySlug)} Buy your bottles today.` };
+  return buyOn(lastShoppingDay(eve, citySlug, customDry), dryNote(eveDry, eve, citySlug), citySlug, customDry);
 }
 
 // When the party ends, and last call 45 min before that — null without a date, and no last
@@ -78,8 +88,12 @@ export function settleAt(party) {
 
 // ── A party out (v1.5) ───────────────────────────────────────────────────────
 
-// A night you bring your own bottles to: the BYOB chip, or a venue District lists as BYOB.
-export const byobNight = (out) => isOut(out) && (out.kind === "byob" || (out.pick.tags || []).some((t) => /\bbyob\b/i.test(String(t))));
+// A night you bring your own bottles to, decided by the pick, not by whichever outing-type chip
+// is on now (out.kind — tapping BYOB to browse doesn't turn a club night into one): a venue
+// picked off the BYOB list (pick.kind, from the Out tab's venuePick) or one District lists as
+// BYOB. lib/out.js isByobPick says the same, so the Out tab and the Plan cards agree.
+export const byobNight = (out) => isOut(out) && out.pick.type === "venue"
+  && (out.pick.kind === "byob" || (out.pick.tags || []).some((t) => /\bbyob\b/i.test(String(t))));
 
 // The Out tab's "Your night out" card (OutTab gives it this id).
 const nightOut = () => ({ tab: "out", card: "night-out" });

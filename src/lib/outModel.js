@@ -59,10 +59,14 @@ export const isOut = (out) => !!(out?.active && out.pick);
  * @typedef {object} VenueDetails
  * @property {number|null} resId
  * @property {string} name
+ * @property {string} zcity        the page's city segment (fetchVenue adds it)
+ * @property {string} slug
+ * @property {string} locality
  * @property {number|null} lat
  * @property {number|null} lon
  * @property {string} address
  * @property {string} phone        "" if none
+ * @property {string[]} phones     every number the page lists
  * @property {string[]} cuisines
  * @property {number|null} rating
  * @property {number|null} votes
@@ -94,11 +98,15 @@ export const isOut = (out) => !!(out?.active && out.pick);
  * @property {string} name
  * @property {string} description  plain text
  * @property {string} venue
+ * @property {string} locality
+ * @property {string} organizer
  * @property {string} address
  * @property {number|null} lat
  * @property {number|null} lon
- * @property {{ start: string, end: string }[]} shows  ISO (UTC), sorted
- * @property {{ ageEntry: number|null, stag: string, id: string, dress: string, reentry: string }} rules  organiser's door rules ("" if not given)
+ * @property {{ start: string, end: string, soldOut?: boolean }[]} shows  ISO (UTC), sorted
+ * @property {{ ageEntry: number|null, stagAllowed: boolean|null, stag: string, id: string, dress: string, reentry: string }} rules
+ *   organiser's door rules; stag/id/dress/reentry are District's own headings ("Stag entry is not allowed at this event"), "" if not given
+ * @property {boolean} soldOut
  * @property {Ticket[]} tickets
  * @property {number|null} priceFrom   cheapest buyable ticket
  * @property {number} feePct           District convenience fee, 0–0.07
@@ -115,8 +123,10 @@ export const isOut = (out) => !!(out?.active && out.pick);
  * @property {string} kind        "stag" | "male" | "female" | "couple" | "group" | "guestlist" | "table" | "general" — from the ticket name
  * @property {number|null} groupSize   people one ticket admits, if the name says (couple 2, "Group of 5" 5)
  * @property {"cover"|"entry"|null} service  cover charge (redeemable on food & drinks) or entry fee
- * @property {{ amount: number, per: "person"|"couple"|null }|null} gateCover  extra paid at the gate, from the ticket's text
+ * @property {{ amount: number, per: "person"|"couple"|null, couple?: number }|null} gateCover  extra paid at the gate, from the ticket's text
  * @property {string} description  plain text
+ * @property {number[]} shows      indexes into EventDetails.shows this ticket is sold for (one entry per ticket across weekly shows)
+ * @property {number[]} buyableIn  the shows it can still be bought for — per-show rows: district.js ticketsForShow()
  */
 
 // What the plan keeps of a venue: enough for the summary, invite, reminders and rides.

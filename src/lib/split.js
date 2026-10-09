@@ -10,12 +10,25 @@
 //  say who drank what, and District tickets are per person (the host buys them for the
 //  group). Missing include keys count as on; at home both amounts are 0, so a party at
 //  home splits exactly as before.
+//  The home carts mostly stay home on a night out (homeParts): a bar or club serves its own
+//  drinks and food, so only a BYOB night's bottles join the split, as on the invite and in
+//  the Out tab's cost lines. That's decided here, not by switching parts off in the shared
+//  `split.include`, which the next party at home would inherit.
 // ═══════════════════════════════════════════════════════════════════════════════
 import { fmt } from "./format.js";
 import { prettyWhen } from "./when.js";
+import { isOut } from "./outModel.js";
+import { byobNight } from "./reminderPlan.js";
 
 const ALL_ON = { liquor: true, food: true, supplies: true, venue: true, tickets: true };
 const OUT_KEYS = ["venue", "tickets"];
+
+// Which home carts count towards the bill: all three at home (or with nothing picked); on a
+// night out none, except the bottles you bring to a BYOB place.
+export function homeParts(out) {
+  if (!isOut(out)) return { liquor: true, food: true, supplies: true };
+  return { liquor: byobNight(out), food: false, supplies: false };
+}
 
 export function splitBill({ liquor = 0, food = 0, supplies = 0, venue = 0, tickets = 0, people = 1, drinkers = 1, mode = "fair", include = {} }) {
   const inc = { ...ALL_ON, ...include };
@@ -64,12 +77,12 @@ export function shareRows(r) {
 }
 
 // What a split covers, every part spelled out, for the labels (includedLabel, the payment card).
-// At home: the switches as they are. On a night out (a venue or ticket amount): only the parts
-// that are switched on and have something in them, so a bar night reads "the venue", not
-// "liquor, food, supplies & the venue".
-export function splitParts(include, totals = {}) {
+// At home: the switches as they are. On a night out (`away`, or a venue or ticket amount): only
+// the parts that are switched on and have something in them, so a bar night reads "the venue",
+// not "liquor, food, supplies & the venue" — and a BYOB night with no venue estimate "liquor".
+export function splitParts(include, totals = {}, away = false) {
   const inc = { ...ALL_ON, ...include };
-  const out = OUT_KEYS.some((k) => (totals[k] || 0) > 0);
+  const out = away || OUT_KEYS.some((k) => (totals[k] || 0) > 0);
   return Object.fromEntries(Object.keys(ALL_ON).map((k) => [k, !!inc[k] && (out ? (totals[k] || 0) > 0 : !OUT_KEYS.includes(k))]));
 }
 
