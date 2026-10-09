@@ -17,7 +17,7 @@
 //  Pure (no Capacitor), so node --test covers it.
 // ═══════════════════════════════════════════════════════════════════════════════
 import { fmt } from "./format.js";
-import { resolveSplit, validVpa } from "./split.js";
+import { homeParts, resolveSplit, validVpa } from "./split.js";
 import { partyStart, partyWhen, prettyWhen } from "./when.js";
 import { isOut, outSpend } from "./outModel.js";
 import { outVenueName } from "./rides.js";
@@ -82,7 +82,8 @@ export function normalizeSettle(s) {
 // Parts left out of the split card stay out. Bistro is priced in its app, so it starts at ₹0.
 // A party out (`out`, v1.5) starts with the venue bill (the venue's estimate, or ₹0 to fill
 // in) for a venue and the tickets as planned (₹0 if none were) for an event — both planned,
-// so the sheet asks for the real figures.
+// so the sheet asks for the real figures. The home carts stay out of it (split.js homeParts),
+// except a BYOB night's bottles.
 export function startSettle({ party, split, plan, liquorTotal = 0, foodCart = [], blinkitTotal = 0, out = null } = {}, now = Date.now()) {
   const r = resolveSplit(split, plan);
   const n = Math.min(r.people, MAX_PEOPLE);
@@ -101,8 +102,9 @@ export function startSettle({ party, split, plan, liquorTotal = 0, foodCart = []
     if (r.include.tickets !== false && (isEvent || spend.tickets > 0)) add(PARTS.tickets.label, "tickets", spend.tickets);
   }
   const lines = Array.isArray(foodCart) ? foodCart : [];
-  if (r.include.liquor && liquorTotal > 0) add("Bottles", "liquor", liquorTotal);
-  if (r.include.food) {
+  const home = homeParts(out);
+  if (home.liquor && r.include.liquor && liquorTotal > 0) add("Bottles", "liquor", liquorTotal);
+  if (home.food && r.include.food) {
     const rest = new Map();
     for (const l of lines) {
       if (l?.kind !== "zomato") continue;
@@ -114,7 +116,7 @@ export function startSettle({ party, split, plan, liquorTotal = 0, foodCart = []
     for (const { name, total } of rest.values()) add(name, "food", total);
     if (lines.some((l) => l?.kind === "bistro")) add("Bistro", "food", 0);
   }
-  if (r.include.supplies && blinkitTotal > 0) add("Supplies", "supplies", blinkitTotal);
+  if (home.supplies && r.include.supplies && blinkitTotal > 0) add("Supplies", "supplies", blinkitTotal);
   if (!expenses.length) add("Bottles", "liquor", 0);
 
   // The morning after, App has already rolled the party date on to next Saturday, so a date

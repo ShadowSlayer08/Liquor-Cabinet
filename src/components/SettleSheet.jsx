@@ -129,8 +129,8 @@ export default function SettleSheet({ settle, setSettle, party, split, plan, liq
               </div>
               {e.planned && (
                 <span className="pill out-planned">
-                  {e.part === "venue" ? "the venue's estimate · edit to the real bill"
-                    : e.part === "tickets" ? "tickets as planned · edit to what was paid, with fees"
+                  {e.part === "venue" ? (e.amount ? "the venue's estimate · edit to the real bill" : "no estimate listed · add the real bill")
+                    : e.part === "tickets" ? (e.amount ? "tickets as planned · edit to what was paid, with fees" : "no tickets planned · add what was paid")
                       : "planned · edit to what was actually paid"}
                 </span>
               )}

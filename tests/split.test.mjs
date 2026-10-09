@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   splitBill, resolveSplit, shareRows, splitMessage, whatsappUrl, includedLabel, validVpa, upiLink,
 } from "../src/lib/split.js";
-import { splitParts } from "../src/lib/split.js";
+import { splitParts, homeParts } from "../src/lib/split.js";
 import { DEFAULT_OUT, slimVenue, slimEvent, outSpend } from "../src/lib/outModel.js";
 
 const totals = { liquor: 8000, food: 3000, supplies: 1000 };
@@ -159,4 +159,34 @@ test("out: the WhatsApp text lists the venue estimate and tickets, with no upi:/
   const club = splitBill({ ...night, tickets: outSpend(outAt(xlive, { tickets: [{ price: 3000, qty: 2 }, { price: 1500, qty: 0 }] }), 4).tickets, people: 4, drinkers: 4 });
   assert.equal(club.total, 6000);
   assert.match(splitMessage({ party: {}, result: club, include: splitParts({}, { ...night, tickets: 6000 }), venue: "XLive" }), /\(tickets, at planned prices\)/);
+});
+
+test("out: the home carts stay home, except a BYOB night's bottles", () => {
+  const all = { liquor: true, food: true, supplies: true };
+  assert.deepEqual(homeParts(null), all);
+  assert.deepEqual(homeParts({ ...outAt(soi7), active: false }), all);
+  assert.deepEqual(homeParts({ ...DEFAULT_OUT, active: true }), all);                     // nothing picked yet
+  assert.deepEqual(homeParts(outAt(soi7)), { liquor: false, food: false, supplies: false });
+  assert.deepEqual(homeParts(outAt(xlive)), { liquor: false, food: false, supplies: false });
+  assert.deepEqual(homeParts(outAt({ ...soi7, kind: "byob" })), { liquor: true, food: false, supplies: false });
+  assert.deepEqual(homeParts(outAt({ ...soi7, tags: ["BYOB"] })), { liquor: true, food: false, supplies: false });
+  assert.deepEqual(homeParts(outAt(xlive, { kind: "byob" })), { liquor: false, food: false, supplies: false });   // the chip alone isn't BYOB
+
+  // A bar night with a ₹6,000 bottle cart and ₹400 of supplies still in the app: the split is the venue
+  // alone, with the shared switches untouched (SplitCard counts the home carts as ₹0).
+  const cart = { liquor: 6000, food: 1500, supplies: 400 };
+  const count = (out) => { const h = homeParts(out); return { liquor: h.liquor ? cart.liquor : 0, food: h.food ? cart.food : 0, supplies: h.supplies ? cart.supplies : 0 }; };
+  const bar = outAt(soi7), venue = outSpend(bar, 6).venue;
+  const r = splitBill({ ...count(bar), venue, people: 6, drinkers: 4, mode: "fair" });
+  assert.deepEqual([r.total, r.perDrinker, r.perNonDrinker], [7200, 1200, 1200]);
+  const msg = splitMessage({ party: {}, result: r, include: splitParts({}, { ...count(bar), venue }, true), venue: "Soi 7 Pub & Brewery" });
+  assert.match(msg, /Splitting about ₹7,200 \(the venue, at planned prices\)/);
+  assert.doesNotMatch(msg, /liquor|food|supplies/);
+  // BYOB: the bottles come along, among the drinkers; food and supplies don't.
+  const byob = outAt({ ...soi7, kind: "byob" });
+  const b = splitBill({ ...count(byob), venue, people: 6, drinkers: 4, mode: "fair" });
+  assert.deepEqual([b.total, b.perDrinker, b.perNonDrinker], [13200, 2700, 1200]);   // 1200 + 6000 / 4
+  // No venue estimate: a BYOB night with only bottles reads "liquor", not the home parts.
+  assert.equal(includedLabel(splitParts({}, { ...count(byob), venue: 0, tickets: 0 }, true)), "liquor");
+  assert.equal(includedLabel(splitParts({}, { liquor: 0, food: 0, supplies: 0 })), "liquor, food & supplies");   // home, as v1.4.1
 });

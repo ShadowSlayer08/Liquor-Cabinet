@@ -136,11 +136,16 @@ test("a club night: the event, its venue, the organiser's age rule and the event
 });
 
 test("a BYOB night lists the bottles you're bringing; links are www.district.in only", () => {
-  const byob = inviteData({ party, ...homeStuff, out: outAt({ ...soi7, tags: [] }, { kind: "byob" }) });
+  const byob = inviteData({ party, ...homeStuff, out: outAt({ ...soi7, tags: [], kind: "byob" }) });   // picked off the BYOB list
   assert.deepEqual(byob.bar, { kind: "byob", items: ["Glenlivet 12", "Kingfisher Ultra"], more: 0 });
   assert.deepEqual(byob.food.items, []);
   // A venue District lists as BYOB counts too, whatever chip is on now.
   assert.equal(inviteData({ party, ...homeStuff, out: outAt({ ...soi7, tags: ["BYOB"] }, { kind: "bar" }) }).bar.kind, "byob");
+  // The chip alone doesn't make it BYOB: a club night or a bar stays as picked when the host taps BYOB to browse…
+  assert.deepEqual(inviteData({ party, ...homeStuff, out: outAt(xlive, { kind: "byob" }) }).bar, { kind: "bottles", items: [], more: 0 });
+  assert.deepEqual(inviteData({ party, ...homeStuff, out: outAt({ ...soi7, kind: "bar" }, { kind: "byob" }) }).bar, { kind: "bottles", items: [], more: 0 });
+  // …and a BYOB pick keeps its bottles when the chip moves on.
+  assert.equal(inviteData({ party, ...homeStuff, out: outAt({ ...soi7, tags: [], kind: "byob" }, { kind: "club" }) }).bar.kind, "byob");
   // A missing URL is rebuilt from the slug; anything not on www.district.in is dropped.
   assert.equal(inviteData({ party, out: outAt({ ...soi7, url: "" }) }).url, SOI7_URL);
   assert.equal(inviteData({ party, out: outAt({ ...xlive, url: "" }) }).url, "https://www.district.in/events/giada-brince-xlive-saturday-oct3-2026-buy-tickets");
