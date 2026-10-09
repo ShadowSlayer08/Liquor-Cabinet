@@ -896,5 +896,9 @@ body:has(.share-ask) .toast { bottom: calc(var(--safe-bottom) + var(--nav-h) + 1
 .ot-gate { color: #f5c04a; margin-top: 2px; }
 .ot-night-note { margin-top: 10px; }
 .ot-close { margin: 6px 0 0 28px; }
+/* A planned ticket that's no longer on sale: kept, with its qty, and a way to drop it */
+.ot-ticket.kept > .grow { opacity: .85; }
+.ot-kept { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.ot-kept-n { min-width: 26px; text-align: center; color: var(--gold); }
 
 /* (end v1.5 out) */

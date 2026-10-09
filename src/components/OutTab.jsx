@@ -68,7 +68,8 @@ export default function OutTab({
 
   // A new party date: the picked venue's closing time is redone from the hours it keeps, so
   // last call and the "closes" line follow the date (lib/out.js outForDate). This only runs
-  // while the tab is open; App.jsx should run it too, since the reminders read pick.closes.
+  // while the tab is open, and the reminders read pick.closes whatever tab changed the date,
+  // so App.jsx has to run it too: useEffect(() => setOut((o) => outForDate(o, party.date)), [party.date]).
   useEffect(() => {
     setOut((o) => outForDate(o, party?.date));
   }, [party?.date, out.pick?.closesFor, setOut]);

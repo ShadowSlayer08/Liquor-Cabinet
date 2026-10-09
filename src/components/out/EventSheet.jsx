@@ -5,7 +5,9 @@
 // exact as of now, with what each name says (couple, group of 5…), cover vs entry fee and any
 // gate cover the event's text mentions. You plan how many of each here; you buy them in District.
 // Shows are kept by their start and tickets by name + price (lib/out.js ticketKey), because a
-// weekly night's ids and show list change as its past shows drop off the page.
+// weekly night's ids and show list change as its past shows drop off the page. A ticket planned
+// for the picked show that has sold out since stays in the plan ("Planned · not on sale now"):
+// it has most likely been bought, and its price is the night's exact cost.
 import { useEffect, useMemo, useRef, useState } from "react";
 import Sheet, { Qty, Skeleton } from "../Sheet.jsx";
 import DryDayBanner from "../DryDayBanner.jsx";
@@ -14,7 +16,7 @@ import { eventUrl, ticketsForShow } from "../../lib/parse/district.js";
 import { ageLine } from "../../lib/age.js";
 import {
   showFor, showOver, alignParty, eventPick, eventWhenText, eventPriceText, doorRules, ticketKindLabel, serviceText, gateCoverText,
-  ticketPeople, gateCoverTotal, plannedTickets, qtyFromPlan, ticketKey, clampQty, feeText, kmText, kmBetween, onNight, directionsUrl,
+  ticketPeople, gateCoverTotal, plannedTickets, keptTicket, qtyFromPlan, ticketKey, clampQty, feeText, kmText, kmBetween, showOnDate, directionsUrl,
 } from "../../lib/out.js";
 import { prettyTime, clockOf } from "../../lib/when.js";
 import { fmt, ageStr } from "../../lib/format.js";
@@ -54,7 +56,12 @@ export default function EventSheet({ e, kind, city, party, setParty, origin, out
     if (d && isPick && !touched.current) setQty(qtyFromPlan(tickets, out.tickets));
   }, [d]);
 
-  const planned = useMemo(() => plannedTickets(tickets, qty), [tickets, qty]);
+  // Already the party, on the picked show: the plan follows the stepper straight away. On
+  // another show it waits for "update", which moves the pick to that show too. On the picked
+  // show a planned ticket that has sold out since stays in the plan (`keep`).
+  const pickedShow = isPick && !!s && Date.parse(s.start) === Date.parse(out.pick.start);
+  const keep = pickedShow ? out.tickets : null;
+  const planned = useMemo(() => plannedTickets(tickets, qty, { keep }), [tickets, qty, keep]);
   const plannedCost = planned.reduce((sum, t) => sum + t.price * t.qty, 0);
   const plannedGate = planned.reduce((sum, t) => sum + gateCoverTotal(t), 0);
   const plannedHeads = planned.reduce((sum, t) => sum + ticketPeople(t) * t.qty, 0);
@@ -71,19 +78,18 @@ export default function EventSheet({ e, kind, city, party, setParty, origin, out
   const over = !!at && showOver(at);
   const move = at ? alignParty(at, party) : null;        // the party's new date and/or time, or null
   const moveDate = !!move && move.date !== party?.date;
+  // On the party's night, or on its date — a show at 00:30 is both before and after it's picked.
+  const onDate = !!s && showOnDate(s, party?.date);
   const soldOut = !!(s?.soldOut || (d?.soldOut && !tickets.some((t) => t.buyable)));
   const asOf = d?.fetchedAt ? (Date.now() - d.fetchedAt < 12 * 3600000 ? prettyTime(clockOf(new Date(d.fetchedAt))) : ageStr(d.fetchedAt)) : "";
 
-  // Already the party, on the picked show: the plan follows the stepper straight away. On
-  // another show it waits for "update", which moves the pick to that show too.
-  const pickedShow = isPick && !!s && Date.parse(s.start) === Date.parse(out.pick.start);
   const setQ = (t, want) => {
     const k = ticketKey(t);
     const next = { ...qty, [k]: clampQty(t, want, qty[k] || 0) };
     touched.current = true;
     setQty(next);
     tap();
-    if (pickedShow) setOut((o) => ({ ...o, tickets: plannedTickets(tickets, next) }));
+    if (pickedShow) setOut((o) => ({ ...o, tickets: plannedTickets(tickets, next, { keep: o.tickets }) }));
   };
 
   // Unread page: the saved tickets stay. Another show: "Booked on District" was for the old one.
@@ -142,7 +148,7 @@ export default function EventSheet({ e, kind, city, party, setParty, origin, out
           <div className="ot-sec">
             <div className="ot-sec-head">
               <span className="kicker">{shows.length > 1 ? "Pick a show" : "When"}</span>
-              {s && onNight(s.start, s.end, party?.date) && <span className="tiny gold">your date</span>}
+              {onDate && <span className="tiny gold">your date</span>}
             </div>
             {shows.length > 1 ? (
               <div className="chips ot-shows">
@@ -154,7 +160,8 @@ export default function EventSheet({ e, kind, city, party, setParty, origin, out
               </div>
             ) : <div className="small soft">{s ? eventWhenText(s.start, s.end) : eventWhenText(e.start, e.end) || "Date on District"}</div>}
             {over ? <div className="tiny red" style={{ marginTop: 6 }}>This show is over{shows.length > 1 ? " — pick another one." : "."}</div>
-              : moveDate ? <div className="tiny gold" style={{ marginTop: 6 }}>Not on your party date — making it the party moves the party to {eventWhenText(at.start, at.end)}.</div>
+              : moveDate && onDate && move.date > (party?.date || "") ? <div className="tiny gold" style={{ marginTop: 6 }}>Starts after midnight — making it the party sets the party to {eventWhenText(at.start, at.end)}, so the reminders count back from then.</div>
+                : moveDate ? <div className="tiny gold" style={{ marginTop: 6 }}>Not on your party date — making it the party moves the party to {eventWhenText(at.start, at.end)}.</div>
                 : move ? <div className="tiny gold" style={{ marginTop: 6 }}>Starts at {prettyTime(move.time)} — making it the party sets the party's time to match.</div>
                   : null}
           </div>
@@ -173,9 +180,9 @@ export default function EventSheet({ e, kind, city, party, setParty, origin, out
             <div className="ot-sec-head"><span className="kicker">Tickets</span>{asOf && <span className="tiny dim">as of {asOf}</span>}</div>
             {!tickets.length && <div className="small muted">District doesn't show tickets for this {shows.length > 1 ? "show" : "one"} right now — open it in District.</div>}
             {tickets.map((t) => {
-              const n = qty[ticketKey(t)] || 0, kindLabel = ticketKindLabel(t);
+              const n = qty[ticketKey(t)] || 0, kindLabel = ticketKindLabel(t), kept = keptTicket(t, planned);
               return (
-                <div key={t.id} className={`ot-ticket ${t.buyable ? "" : "off"}`}>
+                <div key={t.id} className={`ot-ticket ${t.buyable ? "" : kept ? "kept" : "off"}`}>
                   <div className="grow">
                     <div className="ot-ticket-name">
                       <span className="small b">{t.name}</span>
@@ -186,10 +193,17 @@ export default function EventSheet({ e, kind, city, party, setParty, origin, out
                       {serviceText(t.service) && <span className="muted"> · {serviceText(t.service)}</span>}
                     </div>
                     {t.gateCover && <div className="tiny ot-gate">{gateCoverText(t.gateCover)}</div>}
-                    {!t.buyable && <div className="tiny red">Sold out or not on sale</div>}
+                    {!t.buyable && (kept
+                      ? <div className="tiny gold">Planned · not on sale now</div>
+                      : <div className="tiny red">Sold out or not on sale</div>)}
                     {t.description && <div className="tiny dim clamp2">{t.description}</div>}
                   </div>
-                  {t.buyable && !over && (n > 0
+                  {kept ? (
+                    <div className="ot-kept">
+                      <span className="small b ot-kept-n">×{n}</span>
+                      {!over && <button className="btn btn-xs btn-ghost" onClick={() => setQ(t, 0)} aria-label={`Take ${t.name} off the plan`}>Remove</button>}
+                    </div>
+                  ) : t.buyable && !over && (n > 0
                     ? <Qty value={n} onChange={(x) => setQ(t, x)} />
                     : <button className="btn btn-xs btn-ghost" onClick={() => setQ(t, 1)}><Icon.plus size={12} /> Plan</button>)}
                 </div>

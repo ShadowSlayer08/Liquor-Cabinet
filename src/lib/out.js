@@ -334,11 +334,16 @@ export const freshEventPick = (pick, d) => (!d ? pick : {
   feePct: d.feePct || pick.feePct || 0, fetchedAt: d.fetchedAt || Date.now(),
 });
 
+// A show is on the party's date when it falls on that night (6 am to 6 am), or when it starts
+// on that date: making a show that starts at 00:30 the party moves the party to the date it
+// starts on (alignParty), which is the morning after the night it belongs to.
+export const showOnDate = (show, date) => !!(show?.start && date && (onNight(show.start, show.end, date) || istDate(show.start) === date));
+
 // What's off about the pick for the party's date, or "": an event whose show is another
 // night (the date changed after picking it), or a venue whose listed hours skip that day.
 export function pickNote(pick, date) {
   if (!pick || !date) return "";
-  if (pick.type === "event" && pick.start && !onNight(pick.start, pick.end, date)) {
+  if (pick.type === "event" && pick.start && !showOnDate(pick, date)) {
     return `This show is on ${eventWhenText(pick.start, pick.end)}, not the party's date. Open it to pick another show.`;
   }
   if (pick.type === "venue" && closedOn(pick.hours, date)) return `Closed on ${weekday(date)}s, going by its listed hours.`;
@@ -423,8 +428,19 @@ export function qtyFromPlan(showTickets, plan) {
 
 // The plan for one show: its tickets (district.js ticketsForShow) that are on sale, with the
 // quantities chosen in the sheet ({ [ticketKey]: qty }). A ticket another show sells drops out.
-export const plannedTickets = (showTickets, qty) => (showTickets || [])
-  .filter((t) => t?.buyable && (qty?.[ticketKey(t)] || 0) > 0).map((t) => planTicket(t, qty[ticketKey(t)]));
+// `keep` = the saved plan when it's for this same show: a ticket in it that isn't on sale any
+// more stays, with its qty. It has most likely been bought already, and sold-out club nights
+// are common, so re-saving the plan mustn't lose its exact price.
+export function plannedTickets(showTickets, qty, { keep = null } = {}) {
+  const kept = keep?.length ? new Set(Object.keys(qtyFromPlan(showTickets, keep))) : null;
+  return (showTickets || []).filter((t) => {
+    if (!t || !((qty?.[ticketKey(t)] || 0) > 0)) return false;
+    return t.buyable || !!kept?.has(ticketKey(t));
+  }).map((t) => planTicket(t, qty[ticketKey(t)]));
+}
+
+// A row the plan keeps although District doesn't sell it now (plannedTickets' `keep`).
+export const keptTicket = (t, planned) => !t?.buyable && (planned || []).some((p) => ticketKey(p) === ticketKey(t));
 
 // The tickets District sells for the show starting at `start` (the pick's): [] when that show
 // is no longer on the page; all of them when the page lists no shows.

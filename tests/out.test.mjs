@@ -7,9 +7,10 @@ import {
   doorRules, stagText, ticketKindLabel, serviceText, gateCoverText, ticketPeople, gateCoverTotal, planTicket, plannedTickets, clampQty,
   refreshTickets, bottlesOf, isByobPick, venueKey, costForTwoText, eventPriceText, feeText, venueListNote, pickNote,
   offerText, eventWhenText, freshEventPick, directionsUrl, ticketKey, matchTicket, qtyFromPlan, ticketsForStart, outForDate, RUN_REASON,
+  keptTicket, showOnDate,
 } from "../src/lib/out.js";
 import { DEFAULT_OUT } from "../src/lib/outModel.js";
-import { leaveBy, closesAt, lastCallFor, LEAVE_MAX_KM } from "../src/lib/reminderPlan.js";
+import { leaveBy, closesAt, lastCallFor, byobNight, LEAVE_MAX_KM } from "../src/lib/reminderPlan.js";
 import { clockOf } from "../src/lib/when.js";
 import { parseVenuePage, parseEventPage, parseEventList, parseEventData, ticketsForShow } from "../src/lib/parse/district.js";
 import { parseVenueListPage } from "../src/lib/parse/zomato.js";
@@ -345,6 +346,25 @@ test("pickNote: a show on another night, a venue closed that day", () => {
   assert.equal(pickNote(show, null), "");
 });
 
+test("pickNote: a show that starts after midnight is on the party's date, before and after picking it", () => {
+  const late = { start: "2026-10-10T19:00:00Z", end: "2026-10-10T23:00:00Z" };   // 12:30 am on Sun 11 Oct, IST
+  assert.equal(istDate(late.start), "2026-10-11");
+  assert.ok(onNight(late.start, late.end, party.date), "Saturday's night");
+  assert.ok(showOnDate(late, party.date), "the sheet says \"your date\"");
+  // making it the party moves the party to its real start, so the reminders count back from then
+  const move = alignParty(late, party, NOW);
+  assert.deepEqual(move, { date: "2026-10-11", time: "00:30" });
+  const pick = eventPick(EVENTS[1], null, late);
+  assert.equal(pickNote(pick, party.date), "");
+  assert.equal(pickNote(pick, move.date), "", "no warning right after picking it");
+  assert.ok(showOnDate(late, move.date), "still \"your date\" when the sheet is opened again");
+  assert.match(pickNote(pick, "2026-10-12"), /not the party's date/);
+  assert.ok(!showOnDate(late, "2026-10-12"));
+  assert.ok(!showOnDate(late, "2026-10-09"));
+  assert.ok(!showOnDate(null, party.date));
+  assert.ok(!showOnDate(late, null));
+});
+
 test("door rules read as the organiser's, with labels where the text has none", () => {
   assert.deepEqual(doorRules({ ageEntry: 21, stag: "Stag entry not allowed", id: "Govt ID required", dress: "Smart casuals", reentry: "No re-entry" }),
     ["Entry 21+ (organiser's rule)", "Stag entry not allowed", "Govt ID required", "Dress code: Smart casuals", "No re-entry"]);
@@ -472,6 +492,43 @@ test("tickets: the plan for a show keeps only what that show sells, with a qty",
   assert.deepEqual(plannedTickets(ticketsForShow(details, 1), null), []);
 });
 
+test("tickets: a planned ticket that sells out stays in the plan for its show", () => {
+  const details = {
+    shows: [{ start: "2026-10-03T15:30:00Z" }, { start: "2026-10-10T15:30:00Z" }],
+    tickets: [
+      { id: "stag", name: "Stag", price: 1500, min: 1, max: 10, buyable: true, kind: "stag", groupSize: 1, shows: [0, 1], buyableIn: [1] },
+      { id: "couple", name: "Couple", price: 2500, min: 1, max: 10, buyable: true, kind: "couple", groupSize: 2, shows: [0, 1], buyableIn: [0, 1] },
+    ],
+  };
+  // planned for the 10th (and most likely bought): Couple × 2 at ₹2,500
+  const plan = plannedTickets(ticketsForShow(details, 1), { "couple|2500": 2 });
+  assert.deepEqual(plan.map((t) => [t.name, t.qty, t.price]), [["Couple", 2, 2500]]);
+  // a later read: Couple is sold out for the 10th
+  const later = { ...details, tickets: details.tickets.map((t) => (t.id === "couple" ? { ...t, buyableIn: [0] } : t)) };
+  const tix = ticketsForShow(later, 1);
+  const couple = tix.find((t) => t.id === "couple"), stag = tix.find((t) => t.id === "stag");
+  assert.equal(couple.buyable, false);
+  const qty = qtyFromPlan(tix, plan);
+  assert.deepEqual(qty, { "couple|2500": 2 });
+  assert.deepEqual(plannedTickets(tix, qty), [], "without the saved plan: only what's on sale");
+  // "The party · update", or a stepper on the picked show: the saved plan keeps it
+  const kept = plannedTickets(tix, qty, { keep: plan });
+  assert.deepEqual(kept.map((t) => [t.name, t.qty, t.price]), [["Couple", 2, 2500]]);
+  assert.ok(keptTicket(couple, kept), "the sheet shows it as planned, not on sale now");
+  assert.ok(!keptTicket(stag, kept), "a ticket on sale is never a kept one");
+  assert.ok(!keptTicket(couple, []));
+  assert.deepEqual(plannedTickets(tix, { ...qty, "stag|1500": 1 }, { keep: plan }).map((t) => [t.id, t.qty]), [["stag", 1], ["couple", 2]]);
+  assert.deepEqual(plannedTickets(tix, { ...qty, "couple|2500": 0 }, { keep: plan }), [], "Remove takes it off");
+  // the night-out card keeps its exact ticket line rather than "Tickets from ₹X × people"
+  const pick = eventPick(EVENTS[1], null, { start: details.shows[1].start, end: "" });
+  const c = outingCost({ out: { ...DEFAULT_OUT, active: true, pick, tickets: kept }, party });
+  assert.deepEqual(c.lines.map((l) => [l.id, l.kind, l.amount]), [["tickets", "exact", 5000]]);
+  // a qty left from browsing another show doesn't bring in a ticket that show doesn't sell
+  assert.deepEqual(plannedTickets(ticketsForShow(details, 0), { "stag|1500": 2 }, { keep: plan }), [],
+    "stag isn't on sale for the 3rd, and it wasn't in the plan");
+  assert.deepEqual(plannedTickets(tix, qty, { keep: [] }), []);
+});
+
 // ── The night's cost ────────────────────────────────────────────────────────
 
 const lines = [
@@ -521,6 +578,22 @@ test("cost: BYOB adds the bottles you bring (estimate) and corkage only once quo
   // a bar that isn't BYOB: a typed corkage doesn't count
   const bar = { ...DEFAULT_OUT, active: true, pick: venuePick(VENUES[0], null, { kind: "bar" }), corkage: 300 };
   assert.deepEqual(outingCost({ out: bar, party, liquorLines: lines }).lines.map((l) => l.id), ["venue"]);
+});
+
+test("BYOB goes by the pick, not the chip you browse with: the night-out card, invite and reminders agree", () => {
+  const club = venuePick(VENUES[4], null, { kind: "byob" });   // Club Ebowla off the BYOB list; District doesn't tag it BYOB
+  const pub = venuePick(VENUES[0], null, { kind: "bar" });
+  const tagged = venuePick(VENUES[1], { amenities: ["BYOB"] }, { kind: "bar" });
+  const night = eventPick(EVENTS[1], null, null, { kind: "club" });
+  for (const [pick, want] of [[club, true], [pub, false], [tagged, true], [night, false]]) {
+    for (const chip of ["bar", "byob", "club", "events"]) {
+      const out = { ...DEFAULT_OUT, active: true, kind: chip, pick };
+      const why = `${pick.name}, browsing ${chip}`;
+      assert.equal(isByobPick(out.pick), want, why);
+      assert.equal(byobNight(out), want, `${why}: the invite's bottle list and the bottle reminders`);
+      assert.equal(outingCost({ out, party, liquorLines: lines }).lines.some((l) => l.id === "bottles"), want, `${why}: the cost lines`);
+    }
+  }
 });
 
 test("cost: planned tickets are exact; the fee and the gate cover are estimates", () => {
