@@ -1,6 +1,6 @@
 # Liquor Cabinet — guide for Claude Code
 
-Android + iOS party planner (React 19 + Vite 8 + Capacitor 8). Live liquor prices scraped from Livcheers, a budget optimiser ("Fill my bar"), cocktails and mocktails, suggestions from the bottles and guest prefs, a party food/drinks calculator with templates, dry days, bill split and settle-up, invites, reminders, rides home, and ordering hand-off to Zomato, Bistro and Blinkit / Zepto / Instamart. Started from `docs/original/cellar-planner.jsx` (a Claude-artifact prototype).
+Android + iOS party planner (React 19 + Vite 8 + Capacitor 8). Live liquor prices scraped from Livcheers, a budget optimiser ("Fill my bar"), cocktails and mocktails, suggestions from the bottles and guest prefs, a party food/drinks calculator with templates, dry days, bill split and settle-up, invites, reminders, rides home, and ordering hand-off to Zomato, Bistro and Blinkit / Zepto / Instamart — plus, since v1.5, an Out tab for a party at a bar, club night or BYOB place via District (Zomato's going-out app). Started from `docs/original/cellar-planner.jsx` (a Claude-artifact prototype).
 
 **Start here when resuming:** read `docs/HANDOFF.md` (current status, what's unverified on a real phone, ideas for next), then `docs/RESEARCH.md` (how each data source works and why).
 
@@ -27,14 +27,14 @@ On the maintainer's Windows PC: JDK at `%LOCALAPPDATA%\Programs\jdk-21`, SDK at 
 ## Release signing & versioning
 
 - `android/keystore.properties` + `android/keystore/liquor-cabinet.jks` sign release builds. Both are **git-ignored and must never be committed**. Without them, `assembleRelease` falls back to the debug key (such an APK won't install over the user's current one).
-- Bump **both** `versionCode` and `versionName` in `android/app/build.gradle`, plus `version` in `package.json`, `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `ios/App/App.xcodeproj/project.pbxproj`, and the "Liquor Cabinet vX" line in `src/components/PlanTab.jsx`, for every APK you hand over. Current: v1.4.1 = versionCode 6 (iOS build 6).
+- Bump **both** `versionCode` and `versionName` in `android/app/build.gradle`, plus `version` in `package.json`, `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `ios/App/App.xcodeproj/project.pbxproj`, and the "Liquor Cabinet vX" line in `src/components/PlanTab.jsx`, for every APK you hand over. Current: v1.5 = versionCode 7 (iOS build 7).
 - The user sideloads APKs (no Play Store — alcohol-app policies). GitHub: https://github.com/ShadowSlayer08/Liquor-Cabinet (public; renamed from liquor-cabinet, old URLs redirect) — push only when the user asks. Releases page carries the APK + unsigned IPA per version (`gh release create vX.Y …`). The README's "Data sources & legal notice" (free, non-profit, personal use) must stay accurate when data sources change.
 
 ## Architecture
 
 ```
 src/
-  App.jsx                 shell: topbar, 5 tabs, welcome screen, city picker, all persisted state (cfg: plan, carts, settle, grocer);
+  App.jsx                 shell: topbar, 6 tabs, welcome screen, city picker, all persisted state (cfg: plan, carts, settle, grocer, out);
                           App-level sheets FillBarSheet / SettleSheet / LegalSheet; addItems(), goBar(kind), notification routing
   styles.css              design system (tokens in :root) — "midnight speakeasy"; v1.3 rules sit in per-feature blocks at the end
   components/
@@ -54,13 +54,23 @@ src/
     GrocerySheet.jsx      pick a product option for a supply; live Blinkit price check (phone, beta)
     CartTab.jsx           liquor list + store finder, food cart grouped by provider, grocer seg (Blinkit/Zepto/Instamart), "Send order" hand-offs (+ floating bubble)
     PlanTab.jsx           budget ring, spend donut, then the plan/ cards, location, batches, price DB, data sources
+    OutTab.jsx            v1.5 party out: plan card (home|out, outing type, budget a head, bars dry-day banner, state age line),
+                          venue/event lists, "Your night out" (#night-out); out/ = OutPlanCard, VenueCard/VenueSheet, EventCard/EventSheet,
+                          ByobBlock, NightOutCard. Lists only; booking a table / buying tickets always hands off to District
     plan/                 InviteCard, SplitCard (→ settle up), RemindersCard, RidesCard (getting home), DryDaysCard, ZomatoAccountCard, BubbleCard
     RemindersWatcher.jsx  App-level: offers to move reminders when the party date/time changes
-    DryDayBanner.jsx      red/amber dry-day warning for a date
+    DryDayBanner.jsx      red/amber dry-day warning for a date; mode="bars" for the Out tab (barsDryOn)
     Sheet.jsx             bottom sheet + Stepper/Qty/Spinner/Skeleton
   lib/
     parse/livcheers.js    pure parser: Next.js RSC flight → items; CATEGORIES (18), CITIES (30), TIER
-    parse/zomato.js       pure parser: __PRELOADED_STATE__ → dish restaurants + restaurant menus (+ item prices when present)
+    parse/zomato.js       pure parser: __PRELOADED_STATE__ → dish restaurants + restaurant menus (+ item prices when present);
+                          parseVenueList(Page) + isVenueList for the bars / BYOB category pages (Zomato serves a stand-in list with a 200 elsewhere)
+    parse/district.js     pure: district.in venue pages (JSON-LD + flight: amenities, hours, offers, bookable), event lists and event pages
+                          (tickets, cover vs entry fee, gate cover, door rules); URL builders (www only, no query strings), EVENT_CITY/EVENT_PAGES
+    outModel.js           the Out contract: OUT_KINDS, DEFAULT_OUT, slimVenue/slimEvent, outPlace, kmBetween, travelMinutes, outSpend
+    out.js                pure: rankVenues, eventsForDate, outingCost, isByobPick, outForDate (pick.closes follows the party date)
+    outSources.js         Out fetch + cache (Zomato list 12 h, District venue 6 h, event list 3 h, event 1 h); one GET per tap
+    age.js                drinking age per state (18–25, sources + checked date), BYOB rules, usual bar hours — yearly recheck like dry days
     sources.js            scrapers + IndexedDB caching (Livcheers 7 d, Zomato 12 h, menus 6 h); price history on each sync
     pricehist.js          pure: price-change badges (≤14 d) + last 8 prices per bottle (`hist:city:cat`)
     http.js               getText(): CapacitorHttp natively (no CORS), Vite proxy in browser; cookie handling
@@ -73,7 +83,8 @@ src/
     templates.js          party templates (festivalDate() from drydays.js)
     rides.js / settle.js / grocers.js   rides home links, settle-up maths, Blinkit/Zepto/Instamart (pure)
     legal.js              in-app legal notice; LEGAL_SERVICES must name every https host in src (tests/legal.test.mjs, also checks the README table)
-    drydays.js            dry-day tiers per state, dryDayOn(), lastShoppingDay(), nextSaturday(), custom days
+    drydays.js            dry-day tiers per state, dryDayOn() (Haryana 26 Jan / 15 Aug until 17:00), barsDryOn() (Delhi bars shut on national days only),
+                          lastShoppingDay(), shopsOpenAt(), nextSaturday(), custom days
     split.js              splitBill(), upiLink(), validVpa(), WhatsApp text
     reminders.js          party-time reminders via local notifications (pure parts: reminderPlan.js, when.js) — incl. last call + settle up
     canvas.js             shared canvas drawing for invite.js (invite card) and paycard.js (UPI QR payment card)
@@ -103,7 +114,8 @@ ios/App/App/              (Capacitor iOS, SPM — CapApp-SPM/Package.swift is CL
 
 - Native plugins exist twice (Java + Swift) with **identical JS contracts**; OrderBubble is Android-only (`bubbleAvailable()` = `isAndroid()`). Gate platform differences with `isAndroid()` / `isIOS()` from `lib/http.js`.
 - `cfg` (plan + carts) is stored with `@capacitor/preferences` on the phone (iOS can purge IndexedDB); everything else in IndexedDB is re-fetchable cache.
-- Deep links: `liquorcabinet://tab/<cabinet|bar|food|cart|plan>[?view=liquor|food]` and `liquorcabinet://sync` (both platforms).
+- Deep links: `liquorcabinet://tab/<cabinet|bar|food|cart|plan|out>[?view=liquor|food]` and `liquorcabinet://sync` (both platforms).
+- District: read only public pages with plain GETs (never its `/gw/` JSON APIs, never `?` URLs — robots.txt), always `www.district.in`, never framed (InAppBrowser/WebRender); `openDistrict()` hands off. `edition://` app links stay off (`USE_EDITION`) until a phone proves them. See docs/RESEARCH.md "District".
 - The split's WhatsApp text has no `upi://pay` links (NPCI disallowed P2P intent payments in 2024); the payment card's QR codes are the way to pay.
 - Parsers in `src/lib/parse/*` stay **pure** (no Capacitor imports) so `node --test` can run them.
 - Every network call goes through `lib/http.js getText()`. Natively, Capacitor installs a global cookie handler backed by the WebView cookie store, so **never send a hand-written `Cookie` header** — pass `{ cookie }` and `getText` writes it into the store (`CapacitorCookies.setCookie`). In the browser it travels as `x-proxy-cookie` and `vite.config.js` converts it.
