@@ -1,11 +1,12 @@
 // [v1.3 · item 5] Split the bill — per-person shares, a WhatsApp message with UPI pay
 // links, and a payment card image with a QR per share.
 // v1.5: a party out adds the venue (its own estimate) and the planned tickets, split among
-// everyone (lib/split.js); home parts with nothing in them are hidden then. id="split":
-// the Out tab's shortcut scrolls here.
+// everyone (lib/split.js). The home carts don't come along (homeParts) — only a BYOB night's
+// bottles — so they're counted as ₹0 rather than switched off in the shared split settings,
+// which the next party at home would inherit. id="split": the Out tab's shortcut scrolls here.
 import { useState } from "react";
 import { fmt } from "../../lib/format.js";
-import { splitBill, resolveSplit, shareRows, splitMessage, splitParts, whatsappUrl, validVpa } from "../../lib/split.js";
+import { splitBill, resolveSplit, shareRows, splitMessage, splitParts, whatsappUrl, validVpa, homeParts } from "../../lib/split.js";
 import { isOut, outSpend } from "../../lib/outModel.js";
 import { outVenueName } from "../../lib/rides.js";
 import { prettyWhen } from "../../lib/when.js";
@@ -24,17 +25,23 @@ export default function SplitCard({ party, setParty, plan, split, setSplit, liqu
   const s = resolveSplit(split, plan);
   const away = isOut(out);
   const spend = outSpend(out, s.people); // venue: the venue's estimate for everyone splitting; tickets: as planned
-  const totals = { liquor: liquorTotal || 0, food: zomatoTotal || 0, supplies: blinkitTotal || 0, venue: spend.venue || 0, tickets: spend.tickets };
+  const home = homeParts(out);            // a night out leaves the home carts out, bar a BYOB night's bottles
+  const totals = {
+    liquor: home.liquor ? liquorTotal || 0 : 0, food: home.food ? zomatoTotal || 0 : 0, supplies: home.supplies ? blinkitTotal || 0 : 0,
+    venue: spend.venue || 0, tickets: spend.tickets,
+  };
   const result = splitBill({ ...totals, ...s });
   const rows = shareRows(result);
   const planned = totals.liquor + totals.food + totals.supplies + totals.venue + totals.tickets;
-  const parts = splitParts(s.include, totals); // what the labels name
+  const parts = splitParts(s.include, totals, away); // what the labels name
   const on = (k) => s.include[k] !== false;
   const chips = away ? [
     ...(spend.venue != null ? [["venue", "📍 Venue estimate"]] : []),
     ...(spend.tickets > 0 ? [["tickets", "🎟️ Tickets as planned"]] : []),
-    ...PARTS.filter(([k]) => totals[k] > 0),
+    ...(totals.liquor > 0 ? [["liquor", "🍾 Bottles you bring"]] : []),
   ] : PARTS;
+  // The home carts a night out leaves out, for the note under the chips.
+  const leftHome = away ? [!home.liquor && liquorTotal > 0 && "bottles", zomatoTotal > 0 && "food", blinkitTotal > 0 && "supplies"].filter(Boolean) : [];
   const venue = outVenueName(out);
   const host = party?.host || "", upi = party?.upi || "";
   const upiOk = validVpa(upi);
@@ -77,6 +84,9 @@ export default function SplitCard({ party, setParty, plan, split, setSplit, liqu
     spend.venue != null && `The venue's own estimate is ${fmt(cft)} for two, so about ${fmt(cft / 2)} a head; the real bill comes at the table.`,
     spend.venue == null && out.pick.type === "venue" && "The venue hasn't given a cost for two, so it isn't in the split; add the real bill when you settle up.",
     spend.tickets > 0 && "Tickets are at District's prices when you planned them, before its fee.",
+    out.pick.type === "event" && !(spend.tickets > 0) && "Plan tickets in the Out tab to split them here.",
+    totals.liquor > 0 && "Bottles you bring are at Livcheers' indicative prices.",
+    leftHome.length > 0 && `Your carts (${leftHome.length > 1 ? `${leftHome.slice(0, -1).join(", ")} & ${leftHome[leftHome.length - 1]}` : leftHome[0]}) aren't counted on a night out.`,
   ].filter(Boolean).join(" ");
 
   return (
@@ -113,7 +123,7 @@ export default function SplitCard({ party, setParty, plan, split, setSplit, liqu
         </div>
         <div className="tiny muted" style={{ marginTop: 6 }}>
           {s.mode !== "fair" ? "Equal: everyone pays the same share of everything."
-            : away ? "Fair: the venue, tickets and food split among everyone, bottles you bring among drinkers only."
+            : away ? `Fair: the venue and tickets split among everyone${home.liquor ? ", bottles you bring among drinkers only" : ""}.`
               : "Fair: food & supplies split among everyone, liquor split among drinkers only."}
         </div>
       </div>

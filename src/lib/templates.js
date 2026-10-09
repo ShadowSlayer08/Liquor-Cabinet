@@ -13,7 +13,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 import { COCKTAIL } from "./cocktails.js";
 import { DEFAULT_PARTY, planParty } from "./food.js";
-import { dryDayOn, festivalDate, lastShoppingDay, prettyDate, todayISO } from "./drydays.js";
+import { clock, dryDayOn, festivalDate, lastShoppingDay, prettyDate, shopsOpenAt, todayISO } from "./drydays.js";
 import { prettyTime } from "./when.js";
 import { MIXES } from "./optimise.js";
 
@@ -125,7 +125,8 @@ export function templateChanges(before, after) {
     .map(([k, label, f]) => ({ key: k, label, from: before?.[k] != null ? f(before[k]) : "—", to: f(after[k]) }));
 }
 
-// The toast after applying: when it is, and the dry-day "buy by" day if the date is one.
+// The toast after applying: when it is, and the dry-day "buy by" day if the date is one — with
+// the opening time when that day is itself dry until the evening (Haryana's 26 Jan: "(after 5 pm)").
 export function templateToast({ party, note }, citySlug, custom = []) {
   if (note) return `${party.name} set up. ${note}.`;
   if (!party.date) return `${party.name} set up 🎉`;
@@ -134,5 +135,6 @@ export function templateToast({ party, note }, citySlug, custom = []) {
   if (!dry) return `${when} 🎉`;
   const certain = dry.level === "national" || dry.level === "custom";   // festival and state days vary
   const by = lastShoppingDay(party.date, citySlug, custom);
-  return `${when} — it's ${certain ? "" : "often "}a dry day, buy bottles by ${prettyDate(by)}`;
+  const opens = shopsOpenAt(by, citySlug, custom);
+  return `${when} — it's ${certain ? "" : "often "}a dry day, buy bottles by ${prettyDate(by)}${opens ? ` (after ${clock(opens)})` : ""}`;
 }

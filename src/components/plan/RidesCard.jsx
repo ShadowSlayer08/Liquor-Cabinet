@@ -90,7 +90,7 @@ export default function RidesCard({ party, setParty, plan, loc, locating, onLoca
         <Icon.external size={14} />
       </button>
       <div className="tiny dim" style={{ marginTop: 8 }}>
-        {away ? "The venue fills the pickup" : "Your location fills the pickup"}; the app asks where you're going. Liquor Cabinet doesn't book rides.
+        {away && pickup ? "The venue fills the pickup" : away ? "Set the pickup in the ride app" : "Your location fills the pickup"}; the app asks where you're going. Liquor Cabinet doesn't book rides.
       </div>
       {lastCall && (
         <div className="tiny muted" style={{ marginTop: 6 }}>
