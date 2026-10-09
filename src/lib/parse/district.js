@@ -77,9 +77,13 @@ export function eventListUrls(citySlug, genres, { weekend = false } = {}) {
 }
 
 // District venue URL from a Zomato card link ("/ncr/soi-7-pub-brewery-dlf-cyber-city/info" or a full URL).
+// null for a delivery link (".../order": a kitchen, not a place to go) and for a vanity link without a
+// city ("/24-7RestaurantNewDelhi/info"), which has no District page we can name.
+const VENUE_PAGE = /^(info|book|reviews|menu|photos)$/;
 export function fromZomatoUrl(href) {
-  const m = /^(?:https?:\/\/www\.zomato\.com)?\/([a-z0-9-]+)\/([a-z0-9-]+)(?:\/[a-z-]*)?\/?(?:[?#].*)?$/i.exec(String(href || ""));
-  return m ? { zcity: m[1].toLowerCase(), slug: m[2].toLowerCase() } : null;
+  const m = /^(?:https?:\/\/www\.zomato\.com)?\/([a-z0-9-]+)\/([a-z0-9-]+)(?:\/([a-z-]*))?\/?(?:[?#].*)?$/i.exec(String(href || ""));
+  if (!m || VENUE_PAGE.test(m[2].toLowerCase()) || (m[3] && !VENUE_PAGE.test(m[3].toLowerCase()))) return null;
+  return { zcity: m[1].toLowerCase(), slug: m[2].toLowerCase() };
 }
 
 // ── Page plumbing ─────────────────────────────────────────────────────────────
@@ -201,8 +205,9 @@ export function parseVenuePage(html) {
 
 /**
  * The venue's listed closing time on the night of `isoDate` ("2026-10-10"), as "HH:MM" (24 h),
- * or "" when the hours don't say. A row after midnight filed under the same day (Mon 00:00–02:00
- * next to Mon 13:00–23:59) is that night's late close → "02:00".
+ * or "" when the hours don't say or the venue is open round the clock that day. A row after
+ * midnight filed under the same day (Mon 00:00–02:00 next to Mon 13:00–23:59, or 13:00–00:00)
+ * is that night's late close → "02:00".
  * @param {import("../outModel.js").VenueDetails["hours"]} hours
  */
 export function closingTime(hours, isoDate) {
@@ -211,16 +216,20 @@ export function closingTime(hours, isoDate) {
   const day = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay()];
   const mins = (t) => { const x = /^(\d{1,2}):(\d{2})/.exec(t || ""); return x ? +x[1] * 60 + +x[2] : null; };
   const rows = (hours || []).filter((r) => dayName(r?.day) === day && mins(r.opens) != null && mins(r.closes) != null);
-  // Open until midnight in the evening → an early-hours row on the same day is the same night.
-  const toMidnight = rows.some((r) => mins(r.opens) > 0 && mins(r.closes) >= 23 * 60 + 59);
-  let best = "", bestEnd = -1;
+  // 00:00–23:59 (or 00:00–00:00): no closing time to give.
+  if (rows.some((r) => mins(r.opens) === 0 && (mins(r.closes) === 0 || mins(r.closes) >= 23 * 60 + 59))) return "";
+  // Open until midnight in the evening (closes 23:59, 24:00 or 00:00) → an early-hours row on the same day is the same night.
+  const toMidnight = rows.some((r) => { const c = mins(r.closes); return mins(r.opens) > 0 && (c >= 23 * 60 + 59 || c === 0); });
+  let bestEnd = -1;
   for (const r of rows) {
     const o = mins(r.opens), c = mins(r.closes);
     let end = c <= o ? c + 1440 : c;                          // one row across midnight (18:00–02:00)
     if (o === 0 && toMidnight && c < 12 * 60) end = c + 1440; // Mon 00:00–02:00 next to Mon 13:00–23:59
-    if (end > bestEnd) { bestEnd = end; best = hhmm(r.closes); }
+    bestEnd = Math.max(bestEnd, end);
   }
-  return best;
+  if (bestEnd < 0) return "";
+  const t = bestEnd % 1440;                                    // "24:00" reads as "00:00"
+  return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
 }
 
 // ── Event listing ─────────────────────────────────────────────────────────────
@@ -335,16 +344,26 @@ export function gateCover(text, kind = null) {
 }
 
 // The ticket's own price: a cover charge (redeemable on food & drinks) or an entry fee.
-// services[].service_type first; the text decides when it's missing, or when an "entry fee"
-// is in fact fully redeemable ("The ticket amount is fully redeemable on food and drinks").
+// services[].service_type first; the text decides when it's missing, or when it contradicts the
+// type: an "entry fee" that is in fact redeemable ("The ticket amount is fully redeemable on food
+// and drinks", a "Cover Charge" ticket "Redeemable at the Restaurant"), or one that says it isn't
+// ("The ticket price is non-redeemable on food and drinks"). What a line denies ("not redeemable",
+// "No cover charges applicable") is cut before looking for what it says.
 // District's event-level is_cover_charge_enabled flag is wrong too often to use.
-const COVER_TEXT = /\b(fully|100%)\s+redeemable\b|\b(ticket|amount|price)\b[^.\n]{0,30}\bredeemable\b|\bredeemable\s+(on|against)\s+(food|f\s?&\s?b)|\bfull\s+cover\b/i;
-function serviceOf(item, ownText) {
-  const types = (item.services || []).map((s) => String(s?.service_type || "").toUpperCase());
-  if (types.includes("COVER_CHARGE")) return "cover";
-  if (types.includes("ENTRY_FEES")) return COVER_TEXT.test(ownText) ? "cover" : "entry";
-  if (/\bentry fees?\b/i.test(ownText)) return "entry";
-  if (COVER_TEXT.test(ownText) || /\bcover charges?\b/i.test(ownText)) return "cover";
+const COVER_TEXT = /\b(fully|100%)\s+redeemable\b|\b(ticket|amount|price)\b[^.\n]{0,30}\bredeemable\b|\bredeemable\s+(on|against|at)\b|\bfull\s+cover\b/i;
+const NOT_REDEEMABLE = /\b(?:non[\s-]*|not\s+|no\s+)(?:fully\s+)?redeemable\b/i;
+const DENIED = /\b(?:(?:non[\s-]*|not\s+|no\s+)(?:fully\s+)?redeemable|no\s+(?:entry fees?|cover charges?))\b[^.,;\n]*/gi;
+/** "cover" | "entry" | null (the ticket doesn't say) */
+export function ticketService(item, ownText) {
+  const said = String(ownText || "").replace(DENIED, " ");
+  const notRedeemable = NOT_REDEEMABLE.test(ownText || "");
+  const redeemable = COVER_TEXT.test(said) || (/\bcover charge\b/i.test(item?.name || "") && /\bredeemable\b/i.test(said));
+  const types = (item?.services || []).map((s) => String(s?.service_type || "").toUpperCase());
+  if (types.includes("COVER_CHARGE")) return notRedeemable && !redeemable ? "entry" : "cover";
+  if (types.includes("ENTRY_FEES")) return redeemable ? "cover" : "entry";
+  if (redeemable) return "cover";
+  if (notRedeemable || /\bentry fees?\b/i.test(said)) return "entry";
+  if (/\bcover charges?\b/i.test(said)) return "cover";
   return null;
 }
 
@@ -365,7 +384,7 @@ function ticketFrom(item, group) {
     max: caps.length ? Math.min(...caps) : 0,
     buyable: buyable(item, group),
     kind, groupSize,
-    service: serviceOf(item, own),
+    service: ticketService(item, own),
     gateCover: gate,
     description,
   };

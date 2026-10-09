@@ -6,8 +6,9 @@ import { readFileSync } from "node:fs";
 import {
   DISTRICT_BASE, venueUrl, bookUrl, eventUrl, eventListUrl, eventListUrls, EVENT_CITY, EVENT_PAGES, fromZomatoUrl,
   parseVenuePage, parseEventList, parseEventPage, parseEventData, closingTime, ticketKind, gateCover, buyable, cleanOffer, ticketsForShow,
+  ticketService,
 } from "../src/lib/parse/district.js";
-import { parseVenueList, parseVenueListPage, parseVotes } from "../src/lib/parse/zomato.js";
+import { parseVenueList, parseVenueListPage, parseVotes, isVenueList } from "../src/lib/parse/zomato.js";
 import { CITIES } from "../src/lib/parse/livcheers.js";
 import { HttpError } from "../src/lib/http.js";
 import { io, OUT_TTL, fetchVenueList, fetchVenue, fetchEventList, fetchEvent } from "../src/lib/outSources.js";
@@ -107,6 +108,17 @@ test("closingTime: a 00:00–02:00 row next to 13:00–23:59 is that night's lat
   assert.equal(closingTime(null, "2026-10-05"), "");
 });
 
+test("closingTime: a close written as 00:00 or 24:00 runs to midnight; 24 hours has no close", () => {
+  const sat = (rows) => closingTime(rows.map(([opens, closes]) => ({ day: "Saturday", opens, closes })), "2026-10-10");
+  assert.equal(sat([["13:00", "00:00"], ["00:00", "02:00"]]), "02:00");
+  assert.equal(sat([["00:00", "02:00"], ["13:00", "24:00"]]), "02:00");
+  assert.equal(sat([["13:00", "00:00"]]), "00:00");
+  assert.equal(sat([["13:00", "24:00"]]), "00:00");
+  assert.equal(sat([["00:00", "23:59"]]), "");
+  assert.equal(sat([["00:00", "00:00"]]), "");
+  assert.equal(sat([["12:00", "16:00"], ["19:00", "23:30"]]), "23:30");
+});
+
 test("cleanOffer collapses literal and real line breaks", () => {
   assert.equal(cleanOffer("FLAT \\n20% OFF "), "FLAT 20% OFF");
   assert.equal(cleanOffer("FLAT \n10% OFF"), "FLAT 10% OFF");
@@ -139,12 +151,50 @@ test("Zomato /ncr/byob: 9 venues with zcity, slug, resId, timing and offers — 
   assert.equal(venues.filter((v) => v.offer).length, 4);
   const page = parseVenueListPage(html);
   assert.deepEqual([page.total, page.hasMore], [40, true]);
+  assert.equal(page.path, "/ncr/byob");
+  assert.deepEqual(page.filters, { category_sheet: "go_out_home", context: "dineout_home" });
+  assert.equal(isVenueList(page, { zcity: "ncr", path: "byob" }), true);
+  assert.equal(isVenueList(page, { zcity: "ncr", path: "drinks-and-nightlife" }), false);
+});
+
+test("Zomato serves another list (200) where a city has no such page: never bars or BYOB", () => {
+  // Warangal "BYOB" = delivery kitchens: delivery_home, and every card links to /order.
+  const war = parseVenueListPage(fx("zomato_warangal_byob.html"));
+  assert.deepEqual([war.path, war.filters, war.total], ["/warangal/byob", { category_sheet: "delivery_home" }, 75]);
+  assert.equal(isVenueList(war, { zcity: "warangal", path: "byob" }), false);
+  assert.deepEqual(war.venues, []);                               // /order links are no District page
+  // Jaipur "bars" = a redirect to every dine-out place (dineout_home, 6,292 of them).
+  const jai = parseVenueListPage(fx("zomato_jaipur_drinks-and-nightlife.html"));
+  assert.deepEqual([jai.path, jai.filters.context, jai.total], ["/jaipur/restaurants?category=3&context=nightlife", "dineout_home", 6292]);
+  assert.ok(jai.venues.length > 0);                               // readable cards, wrong list
+  assert.equal(isVenueList(jai, { zcity: "jaipur", path: "drinks-and-nightlife" }), false);
+  // Hubli's redirect keeps the nightlife context: those are bars.
+  const hub = parseVenueListPage(fx("zomato_hubli_drinks-and-nightlife.html"));
+  assert.equal(hub.path, "/hubli/restaurants?category=3&context=nightlife");
+  assert.equal(isVenueList(hub, { zcity: "hubli", path: "drinks-and-nightlife" }), true);
+  assert.ok(hub.venues.length === 4 && hub.venues.every((v) => v.zcity === "hubli"));
+  // BYOB must be the /<zcity>/byob page itself.
+  assert.equal(isVenueList({ ...hub, path: "/hubli/restaurants?category=3", filters: { category_sheet: "go_out_home", context: "dineout_home" } }, { zcity: "hubli", path: "byob" }), false);
+  // No filter rail at all: can't tell.
+  assert.equal(isVenueList({ ...hub, filters: null }, { zcity: "hubli", path: "drinks-and-nightlife" }), null);
+});
+
+test("fromZomatoUrl: venue pages only — no delivery links, no vanity links without a city", () => {
+  assert.deepEqual(fromZomatoUrl("/ncr/soi-7-pub-brewery-dlf-cyber-city/info"), { zcity: "ncr", slug: "soi-7-pub-brewery-dlf-cyber-city" });
+  assert.deepEqual(fromZomatoUrl("/ncr/soi-7-pub-brewery-dlf-cyber-city"), { zcity: "ncr", slug: "soi-7-pub-brewery-dlf-cyber-city" });
+  assert.equal(fromZomatoUrl("/warangal/roti-walaa-mathwada/order"), null);
+  assert.equal(fromZomatoUrl("https://www.zomato.com/hubli/hotel-shree-ganesh-keshwapur/order"), null);
+  assert.equal(fromZomatoUrl("/24-7RestaurantNewDelhi/info"), null);
+  assert.equal(fromZomatoUrl(""), null);
 });
 
 test("Zomato drinks-and-nightlife lists for NCR and Bengaluru", () => {
   const ncr = parseVenueListPage(fx("zomato_ncr_drinks-and-nightlife.html"));
   assert.equal(ncr.venues.length, 9);
   assert.equal(ncr.total, 1131);
+  assert.equal(ncr.filters.context, "nightlife_home");
+  assert.equal(isVenueList(ncr, { zcity: "ncr", path: "drinks-and-nightlife" }), true);
+  assert.equal(isVenueList(parseVenueListPage(fx("zomato_bangalore_drinks-and-nightlife.html")), { zcity: "bangalore", path: "drinks-and-nightlife" }), true);
   assert.ok(ncr.venues.every((v) => v.zcity === "ncr" && v.slug && v.name));
   assert.equal(ncr.venues.find((v) => v.resId === 310737).offer, "25% OFF");
   const blr = parseVenueList(fx("zomato_bangalore_drinks-and-nightlife.html"));
@@ -295,6 +345,36 @@ test("gateCover reads extra cover at the gate from the text", () => {
   assert.equal(gateCover("• No cover charges applicable"), null);
   assert.equal(gateCover("- Gate open at 10 PM"), null);
   assert.equal(gateCover(""), null);
+  // "Not redeemable" says nothing about a gate either.
+  assert.equal(gateCover("The ticket price is non-redeemable on food and drinks."), null);
+});
+
+test("ticketService: cover vs entry fee, and text that says it's not redeemable", () => {
+  const entry = (name = "Entry") => ({ name, services: [{ service_type: "ENTRY_FEES" }] });
+  const cover = { name: "Cover", services: [{ service_type: "COVER_CHARGE" }] };
+  const bare = { name: "Regular Ticket" };
+  // Negations aren't a cover.
+  assert.equal(ticketService(entry(), "The ticket price is non-redeemable on food and drinks."), "entry");
+  assert.equal(ticketService(bare, "Ticket amount not redeemable"), "entry");
+  assert.equal(ticketService(entry(), "Entry fee, not fully redeemable"), "entry");
+  assert.equal(ticketService(bare, "Entry fee, not fully redeemable"), "entry");
+  assert.equal(ticketService(cover, "Cover charge is non-redeemable"), "entry");
+  assert.equal(ticketService(bare, "• No cover charges applicable"), null);
+  // A redeemable "Cover Charge" ticket sold as ENTRY_FEES (live: corporate-night-feb23-2026).
+  assert.equal(ticketService(entry("Cover Charge"), "Cover Charge is Redeemable at the Restaurant."), "cover");
+  assert.equal(ticketService(entry("Cover Charge"), "Redeemable — show this ticket at the bar"), "cover");
+  assert.equal(ticketService(entry("Stag Entry"), "Redeemable — show this ticket at the bar"), "entry");
+  // What was right stays right; a line that denies something else doesn't undo the cover.
+  assert.equal(ticketService(entry(), "The ticket amount is fully redeemable on food and drinks"), "cover");
+  assert.equal(ticketService(entry(), "Ticket price fully redeemable against F&B. Convenience fees are non-redeemable"), "cover");
+  assert.equal(ticketService(bare, "Cover charge redeemable on F&B, convenience fee non-redeemable"), "cover");
+  assert.equal(ticketService(cover, ""), "cover");
+  assert.equal(ticketService(entry(), "Entry for 1"), "entry");
+  assert.equal(ticketService(bare, "Entry for 1"), null);
+  // Through the event reader too.
+  const show = (item) => ({ venue: { name: "X", shows: [{ start_utc_timestamp: 1790000000, items_for_sale: [{ items: [{ quantity_available_for_purchase: 5, price: 1000, ...item }] }] }] } });
+  assert.equal(parseEventData(show({ name: "Cover Charge", services: [{ service_type: "ENTRY_FEES" }], description: "Cover Charge is Redeemable at the Restaurant." })).tickets[0].service, "cover");
+  assert.equal(parseEventData(show({ name: "Stag", services: [{ service_type: "ENTRY_FEES" }], description: "The ticket price is non-redeemable on food and drinks." })).tickets[0].service, "entry");
 });
 
 test("buyable copies District's own rule", () => {
@@ -390,13 +470,29 @@ test("fetchVenueList: one Zomato GET with the zone cookie, then the 12 h cache",
 });
 
 test("fetchVenueList: Delhi without GPS reads NCR's list; a city without the page is an empty list", async () => {
-  const net = fakeNet({ "https://www.zomato.com/ncr/drinks-and-nightlife": fx("zomato_ncr_drinks-and-nightlife.html") });
+  const state = (sections) => `<script>window.__PRELOADED_STATE__ = JSON.parse(${JSON.stringify(JSON.stringify({ pages: { search: { "/kanpur/byob": { sections } } } }))});</script>`;
+  const net = fakeNet({
+    "https://www.zomato.com/ncr/drinks-and-nightlife": fx("zomato_ncr_drinks-and-nightlife.html"),
+    "https://www.zomato.com/warangal/byob": fx("zomato_warangal_byob.html"),                     // 200, delivery kitchens
+    "https://www.zomato.com/jaipur/drinks-and-nightlife": fx("zomato_jaipur_drinks-and-nightlife.html"), // 200 after a redirect, every dine-out place
+    "https://www.zomato.com/hubli/drinks-and-nightlife": fx("zomato_hubli_drinks-and-nightlife.html"),
+    "https://www.zomato.com/kanpur/byob": state({ SECTION_SEARCH_RESULT: [], SECTION_SEARCH_META_INFO: { searchMetaData: { totalResults: 0 } } }),
+  });
   const r = await fetchVenueList("bar", { city: "delhi" });
   assert.deepEqual(net.calls, [{ url: "https://www.zomato.com/ncr/drinks-and-nightlife", cookie: null }]);
   assert.deepEqual([r.venues.length, r.local], [9, false]);
+  assert.ok(!("filters" in r) && !("path" in r));
   assert.ok(net.db.has("out:list:bar:ncr:city"));
-  const none = await fetchVenueList("byob", { city: "warangal" });
-  assert.deepEqual([none.venues, none.total, none.notFound, none.url], [[], 0, true, "https://www.zomato.com/warangal/byob"]);
+  for (const [kind, city, url] of [["byob", "warangal", "https://www.zomato.com/warangal/byob"], ["bar", "jaipur", "https://www.zomato.com/jaipur/drinks-and-nightlife"],
+    ["byob", "gurgaon", "https://www.zomato.com/ncr/byob"]]) {                                     // no page at all: 404
+    const none = await fetchVenueList(kind, { city });
+    assert.deepEqual([none.venues, none.total, none.notFound, none.url], [[], 0, true, url], city);
+  }
+  assert.equal((await fetchVenueList("byob", { city: "warangal" })).fromCache, true);       // cached like any list
+  const hubli = await fetchVenueList("bar", { city: "hubli-dharwad" });
+  assert.deepEqual([hubli.venues.length, hubli.notFound], [4, undefined]);
+  // A page that no longer says which filters it applied can't be trusted either way.
+  await assert.rejects(fetchVenueList("byob", { city: "kanpur" }), /Zomato page format changed/);
   await assert.rejects(fetchVenueList("club", { city: "gurgaon" }), /No Zomato list/);
 });
 
