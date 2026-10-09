@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseCategoryHtml, CATEGORIES, categoryUrl, parseMl } from "../src/lib/parse/livcheers.js";
-import { parseDishPage, parseMenuPage, dishUrl, parseVenueList, parseVenueListPage } from "../src/lib/parse/zomato.js";
+import { parseDishPage, parseMenuPage, dishUrl, parseVenueList, parseVenueListPage, isVenueList } from "../src/lib/parse/zomato.js";
 import { DISTRICT_BASE, venueUrl, eventUrl, eventListUrls, parseVenuePage, parseEventList, parseEventPage, closingTime } from "../src/lib/parse/district.js";
 
 // CI sets LC_SKIP_LIVE: GitHub's runners are datacenter IPs, which these sites may turn away.
@@ -65,25 +65,37 @@ test("zomato: GPS zone localises restaurants and menus load", { ...LIVE, timeout
 test("zomato: BYOB and bars lists near Sector 57 carry District slugs", { ...LIVE, timeout: 120000 }, async () => {
   const zone = JSON.parse((await get("https://www.zomato.com/webroutes/location/get?lat=28.4595&lon=77.0266")).text).locationDetails;
   const cookie = `ltv=${zone.entityId}; lty=${zone.entityType}`;
-  for (const path of ["byob", "drinks-and-nightlife"]) {
+  for (const [path, context] of [["byob", "dineout_home"], ["drinks-and-nightlife", "nightlife_home"]]) {
     const { status, text } = await get(`https://www.zomato.com/ncr/${path}`, cookie);
     assert.equal(status, 200, path);
     const page = parseVenueListPage(text);
-    console.log(`  ncr/${path}: ${page.venues.length} of ${page.total} — ${page.venues.slice(0, 3).map((v) => `${v.name} [${v.zcity}/${v.slug}] ${v.distanceKm} km ₹${v.costForTwo}`).join(" | ")}`);
+    console.log(`  ncr/${path}: ${page.venues.length} of ${page.total} [${JSON.stringify(page.filters)}] — ${page.venues.slice(0, 3).map((v) => `${v.name} [${v.zcity}/${v.slug}] ${v.distanceKm} km ₹${v.costForTwo}`).join(" | ")}`);
+    assert.deepEqual([page.filters?.category_sheet, page.filters?.context], ["go_out_home", context], "the filter rail moved — isVenueList needs a look");
+    assert.equal(isVenueList(page, { zcity: "ncr", path }), true);
     assert.ok(page.venues.length > 0 && page.total > 0);
     assert.ok(page.venues.every((v) => v.resId && v.zcity && /^[a-z0-9-]+$/.test(v.slug) && v.name));
   }
 });
 
-test("zomato: going-out lists outside NCR", { ...LIVE, timeout: 120000 }, async () => {
-  // Bengaluru's bars list was checked during research; the rest are logged to see which cities have them.
-  const { status, text } = await get("https://www.zomato.com/bangalore/drinks-and-nightlife");
-  assert.equal(status, 200);
-  const blr = parseVenueList(text);
-  assert.ok(blr.length > 0 && blr.every((v) => v.zcity === "bangalore" && v.slug));
-  for (const [city, path] of [["bangalore", "byob"], ["mumbai", "drinks-and-nightlife"], ["pune", "byob"]]) {
+test("zomato: going-out lists outside NCR say which list they are", { ...LIVE, timeout: 120000 }, async () => {
+  // Real lists (checked 2026-10-09), and cities where Zomato answers 200 with another list:
+  // Warangal "BYOB" = delivery kitchens, Jaipur "bars" = a redirect to every dine-out place.
+  for (const [city, path, context, real] of [
+    ["bangalore", "drinks-and-nightlife", "nightlife_home", true],
+    ["mumbai", "drinks-and-nightlife", "nightlife_home", true],
+    ["pune", "byob", "dineout_home", true],
+    ["hubli", "drinks-and-nightlife", "nightlife_home", true],
+    ["warangal", "byob", undefined, false],
+    ["jaipur", "drinks-and-nightlife", "dineout_home", false],
+  ]) {
     const r = await get(`https://www.zomato.com/${city}/${path}`);
-    console.log(`  ${city}/${path}: HTTP ${r.status}, ${r.status === 200 ? parseVenueList(r.text).length : 0} venues`);
+    assert.equal(r.status, 200, `${city}/${path}`);
+    const page = parseVenueListPage(r.text);
+    console.log(`  ${city}/${path}: ${page.path} ${JSON.stringify(page.filters)} — ${page.venues.length} of ${page.total}`);
+    assert.equal(page.filters?.context, context, `${city}/${path}`);
+    assert.equal(isVenueList(page, { zcity: city, path }), real, `${city}/${path}`);
+    if (real) assert.ok(page.venues.every((v) => v.zcity === city && v.slug), `${city}/${path}`);
+    if (city === "bangalore") assert.ok(parseVenueList(r.text).length > 0);
   }
 });
 
