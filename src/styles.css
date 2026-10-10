@@ -902,3 +902,62 @@ body:has(.share-ask) .toast { bottom: calc(var(--safe-bottom) + var(--nav-h) + 1
 .ot-kept-n { min-width: 26px; text-align: center; color: var(--gold); }
 
 /* (end v1.5 out) */
+
+/* ── v1.5 Fill my bar quiz ── */
+/* Five questions (dots, chips that cycle some/lots, two-line options), then the bar: answers strip, reasons, swaps */
+.quiz-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 2px 0 14px; min-height: 26px; }
+.quiz-top-acts { display: flex; align-items: center; gap: 16px; }
+.quiz-dots { display: flex; gap: 6px; }
+.quiz-dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, .12); transition: all .25s; }
+.quiz-dots i.done { background: var(--gold-lo); }
+.quiz-dots i.on { width: 20px; border-radius: 4px; background: var(--gold); }
+.quiz-link { color: var(--gold); font-weight: 600; padding: 4px 0; text-align: left; }
+.quiz-link.dim { color: var(--dim); font-weight: 500; }
+.quiz-skip-all { display: block; margin: 18px auto 0; }
+.quiz-step { display: grid; gap: 12px; }
+.quiz-q { font-size: 22px; }
+.quiz-help { margin-top: -6px; line-height: 1.45; }
+.quiz-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.quiz-chips .chip { white-space: normal; text-align: left; }
+.chip.some { color: var(--gold-hi); border-color: var(--gold); background: rgba(231, 168, 70, .1); }
+.quiz-split { display: grid; gap: 6px; }
+.quiz-split-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: rgba(255, 255, 255, .08); }
+.quiz-split-bar i { height: 100%; transition: width .35s cubic-bezier(.2, .8, .2, 1); }
+.quiz-split-bar i + i { box-shadow: -1px 0 0 var(--bg); }
+.quiz-seed { color: var(--gold); letter-spacing: .3px; }
+.quiz-note { margin-bottom: 10px; }
+.quiz-step .quiz-note { margin-bottom: 0; }
+.quiz-opts { display: grid; gap: 8px; }
+.quiz-opt { display: grid; gap: 2px; width: 100%; min-width: 0; text-align: left; padding: 12px 14px; border-radius: 16px;
+  background: var(--panel); border: 1px solid var(--stroke); color: var(--soft); transition: all .2s; }
+.quiz-opt b { font-size: 14px; color: var(--text); }
+.quiz-opt span { color: var(--muted); }
+.quiz-opt.on { background: var(--grad-gold); border-color: transparent; box-shadow: 0 6px 16px rgba(231, 168, 70, .28); }
+.quiz-opt.on b, .quiz-opt.on span { color: #231404; }
+.quiz-money .input { width: 100%; }
+.quiz-head { margin-top: -4px; }
+.quiz-drinks { max-width: 220px; }
+
+.opt-strip { margin-bottom: 8px; align-items: center; }
+.opt-strip .chip { padding: 6px 11px; font-size: 12px; }
+.opt-strip .quiz-link { flex-shrink: 0; white-space: nowrap; padding-right: 4px; }
+.opt-progress { margin: -6px 0 12px; }
+.opt-why { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.opt-why span { font-size: 10.5px; line-height: 1.3; padding: 3px 7px; border-radius: 7px; color: var(--gold-hi); background: rgba(231, 168, 70, .1); border: 1px solid rgba(231, 168, 70, .22); }
+.opt-acts .btn.on { border-color: var(--gold); color: var(--gold-hi); }
+.opt-alts { display: grid; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--stroke-2); }
+.opt-alts .kicker { margin-top: 2px; }
+.opt-alt { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; text-align: left; padding: 8px 10px; border-radius: 12px;
+  background: rgba(0, 0, 0, .25); border: 1px solid var(--stroke); color: var(--soft); }
+.opt-alt .grow { display: grid; gap: 1px; }
+.opt-diff { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.opt-diff.up { color: var(--gold); }
+.opt-diff.down { color: var(--green); }
+.opt-brands { display: flex; flex-wrap: wrap; gap: 6px; }
+.opt-brands .chip { padding: 6px 11px; font-size: 12px; }
+.opt-chip-diff { margin-left: 6px; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.opt-chip-diff.up { color: var(--gold); }
+.opt-chip-diff.down { color: var(--green); }
+.chip.on .opt-chip-diff { color: inherit; }
+
+/* (end v1.5 Fill my bar quiz) */

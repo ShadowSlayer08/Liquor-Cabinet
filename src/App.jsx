@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { App as CapApp } from "@capacitor/app";
 import { CATEGORIES, CITIES, cityName } from "./lib/parse/livcheers.js";
-import { loadCachedCatalog, STALE_MS } from "./lib/sources.js";
+import { loadCachedCatalog, priceKey, STALE_MS } from "./lib/sources.js";
 import { store } from "./lib/store.js";
 import { DEFAULT_PARTY, planParty } from "./lib/food.js";
 import { nextSaturday, todayISO } from "./lib/drydays.js";
@@ -13,6 +13,8 @@ import { onBubbleToggle } from "./lib/bubble.js";
 import { DEFAULT_OUT, withOut } from "./lib/outModel.js";
 import { outForDate } from "./lib/out.js";
 import { AGE_LINE } from "./lib/age.js";
+import { normalizeQuiz } from "./lib/barQuiz.js";
+import { ranklessCats } from "./lib/barScore.js";
 import ScraperPanel from "./components/ScraperPanel.jsx";
 import CabinetTab from "./components/CabinetTab.jsx";
 import BarTab from "./components/BarTab.jsx";
@@ -43,6 +45,19 @@ const withDate = (p) => ({ ...p, date: p.date && p.date >= todayISO() ? p.date :
 const DEFAULT_SPLIT = { include: { liquor: true, food: true, supplies: true }, people: null, drinkers: null, mode: "fair" };
 // v1.0/1.1 food lines used `servings`; everything is `qty` now.
 const migrateFood = (lines) => (lines || []).map((l) => (l.qty == null && l.servings != null ? { ...l, qty: l.servings, restaurant: l.restaurant && { ...l.restaurant, costForOne: l.restaurant.costForOne ?? l.unitPrice } } : l));
+// The city's cached prices. Ones saved before the parser kept Livcheers' popularity rank (v1.5)
+// count as stale, so the next Smart Sync re-downloads them: Fill my bar picks by popularity.
+async function loadPrices(slug) {
+  const { catalog, ages } = await loadCachedCatalog(slug, CATEGORIES);
+  const old = Date.now() - STALE_MS - 1;
+  for (const cat of ranklessCats(catalog)) {
+    if (!(ages[cat] > old)) continue;
+    ages[cat] = old;
+    const cached = await store.get(priceKey(slug, cat));
+    if (cached) await store.set(priceKey(slug, cat), { ...cached, fetchedAt: old });
+  }
+  return { catalog, ages };
+}
 
 export default function App() {
   const [ready, setReady] = useState(false);
@@ -70,6 +85,7 @@ export default function App() {
   const [settle, setSettle] = useState(null);           // settle-up after the party (lib/settle.js); survives the date roll-over
   const [grocer, setGrocer] = useState("blinkit");      // which 10-minute app the supplies run uses (lib/grocers.js)
   const [showFill, setShowFill] = useState(false);      // budget optimiser sheet
+  const [barQuiz, setBarQuiz] = useState(null);         // Fill my bar answers (lib/barQuiz.js); null = never asked
   const [showSettle, setShowSettle] = useState(false);
   const [showLegal, setShowLegal] = useState(false);
   const [barKind, setBarKind] = useState("cocktails");  // Bar tab: cocktails | mocktails
@@ -103,10 +119,11 @@ export default function App() {
       if (cfg.settle) setSettle(cfg.settle);
       if (cfg.grocer) setGrocer(cfg.grocer);
       if (cfg.out) setOut(withOut(cfg.out));
+      if (cfg.barQuiz) setBarQuiz(normalizeQuiz(cfg.barQuiz));
       if (cfg.syncIds) setSyncIds(cfg.syncIds);
       if (cfg.activeCat) setActiveCat(cfg.activeCat);
       if (cfg.loc) setLoc(cfg.loc);
-      const { catalog, ages } = await loadCachedCatalog(c, CATEGORIES);
+      const { catalog, ages } = await loadPrices(c);
       setCatalog(catalog); setAges(ages);
       // First launch (or upgrading from a version without onboarding) → welcome screen.
       // (a launch link may have landed while this was loading — it wins)
@@ -118,10 +135,10 @@ export default function App() {
   useEffect(() => {
     if (ready) store.set("cfg", {
       city, loc, budget, liquor, batches, activeBatch, food, party, syncIds, activeCat, onboarded,
-      cocktailMenu, customDry, reminders, split, bubble, zomatoExact, settle, grocer, out,
+      cocktailMenu, customDry, reminders, split, bubble, zomatoExact, settle, grocer, out, barQuiz,
     });
   }, [ready, city, loc, budget, liquor, batches, activeBatch, food, party, syncIds, activeCat, onboarded,
-    cocktailMenu, customDry, reminders, split, bubble, zomatoExact, settle, grocer, out]);
+    cocktailMenu, customDry, reminders, split, bubble, zomatoExact, settle, grocer, out, barQuiz]);
 
   // ── Android back button + notification taps ──────────────────────────────
   useEffect(() => {
@@ -192,7 +209,7 @@ export default function App() {
 
   const switchCity = async (slug) => {
     setCity(slug);
-    const { catalog, ages } = await loadCachedCatalog(slug, CATEGORIES);
+    const { catalog, ages } = await loadPrices(slug);
     setCatalog(catalog); setAges(ages);
     return Object.keys(catalog).length;
   };
@@ -431,7 +448,8 @@ export default function App() {
       {showFill && (
         <FillBarSheet catalog={catalog} city={city} plan={plan} party={party} budget={budget} spent={spent} cocktailMenu={cocktailMenu}
           batchName={batches[activeBatch]?.name} addItems={addItems} toast={toast} onClose={() => setShowFill(false)}
-          openScraper={() => setShowScraper(true)} openScraperWith={openScraperWith} />
+          openScraper={() => setShowScraper(true)} openScraperWith={openScraperWith}
+          quiz={barQuiz} setQuiz={setBarQuiz} goBar={(kind) => { setShowFill(false); goBar(kind); }} />
       )}
       {showSettle && (
         <SettleSheet settle={settle} setSettle={setSettle} party={party} split={split} plan={plan} out={out}
