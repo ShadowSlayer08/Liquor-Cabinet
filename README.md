@@ -11,8 +11,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest"><b>⬇ Download v1.4.1 — Android APK &amp; iPhone IPA</b></a><br>
-  <sub>or straight from the repo: <a href="release/LiquorCabinet-1.4.1.apk">APK</a> · <a href="release/LiquorCabinet-1.4.1-unsigned.ipa">IPA</a> · free, non-commercial, personal use — see <a href="#data-sources--legal-notice">legal notice</a></sub>
+  <a href="https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest"><b>⬇ Download v1.5 — Android APK &amp; iPhone IPA</b></a><br>
+  <sub>or straight from the repo: <a href="release/LiquorCabinet-1.5.apk">APK</a> · <a href="release/LiquorCabinet-1.5-unsigned.ipa">IPA</a> · free, non-commercial, personal use — see <a href="#data-sources--legal-notice">legal notice</a></sub>
 </p>
 
 ---
@@ -21,18 +21,18 @@
 
 ### Android
 
-1. On your Android phone, download `LiquorCabinet-1.4.1.apk` from the [latest release](https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest) (or [`release/`](release/LiquorCabinet-1.4.1.apk) in the repo).
+1. On your Android phone, download `LiquorCabinet-1.5.apk` from the [latest release](https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest) (or [`release/`](release/LiquorCabinet-1.5.apk) in the repo).
 2. Open it. When Android asks, allow installs from that source.
 3. Launch **Liquor Cabinet**, tap **Use my location**, then **⚡ Smart Sync** to pull today's prices.
 
-It needs **Android 8.0 or newer** and an internet connection. v1.4.1 installs over v1.0–v1.4 and keeps your carts.
+It needs **Android 8.0 or newer** and an internet connection. v1.5 installs over v1.0–v1.4.1 and keeps your carts.
 It asks for **location** (restaurants that deliver to you), **notifications** (order checklist and party reminders) and, only if you turn on the floating checklist, **display over other apps**. All are optional.
 
 ### iPhone (beta, sideload)
 
 The same app runs on iPhone (iOS 15+). There's no App Store listing, and an iPhone won't install an app file the way Android does — it has to be signed with an Apple ID when you install it:
 
-1. Download `LiquorCabinet-1.4.1-unsigned.ipa` from the [latest release](https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest) (every push also builds one: [iOS workflow](https://github.com/ShadowSlayer08/Liquor-Cabinet/actions/workflows/ios.yml) → Artifacts).
+1. Download `LiquorCabinet-1.5-unsigned.ipa` from the [latest release](https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest) (every push also builds one: [iOS workflow](https://github.com/ShadowSlayer08/Liquor-Cabinet/actions/workflows/ios.yml) → Artifacts).
 2. Install it with [Sideloadly](https://sideloadly.io/) (Windows / Mac) or [AltStore](https://altstore.io/), signing in with your own Apple ID.
 3. On the iPhone: Settings → General → VPN & Device Management → trust your Apple ID; on iOS 16+ also turn on Settings → Privacy & Security → **Developer Mode**.
 
@@ -40,6 +40,21 @@ With a free Apple ID the app runs for 7 days before it must be re-signed (AltSto
 
 Different on iPhone: there's no floating checklist bubble — iOS doesn't let apps draw over other apps — so the order checklist arrives as a notification. Everything else is the same app; the beta features (Zomato sign-in, live Blinkit prices) are as untested on iPhone as on Android.
 
+## What's new in v1.5
+
+**🌃 Out — plan the party outside.** A sixth tab for a night at a bar, a club night, a BYOB place or a food & drink event, with **District** (Zomato's going-out app):
+
+- **Bars & pubs and BYOB places near you**, from Zomato's own lists for your delivery zone, each with the venue's "for two" estimate, District's offer and opening time. Open one to see what District lists for it (BYOB, full bar, DJ, large-group seating…), its hours that night and live offers; **Book a table on District** appears only where District takes bookings.
+- **Club nights and food & drink events** on your party date first, with the tickets (stag, couple, group, guest list), whether a ticket is a cover charge or an entry fee, any extra paid at the gate, and the organiser's door rules.
+- **Your night out**: the cost a head (estimates and exact ticket prices labelled as such), **leave by** time from your location, the venue's closing time and last call, and a "Booked on District" tick. Booking and buying always happen in the District app.
+- The rest of the app follows the night out: the **invite** carries the venue and its District link, **reminders** say when to leave and when free cancellation ends, **Getting home** picks you up from the venue, and the **split** and **settle-up** count the venue bill and tickets — and your own bottles only on a BYOB night.
+- **Rules that differ by state**: the legal drinking age (18 to 25 — the welcome screen no longer says "21+"), Delhi bars that stay open on festival dry days when shops shut, Haryana's 26 Jan and 15 Aug dry only until 5 pm, and what BYOB means where you are. All of it is information with its source, not legal advice — it's also in the in-app legal notice.
+
+**🪄 Fill my bar, rebuilt.** It now asks up to five quick questions — what your guests drink (tap once for some, twice for lots), how they drink it, how fancy, Indian or imported, and the budget — and remembers the answers for next time.
+
+- Picks go by what people actually buy (Livcheers' popularity ranking), not by a handful of 5★ reviews: a crowd-favourites bar for 40 drinks in Gurugram is now Blenders Pride, Smirnoff and Bira instead of bottles nobody has heard of.
+- Every bottle says why it's there ("Top-10 whisky on Livcheers"). Swap it for the next best, or for their usual brand, with the price difference shown. It still never goes over your budget.
+- Indian whisky (Royal Stag, Blenders Pride, Black Dog…) is now synced by default.
 ## What's new in v1.4.1
 
 Host features — the app now helps before, during and after the party:
@@ -117,10 +132,12 @@ Going out works the same way. **District** doesn't let other apps book tables or
 
 ```
 src/
-  App.jsx                 app shell: header, 5 tabs, carts, persistence
-  components/             Cabinet, Bar, Food, Cart, Plan tabs + sheets; plan/ holds the Plan tab's cards
+  App.jsx                 app shell: header, 6 tabs, carts, persistence
+  components/             Cabinet, Bar, Food, Cart, Plan, Out tabs + sheets; plan/ holds the Plan tab's cards, out/ the Out tab's
   lib/parse/livcheers.js  Livcheers page parser (categories, cities, tiers)
-  lib/parse/zomato.js     Zomato dish-page + restaurant-menu parser (menu prices when signed in)
+  lib/parse/zomato.js     Zomato dish-page + restaurant-menu parser (menu prices when signed in), bars / BYOB lists
+  lib/parse/district.js   District venue, event-list and event pages (Out tab);  lib/outSources.js fetches and caches them
+  lib/out.js, outModel.js the Out tab's ranking, costs and shared shapes;  lib/age.js drinking age, BYOB rules, bar hours per state
   lib/location.js         GPS → nearest city + Zomato delivery zone, Bistro areas
   lib/food.js             party calculator, Blinkit supply list;  lib/dishes.js the 60 dishes and their tags
   lib/cocktails.js        cocktails and mocktails, what's makeable, cocktail supplies
@@ -128,13 +145,13 @@ src/
   lib/optimise.js         "Fill my bar" budget optimiser;  lib/templates.js party templates
   lib/rides.js            rides home + designated drivers;  lib/settle.js settle-up after the party
   lib/grocers.js          Blinkit / Zepto / Instamart;  lib/legal.js the in-app legal notice (tested against the source)
-  lib/drydays.js          dry-day tiers per state, custom dry days
+  lib/drydays.js          dry-day tiers per state, custom dry days, which days bars shut too
   lib/pricehist.js        price-change badges and history between syncs
   lib/split.js            bill split + UPI links;  lib/paycard.js, invite.js, canvas.js, shareImage.js draw and share the images
   lib/reminders.js        party reminders (reminderPlan.js / when.js hold the pure parts)
   lib/blinkitLive.js      live Blinkit prices (beta);  lib/bubble.js floating checklist;  lib/zomatoAccount.js Zomato sign-in
   lib/sources.js          scrapers with on-device caching
-  lib/order.js            Zomato / Bistro / Blinkit / Maps hand-off, checklist notification, haptics
+  lib/order.js            Zomato / Bistro / Blinkit / District / Maps hand-off, checklist notification, haptics
 android/                  Capacitor Android project; native plugins in app/src/main/java/…/liquorcabinet:
                           ExternalAppPlugin (open other apps), WebRenderPlugin (hidden page reader), OrderBubblePlugin (overlay)
 ios/                      Capacitor iOS project (Swift Package Manager); ios/App/App has the Swift plugins:

@@ -1,6 +1,6 @@
 # Handoff — where things stand
 
-_Updated 2 Oct 2026, v1.4.1 (host features) — local Claude Code on the user's Windows PC._
+_Updated 10 Oct 2026, v1.5 (party out with District + Fill my bar quiz) — local Claude Code on the user's Windows PC._
 
 ## Shipped
 
@@ -11,9 +11,33 @@ _Updated 2 Oct 2026, v1.4.1 (host features) — local Claude Code on the user's 
 | v1.2 | (history) | GPS → Zomato delivery zone; real Zomato menus; Bistro; order-checklist notifications; full "wow" redesign |
 | v1.3 | (history) | Bar tab + cocktails, dry days, price-drop badges, store finder, bill split + UPI QR card, invite card, reminders, exact Zomato prices (beta), live Blinkit prices (beta), floating order checklist (beta) |
 | v1.4 | (history) | iPhone (Capacitor iOS, Swift plugins, CI-built unsigned IPA), no upi:// links (NPCI), honest location copy, cfg in native storage, liquorcabinet:// links |
-| **v1.4.1** | `release/LiquorCabinet-1.4.1.apk` (versionCode 6) + `release/LiquorCabinet-1.4.1-unsigned.ipa` (iOS build 6) | Fill my bar (budget optimiser), 75 cocktails + 22 mocktails, suggestions from bottles and guest prefs, 60 dishes, party templates, getting home (drivers + ride apps), settle up, Zepto / Instamart, in-app legal notice |
+| v1.4.1 | (history) | Fill my bar (budget optimiser), 75 cocktails + 22 mocktails, suggestions from bottles and guest prefs, 60 dishes, party templates, getting home (drivers + ride apps), settle up, Zepto / Instamart, in-app legal notice |
+| **v1.5** | `release/LiquorCabinet-1.5.apk` (versionCode 7) + `release/LiquorCabinet-1.5-unsigned.ipa` (iOS build 7) | Out tab: bars & pubs, club nights, BYOB places and events with District (lists from Zomato/District pages, booking hand-off), night-out costs and leave-by, invite/reminders/rides/split follow the outing, state drinking ages + BYOB rules + bars-on-dry-days; Fill my bar asks a short quiz and picks popular bottles |
 
 Repo: **https://github.com/ShadowSlayer08/Liquor-Cabinet** (public, pushed at the user's request). The signing key (`android/keystore/`, `android/keystore.properties`) is git-ignored and never committed; every APK since v1.2 is signed with the same key (cert SHA-256 `a3d9f3e7…98abd9`), so it installs over it.
+
+## v1.5 — party out with District (what was built)
+
+Research first (four agents + independent verifiers; condensed in `docs/RESEARCH.md` "District"), then a foundation (`d7531f5`…`561156d`: 6th tab, `cfg.out`, `lib/outModel.js` contract, District URL builders, `openDistrict`, native link setup, legal rows) and four parallel tracks, each adversarially reviewed and fixed:
+
+- **A — data** (`lib/parse/district.js`, `parseVenueList(Page)`/`isVenueList` in `parse/zomato.js`, `lib/outSources.js`, 16 trimmed fixtures in `tests/fixtures/district/`): District venue pages (JSON-LD first, flight extras optional), event lists and event pages (shows, tickets with District's buyable rule, cover vs entry fee incl. "non-redeemable", gate cover from the ticket text, door rules). Review found Zomato serving a **stand-in list with a 200** for cities without bars/BYOB pages (Jaipur's "bars" = 6,292 restaurants, Warangal's "BYOB" = delivery kitchens): `isVenueList` checks the applied filters and the app shows "nothing listed" instead.
+- **B — Out tab UI** (`OutTab.jsx`, `components/out/*`, `lib/out.js`): plan card (home | out, outing type, budget a head, big group, bars dry-day banner, state age line), venue and event lists and sheets, BYOB block (Cabinet bottles + corkage), "Your night out" (`#night-out`). Planned tickets survive a sell-out for the picked show; weekly runs vs one-night events; one BYOB rule (`isByobPick` = `reminderPlan.byobNight`).
+- **C — rules & legal** (`lib/age.js`, `barsDryOn`/`shopsOpenAt` in `drydays.js`, `DryDayBanner mode="bars"`, legal copy, README): ages 18–25 by state with sources and `checked: "2026-10"`, BYOB rules (Delhi Rule 12(b), Haryana licensed taverns to 31 Mar 2027), usual bar hours, Delhi bars shut only on national days, Haryana 26 Jan / 15 Aug dry until 17:00.
+- **D — plan cards follow a party out** (invite, reminders, rides, split, settle): venue + District link on the invite, "Leave by" / "Free cancellation ends" / last call from the venue's listed close, pickup at the venue, venue and ticket parts in the split and settle-up; home carts stay out of a non-BYOB night.
+
+Lead fixes from the browser check: without a zone, Zomato's list is its default area — the tab says "Across Delhi NCR" and drops its distances; a party date changed on any tab redoes the pick's closing time (`outForDate` in App).
+
+**Fill my bar rework** (the owner: "a weak feature… ask some questions, then suggest; the suggested drinks are not good"). The old optimiser maximised Livcheers rating × drinks, and ratings carry no vote counts, so lone 5★ bottles won (Glen Victory, Xclamation Rum, Blue Moon vodka). Research on 3,900 real bottles: `city_liquors.rank` is one all-India popularity list (Bira #1, JW Red #4, Blenders Pride #19, Absolut #23); every 5.0★ bottle is unranked. Now:
+- `lib/barScore.js` — the score: popularity from rank (own → same-brand bottle nearest in price → a short staples list matched by name: Old Monk XXX, McDowell's Celebration, Jose Cuervo Especial, core Sula), rating shrunk toward the family mean, a per-city price ladder with tier bands (Easy / Crowd favourites / Treat them / Top shelf), type and origin fit, a popularity gate (#350 or 2.5× the family's best), flavour detection. Catalogs cached before ranks were parsed are marked stale on load (`loadPrices` in App) and scored with a stopgap per category until re-synced.
+- `lib/barQuiz.js` + `components/fillbar/BarQuiz.jsx` — five skippable questions, answers in `cfg.barQuiz` (templates pre-fill, never overwrite answered families); `FillBarSheet.jsx` results with reasons (`PickLine.jsx`), swaps, "their usual" brands, budget chips.
+- `lib/optimise.js` — the exact knapsack now maximises score × drinks; "Let the budget decide" auto tier (never drops a tier as money rises); two labels for the biggest family; cocktail minimums kept; optional shots tequila.
+- Tests on a real Gurgaon catalog (`tests/fixtures/livcheers/`) assert household names at ₹8k / ₹15k / ₹40k, origin filters, no flavoured bottles unless shots/cocktails, and every old budget guarantee; an adversarial review ran 400 random asks on Gurgaon, a rankless catalog and live Mumbai.
+- Lead fixes: Indian whisky syncs by default (a pre-v1.5 cfg gets it added once); each "How fancy?" tier shows its own example bottle.
+
+### How v1.5 was checked
+
+- `npm test` (offline + live District/Zomato parser tests), `npx vite build`.
+- Browser (375×812, live data, GPS stubbed to Sector 57 Gurugram): bars & pubs and BYOB lists with real distances, a BYOB venue sheet from its District page (amenities, listed hours "closes 4 am", offers "as of", not bookable → "Open in District"), club nights on the party date, an event sheet (male/female/couple entry tickets, door rules, legal age, fee line), "Make this the party" → night-out card (leave by, last call), Plan cards (invite, split = venue estimate only, rides pickup at the venue, reminders). No console errors, no images, no horizontal scroll.
 
 ## v1.4.1 — host features (what was built)
 
@@ -67,6 +91,14 @@ Capacitor iOS added (SPM) with Swift ports of ExternalApp and WebRender, a new C
 
 ## Not verified — needs a real phone
 
+v1.5 (District):
+- With District installed: does `https://www.district.in/dining/<zcity>/<slug>/book` (and `/events/<slug>-buy-tickets`) open the District app on Android (explicit-package intent) and iPhone (universal link)? Does `edition://r/<resId>` open a venue (decides `USE_EDITION` in `lib/order.js`)? Without District: the page opens in the browser.
+- CapacitorHttp GETs of www.district.in on mobile data (Akamai never challenged desktop IPs); Zomato bars/BYOB lists localised by the zone cookie on the phone.
+- "Leave by", "Free cancellation ends" and venue last-call notifications firing and routing to the Out tab's night-out card; Uber/Ola with the venue as pickup.
+- Law data to recheck yearly (`lib/age.js`, `lib/drydays.js`): Delhi beer-21 proposal, Maharashtra/West Bengal ages (secondary sources), Haryana tavern rules after 31 Mar 2027, whether festival dry days shut bars outside Delhi/Haryana.
+
+Earlier versions:
+
 Nothing native has run on a device yet (same as v1.2). Check on the phone:
 - Location permission, notifications (checklist + reminders firing at the right time, tap routing), haptics, app hand-offs (Zomato/Bistro/Blinkit/Maps/WhatsApp wa.me), image sharing (invite/payment card via the Share sheet).
 - Zomato sign-in inside the in-app browser (OTP flow), whether `isIsolated: false` really shares the session with native requests, which price field signed-in menus use.
@@ -77,6 +109,10 @@ Nothing native has run on a device yet (same as v1.2). Check on the phone:
 - The "last call" and "settle up" reminders firing and routing to the Getting home card / settle-up sheet.
 
 ## Ideas for next
+
+- Cabinet's "Editor's picks" still ranks lone 5★ bottles — rank it by popularity like Fill my bar (`lib/barScore.js`).
+- Fill my bar overbuys for very small parties (a bottle per family); merging families for tiny asks needs its own rule.
+- District `/gw/` APIs (table slots, cover charges, BYOB-by-tag lists) as an opt-in beta, if the owner wants it (see RESEARCH.md).
 
 - Sync ticks from the floating bubble back into the Blinkit checklist (the plugin can `notifyListeners("toggle")`).
 - A yearly refresh of festival dry days (or fetch the state excise lists).
