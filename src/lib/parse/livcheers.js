@@ -39,7 +39,7 @@ export const CATEGORIES = [
   { id: "malts",       slug: "single-malts",         label: "Single Malts",   emoji: "🥃", color: "#d4872a", serve: { kind: "spirit", mixer: "soda" }, sync: true },
   { id: "worldwhisky", slug: "world-whisky",         label: "World Whisky",   emoji: "🌍", color: "#b87c20", serve: { kind: "spirit", mixer: "soda" }, sync: true },
   { id: "scotch",      slug: "blended-scotch",       label: "Blended Scotch", emoji: "🏴", color: "#a8741c", serve: { kind: "spirit", mixer: "soda" }, sync: true },
-  { id: "indian",      slug: "made-in-india-whisky", label: "Indian Whisky",  emoji: "🐅", color: "#c0602a", serve: { kind: "spirit", mixer: "soda" }, sync: false },
+  { id: "indian",      slug: "made-in-india-whisky", label: "Indian Whisky",  emoji: "🐅", color: "#c0602a", serve: { kind: "spirit", mixer: "soda" }, sync: true },  // v1.5: Royal Stag, Blenders Pride… (Fill my bar)
   { id: "gin",         slug: "gin",                  label: "Gin",            emoji: "🌿", color: "#20c970", serve: { kind: "spirit", mixer: "tonic" }, sync: true },
   { id: "tequila",     slug: "tequila",              label: "Tequila",        emoji: "🌵", color: "#e0c020", serve: { kind: "shot", mixer: null }, sync: true },
   { id: "rum",         slug: "rum",                  label: "Rum",            emoji: "🍹", color: "#e03060", serve: { kind: "spirit", mixer: "cola" }, sync: true },

@@ -120,7 +120,9 @@ export default function App() {
       if (cfg.grocer) setGrocer(cfg.grocer);
       if (cfg.out) setOut(withOut(cfg.out));
       if (cfg.barQuiz) setBarQuiz(normalizeQuiz(cfg.barQuiz));
-      if (cfg.syncIds) setSyncIds(cfg.syncIds);
+      // v1.5 syncs Indian whisky by default (India's most-bought bottles, which Fill my bar needs);
+      // a cfg from before v1.5 (no `out` yet) gets it added once.
+      if (cfg.syncIds) setSyncIds(!cfg.out && !cfg.syncIds.includes("indian") ? [...cfg.syncIds, "indian"] : cfg.syncIds);
       if (cfg.activeCat) setActiveCat(cfg.activeCat);
       if (cfg.loc) setLoc(cfg.loc);
       const { catalog, ages } = await loadPrices(c);

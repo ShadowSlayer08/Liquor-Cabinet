@@ -70,13 +70,19 @@ export default function FillBarSheet({ catalog, city, plan, party, budget, spent
     [view, stepId, draft, catalog, drinks, peg, cocktailMenu, have]);
   const draftAmount = draft.money?.kind === "amount" ? draft.money.value : moneyOf(draft, draftEnough.cost);
   // "e.g. Royal Stag ₹570 · Magic Moments ₹570": the best bottle at each tier of the two biggest families.
+  // Worked out from the top tier down, and a tier skips the bottle the tier above showed when it has
+  // another one, so "Easy on the wallet" and "Crowd favourites" don't read the same.
   const examples = useMemo(() => {
     if (view !== "quiz" || stepId !== "vibe") return {};
     const p = profileFromQuiz(draft);
     const fams = Object.entries(p.shares).sort((a, b) => b[1] - a[1]).map(([f]) => f).filter((f) => FAMILIES[f]?.cats.some((c) => catalog?.[c]?.length)).slice(0, 2);
-    const out = {};
-    for (const t of TIER_IDS) {
-      const picks = fams.map((family) => topPick({ catalog, family, profile: p.profile, tier: t, pegMl: peg })).filter(Boolean);
+    const out = {}, above = {};
+    for (const t of [...TIER_IDS].reverse()) {
+      const picks = fams.map((family) => {
+        const c = topPick({ catalog, family, profile: p.profile, tier: t, pegMl: peg, skip: above[family] });
+        if (c) above[family] = new Set([c.key]);
+        return c;
+      }).filter(Boolean);
       if (picks.length) out[t] = picks.map((c) => `${shortName(c.item.name)} ${fmt(c.item.price)}`).join(" · ");
     }
     return out;

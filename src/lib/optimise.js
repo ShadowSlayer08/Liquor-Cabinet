@@ -501,13 +501,15 @@ export function barCost(args = {}, tier = "classic") {
   return fillBar({ ...args, budget: BIG, profile: { ...(args.profile || {}), tier }, stepDown: false }).cost;
 }
 
-// The best-scored bottle of a family at a tier (the quiz's "e.g. Royal Stag ₹570").
-export function topPick({ catalog = {}, family, profile = {}, tier = "classic", pegMl = 60 } = {}) {
+// The best-scored bottle of a family at a tier (the quiz's "e.g. Royal Stag ₹570"). `skip`: keys
+// to pass over when another bottle fits, so neighbouring tiers don't show the same example.
+export function topPick({ catalog = {}, family, profile = {}, tier = "classic", pegMl = 60, skip = null } = {}) {
   if (!FAMILIES[family]) return null;
   // (their usual brand isn't an example of a tier)
   const { rows } = scoreFamily(familyContext(catalog, family, Number(pegMl) === 30 ? 30 : 60), { style: { mix: true }, origin: "any", ...profile, favs: {} }, tier);
   const { list } = candidates(rows, family, new Set());
-  return [...list].filter((c) => !c.flav).sort((a, b) => b.sc - a.sc || cmp(a.key, b.key))[0] || null;
+  const ranked = [...list].filter((c) => !c.flav).sort((a, b) => b.sc - a.sc || cmp(a.key, b.key));
+  return (skip && ranked.find((c) => !skip.has(c.key))) || ranked[0] || null;
 }
 
 // "Indian Whisky & Brandy", "Gin, Rum & Vodka" — category labels for the sheet's notes.
