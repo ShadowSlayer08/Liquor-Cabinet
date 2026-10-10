@@ -1,6 +1,7 @@
 // One Fill my bar pick: the bottle, why it's here (two short reasons), Swap and "No whisky".
 // Swap opens the next best bottles that still fit and "Or their usual" — the family's
-// best-known brands here; picking one also remembers it for next time (quiz favs).
+// best-known brands here that fit, with what they'd add; picking one also remembers it for
+// next time (quiz favs).
 import { BottleStage } from "../ProductCard.jsx";
 import { CAT } from "../../lib/parse/livcheers.js";
 import { FAMILIES } from "../../lib/cocktails.js";
@@ -56,6 +57,7 @@ export default function PickLine({ line: l, pair, alts = [], brands = [], fav, r
                   {brands.map((b) => (
                     <button key={b.key} className={`chip ${fav === b.key ? "on" : ""}`} aria-pressed={fav === b.key} onClick={() => onBrand(b)}>
                       {fav === b.key ? "★ " : ""}{b.label}
+                      {Math.abs(b.diff || 0) >= 10 && <span className={`opt-chip-diff ${b.diff > 0 ? "up" : "down"}`}>{diff(b.diff)}</span>}
                     </button>
                   ))}
                 </div>

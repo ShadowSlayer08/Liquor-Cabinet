@@ -905,7 +905,8 @@ body:has(.share-ask) .toast { bottom: calc(var(--safe-bottom) + var(--nav-h) + 1
 
 /* ── v1.5 Fill my bar quiz ── */
 /* Five questions (dots, chips that cycle some/lots, two-line options), then the bar: answers strip, reasons, swaps */
-.quiz-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 2px 0 14px; }
+.quiz-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 2px 0 14px; min-height: 26px; }
+.quiz-top-acts { display: flex; align-items: center; gap: 16px; }
 .quiz-dots { display: flex; gap: 6px; }
 .quiz-dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, .12); transition: all .25s; }
 .quiz-dots i.done { background: var(--gold-lo); }
@@ -954,5 +955,9 @@ body:has(.share-ask) .toast { bottom: calc(var(--safe-bottom) + var(--nav-h) + 1
 .opt-diff.down { color: var(--green); }
 .opt-brands { display: flex; flex-wrap: wrap; gap: 6px; }
 .opt-brands .chip { padding: 6px 11px; font-size: 12px; }
+.opt-chip-diff { margin-left: 6px; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.opt-chip-diff.up { color: var(--gold); }
+.opt-chip-diff.down { color: var(--green); }
+.chip.on .opt-chip-diff { color: inherit; }
 
 /* (end v1.5 Fill my bar quiz) */

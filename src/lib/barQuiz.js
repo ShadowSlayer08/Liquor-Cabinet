@@ -15,7 +15,7 @@
 import { CAT } from "./parse/livcheers.js";
 import { COCKTAIL, FAMILIES, servingsByFamily } from "./cocktails.js";
 import { MIXES } from "./optimise.js";
-import { TIERS, brandKey, importedLevel, realChoice } from "./barScore.js";
+import { TIERS, BRAND_KNOWN, brandKey, importedLevel, originApplies, typeOf } from "./barScore.js";
 import { TEMPLATES } from "./templates.js";
 import { fmt, fmtShort } from "./format.js";
 
@@ -83,9 +83,9 @@ export const TASTE_HINTS = {
 };
 // "Not sure" + cocktails only: the spirits cocktails are made of.
 export const COCKTAIL_SHARES = { vodka: 0.35, rum: 0.30, gin: 0.20, tequila: 0.15 };
-// Share of each family made in India, for when it isn't synced yet (Gurgaon, Oct 2026).
-const DESI_GUESS = { whisky: 0.3, rum: 0.4, vodka: 0.35, gin: 0.3, tequila: 0.03, brandy: 0.2, beer: 0.8, redwine: 0.12, whitewine: 0.15, bubbly: 0.1 };
-const CHOICE_KINDS = new Set(["spirit", "shot", "wine"]);   // beer is nearly all brewed here: only a nudge
+// Families with well-known bottles made here and imported, for when they aren't synced yet (Gurgaon
+// and Mumbai, Oct 2026 — no well-known imported rum; beer and tequila ignore the answer).
+const ORIGIN_GUESS = new Set(["whisky", "vodka", "gin", "brandy", "redwine", "whitewine", "bubbly"]);
 
 export const DEFAULT_QUIZ = { v: 1, families: null, seededMix: null, style: ["mix"], tier: "auto", origin: "any", money: { kind: "left" }, favs: {}, answered: [], variety: true };
 
@@ -174,6 +174,8 @@ export function seedQuiz({ saved = null, party = null, cocktailMenu = [] } = {})
   if (isObj(saved)) {
     const s = normalizeQuiz(saved);
     if (!tpl || mix === s.seededMix) return { answers: s, from: "saved", reseeded: false };
+    // The generic "Mixed bar" style says nothing the host's own answer doesn't.
+    if (mix === "mixed" && s.answered.includes("families")) return { answers: { ...s, seededMix: mix }, from: "saved", reseeded: false };
     return { answers: { ...s, families: tpl.families, style: tpl.style, seededMix: mix, answered: s.answered.filter((k) => k !== "families" && k !== "style") }, from: "template", reseeded: true };
   }
   const base = normalizeQuiz({});
@@ -224,11 +226,12 @@ export function syncCatsFor(answers) {
   return [...new Set(Object.keys(profileFromQuiz(answers).shares).flatMap((f) => FAMILIES[f]?.cats || []))];
 }
 
-// Q4 only when a spirit or wine they drink comes both ways here (15–85% made in India).
-export function stepsFor(answers, { desiShare = {} } = {}) {
+// Q4 only when a spirit or wine they drink has well-known bottles both ways here: `choice` =
+// { family: bool } from what's synced (barScore originChoice), else the built-in guess.
+export function stepsFor(answers, { choice = {} } = {}) {
   const fams = Object.keys(profileFromQuiz(answers).shares);
-  const choice = fams.some((f) => CHOICE_KINDS.has(CAT[FAMILIES[f]?.cats[0]]?.serve.kind) && realChoice(desiShare[f] ?? DESI_GUESS[f] ?? 0));
-  return STEPS.filter((s) => s !== "origin" || choice);
+  const ask = fams.some((f) => originApplies(f) && (f in choice ? !!choice[f] : ORIGIN_GUESS.has(f)));
+  return STEPS.filter((s) => s !== "origin" || ask);
 }
 
 // The budget: what the host picked, else what's left of the plan's budget, else the chosen tier's
@@ -265,7 +268,7 @@ export function quizSummary(answers, { amount = null, tier = null, steps = STEPS
     : st.length === 1 && st[0].id === "mix" ? "🥤 With mixers"
     : `${st[0].emoji} ${cap(and(st.slice(0, 2).map((s) => s.short)))}${st.length > 2 ? " +1" : ""}` });
   const t = a.tier === "auto" ? tier : a.tier;
-  out.push({ step: "vibe", label: `✨ ${t && TIERS[t] ? TIERS[t].label : "Best for my budget"}${a.tier === "auto" && amount > 0 && t ? ` · fits ${fmtShort(amount)}` : ""}` });
+  out.push({ step: "vibe", label: `✨ ${t && TIERS[t] ? TIERS[t].label : "Best for my budget"}${a.tier === "auto" && t && TIERS[t] ? " · budget's pick" : ""}` });
   if (steps.includes("origin")) { const o = ORIGINS.find((x) => x.id === a.origin); out.push({ step: "origin", label: `${o.id === "any" ? "🌐" : o.emoji} ${o.short}` }); }
   if (amount > 0) out.push({ step: "budget", label: `💰 ${fmtShort(amount)}` });
   return out;
@@ -293,7 +296,7 @@ export function menuByFamily(menu = []) {
 }
 
 function styleReason(line, style) {
-  const f = line.family, type = String(line.item?.type || line.item?.sub || "").toLowerCase();
+  const f = line.family, type = typeOf(line.item).toLowerCase();
   const malt = line.cat === "malts" || /single malt/i.test(line.item?.name || "");
   const spirit = ["whisky", "rum", "vodka", "gin", "brandy"].includes(f);
   const fits = {
@@ -307,12 +310,17 @@ function styleReason(line, style) {
   return s ? text[s] : null;
 }
 
+// "Top-10 gin" only means something when the city ranks plenty of them (≥ 3 × 10) and the bottle
+// sits well up Livcheers' list (≤ #300).
+const PLACES = [[1, "Most popular"], [3, "Top-3"], [10, "Top-10"], [25, "Top-25"]];
+const PLACE_RANK = 300, PLACE_DEPTH = 3, POPULAR_RANK = 200;
+
 /**
  * Up to `max` short reasons for a picked bottle, never two of a kind, in this order: their usual,
  * the cocktail menu, Livcheers popularity (only for a bottle Livcheers actually ranks — a borrowed
  * or household-name rank says so), its Livcheers rating (ranked bottles only), how they drink,
  * where it's from, and the price per drink when it's the cheapest in its band (or nothing else fits).
- * @param line  a fillBar line ({ family, item, rank, from, pos, flav, fav, cheap, costPerDrink, cat })
+ * @param line  a fillBar line ({ family, item, rank, from, pos, of, flav, fav, cheap, costPerDrink, cat })
  * @param ctx   { profile: { style, origin, favs }, menu: menuByFamily(cocktailMenu) }
  * @returns [{ kind, text }]
  */
@@ -325,12 +333,10 @@ export function reasonsFor(line, { profile = {}, menu = {}, max = 2 } = {}) {
   const drinks = menu[line.family] || [];
   if (drinks.length) add("menu", drinks.length === 1 ? `For your ${plural(drinks[0])}` : "For your cocktail menu");
   const ranked = line.from === "own" && line.rank > 0;
-  if (ranked && line.pos === 1) add("pop", `Most popular ${noun} on Livcheers`);
-  else if (ranked && line.pos <= 3) add("pop", `Top-3 ${noun} on Livcheers`);
-  else if (ranked && line.pos <= 10) add("pop", `Top-10 ${noun} on Livcheers`);
-  else if (ranked && line.pos <= 25) add("pop", `Top-25 ${noun} on Livcheers`);
-  else if (ranked && line.rank <= 200) add("pop", "Popular on Livcheers");
-  else if (line.from === "brand") add("pop", "Popular brand");
+  const place = ranked && line.rank <= PLACE_RANK && line.pos > 0 ? PLACES.find(([n]) => line.pos <= n && (line.of || 0) >= PLACE_DEPTH * n) : null;
+  if (place) add("pop", `${place[1]} ${noun} on Livcheers`);
+  else if (ranked && line.rank <= POPULAR_RANK) add("pop", "Popular on Livcheers");
+  else if (line.from === "brand" && line.rank <= BRAND_KNOWN) add("pop", "Popular brand");
   else if (line.from === "staple") add("pop", "A household name");
   // A rating only for a bottle Livcheers ranks, and not right after "… on Livcheers".
   if (ranked && line.item.rating >= 4.5 && !out.some((r) => r.kind === "pop")) add("rating", `${line.item.rating}★ on Livcheers`);

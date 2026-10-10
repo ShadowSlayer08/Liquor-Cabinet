@@ -16,17 +16,20 @@
 //       over). At a fixed tier, more money never gives a worse bar. A two-label
 //       pair is just one more option in its family, so that still holds;
 //    3. the tier: "auto" takes the fanciest of Treat them → Crowd favourites →
-//       Easy on the wallet whose whole bar fits in its band; a tier the host picked
-//       steps down the same way when the money is short, and says what it'd cost;
+//       Easy on the wallet whose bar comes within 90% of that tier's best bar (so
+//       more money never means a plainer tier); a tier the host picked steps down
+//       when the money can't keep the bar in its band, and says what it'd cost;
 //    4. if even the cheapest basket doesn't fit (`trimmed`), the money covers as
 //       many drinks as it can: every target shrinks by one factor, or the cheapest
 //       drinks go first — whichever covers more — keeping a bottle of every family
-//       the host asked for while the money covers one. `short` = drinks missing.
+//       the host asked for (or swapped a bottle into) while the money covers one.
+//       `short` = drinks missing. A family the quiz only added (tequila for shots,
+//       `optional`) is left out when the bar is better without it (`dropped`).
 //  The host can swap a bottle (pins, "family" or "family#1" for a second label),
 //  drop one (exclude) or a whole family (skip) — its drinks go to the others.
 // ═══════════════════════════════════════════════════════════════════════════════
 import { CAT } from "./parse/livcheers.js";
-import { FAMILIES, familyOfCat, servingsByFamily } from "./cocktails.js";
+import { COCKTAIL, FAMILIES, familyOfCat, servingsByFamily } from "./cocktails.js";
 import { TIERS, TIER_DOWN, brandKey, familyContext, scoreFamily, topBrands } from "./barScore.js";
 
 // Bar styles templates store on party.mix (labels for the template sheet). The quiz turns one
@@ -45,8 +48,8 @@ const SCALE = 1000;              // score → integer value per drink
 const BIG = 1e7;                 // "money no object", for what a tier's full bar costs
 export const AUTO = ["premium", "classic", "value"];   // "auto" never picks top shelf on its own
 const TIER_UP = { value: "classic", classic: "premium" };
-const IN_BAND = 0.95;            // a tier is taken when ≥ 95% of the drinks are in its price band…
-const AUTO_FIT = 0.8;            // …and (auto) every family got ≥ 80% of its best bottle's score
+const IN_BAND = 0.95;            // a picked tier holds while ≥ 95% of the drinks are in its price band
+const AUTO_FIT = 0.9;            // "auto" takes a tier once the bar is worth ≥ 90% of the tier's best bar
 // Two labels for the biggest family: A covers ~60% in whole bottles, B the rest (≥ half a bottle).
 export const VARIETY = { minBottles: 3, minSip: 2, minBeer: 10, shareA: 0.6, bonus: 0.05, pool: 10 };
 const ORDER = Object.keys(FAMILIES);
@@ -70,7 +73,7 @@ function candidates(rows, f, exclude) {
     const kind = CAT[o.cat]?.serve.kind || "spirit", ml = o.item.ml || 750;
     return {
       family: f, cat: o.cat, item: o.item, key: lineKey(o.cat, o.item), ml, s: o.s, full: kind === "beer" || kind === "can" || ml >= 700,
-      sc: o.score, ok: o.ok, fav: o.fav, parts: o.parts, rank: o.rank, from: o.from, pos: o.pos, flav: o.flav, ppd: o.ppd,
+      sc: o.score, ok: o.ok, fav: o.fav, parts: o.parts, rank: o.rank, from: o.from, pos: o.pos, of: o.of, flav: o.flav, ppd: o.ppd,
       q: o.item.rating || 0, unrated: !(o.item.rating > 0),
     };
   }).filter((c) => c.s >= 1 && c.sc > 0 && !exclude.has(c.key));
@@ -84,15 +87,16 @@ const option = (c, need) => {
   return { ...c, need, qty, cost, units: Math.ceil(cost / STEP), value: Math.round(c.sc * SCALE) * need };
 };
 
-// Two labels of different brands from the best-scored few (or the pinned ones).
-function pairOptions(poolA, poolB, need) {
+// Two labels of different brands from the best-scored few (or the pinned ones). `order`: the label
+// with more bottles comes first (when nothing in the family is pinned, so slots can move).
+function pairOptions(poolA, poolB, need, order = false) {
   const out = [];
   for (const a of poolA) for (const b of poolB) {
     if (a.key === b.key || brandKey(a.item.brand) === brandKey(b.item.brand)) continue;
     const nA = Math.min(need - 1, Math.max(1, Math.round((VARIETY.shareA * need) / a.s)) * a.s), nB = need - nA;
     if (nA < 1 || nB < Math.max(1, Math.ceil(b.s / 2))) continue;
     const oa = option(a, nA), ob = option(b, nB);
-    out.push({ pair: [oa, ob], family: a.family, key: `${oa.key}+${ob.key}`, need, cost: oa.cost + ob.cost,
+    out.push({ pair: order && ob.qty > oa.qty ? [ob, oa] : [oa, ob], family: a.family, key: `${oa.key}+${ob.key}`, need, cost: oa.cost + ob.cost,
       units: Math.ceil((oa.cost + ob.cost) / STEP), value: oa.value + ob.value + Math.round(VARIETY.bonus * SCALE) * need });
   }
   return out;
@@ -177,7 +181,7 @@ function bestBasket(fronts, budget) {
 const toLine = (o, slot = 0) => ({
   family: o.family, slot, id: lineId(o.family, slot), cat: o.cat, item: o.item, key: o.key, qty: o.qty, perBottle: o.s,
   drinks: o.qty * o.s, cost: o.qty * o.item.price, costPerDrink: Math.round(o.item.price / o.s), need: o.need,
-  q: o.q, unrated: o.unrated, score: o.sc, parts: o.parts, rank: o.rank, from: o.from, pos: o.pos, flav: o.flav, fav: o.fav,
+  q: o.q, unrated: o.unrated, score: o.sc, parts: o.parts, rank: o.rank, from: o.from, pos: o.pos, of: o.of, flav: o.flav, fav: o.fav,
 });
 const toLines = (o) => (o.pair ? o.pair.map((p, i) => toLine(p, i)) : [toLine(o)]);
 
@@ -208,31 +212,38 @@ function topUp(lines, fams, T, choices, left, target) {
   return lines;
 }
 
-// Way 1: every family's target shrinks by one factor until the cheapest basket fits (a family
-// the host asked for keeps at least one drink while that fits), then what's left tops up.
+// Way 1: every family's target shrinks by one factor until the cheapest basket fits (the families
+// to keep — `keep`, in order — hold at least one drink while the money covers theirs), then what's
+// left tops up.
 function scaleDown(fams, T, choices, money, target, keep) {
   const cap = Math.floor(money / STEP);
-  const attempt = (kept) => {
-    const at = (a) => fams.map((f) => { const n = Math.floor(a * T[f]); return kept && keep.has(f) ? Math.max(1, n) : n; });
-    const unitsAt = (a) => sum(at(a).map((n, i) => (n > 0 ? singles(choices(fams[i]), n)[0].units : 0)));
-    if (unitsAt(0) > cap) return null;
-    let lo = 0, hi = 1;
-    for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (unitsAt(mid) <= cap) lo = mid; else hi = mid; }
-    return at(lo).map((n, i) => (n > 0 ? toLine(singles(choices(fams[i]), n)[0]) : null));
-  };
-  const lines = attempt(true) || attempt(false);
+  const unitsOf = (n, i) => (n > 0 ? singles(choices(fams[i]), n)[0].units : 0);
+  const held = new Set();
+  let used = 0;
+  for (const f of keep) {
+    const i = fams.indexOf(f), u = i < 0 ? Infinity : unitsOf(1, i);
+    if (used + u <= cap) { held.add(f); used += u; }
+  }
+  const at = (a) => fams.map((f) => { const n = Math.floor(a * T[f]); return held.has(f) ? Math.max(1, n) : n; });
+  const unitsAt = (a) => sum(at(a).map(unitsOf));
+  let lo = 0, hi = 1;
+  for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (unitsAt(mid) <= cap) lo = mid; else hi = mid; }
+  const lines = at(lo).map((n, i) => (n > 0 ? toLine(singles(choices(fams[i]), n)[0]) : null));
   return topUp(lines, fams, T, choices, money - sum(lines.map((l) => l?.cost || 0)), target);
 }
 
-// Way 2: the cheapest drinks first — a bottle of every family the host asked for, then each
-// family's cheapest-per-drink bottle up to its target, cheapest family first, then more of
-// whatever is cheapest until every drink is covered.
+// Way 2: the cheapest drinks first — a bottle of every family to keep (in order) while the money
+// lasts, then each family's cheapest-per-drink bottle up to its target, cheapest family first,
+// then more of whatever is cheapest until every drink is covered.
 function cheapestFirst(fams, T, choices, money, target, keep) {
   const lines = fams.map(() => null);
   const best = fams.map((f) => [...choices(f)].sort(byCpd)[0]);
   const order = fams.map((_, i) => i).sort((a, b) => byCpd(best[a], best[b]));
   let left = money;
-  for (const i of order) if (keep.has(fams[i]) && best[i].item.price <= left) { addBottle(lines, i, best[i]); left -= best[i].item.price; }
+  for (const f of keep) {
+    const i = fams.indexOf(f);
+    if (i >= 0 && !lines[i] && best[i].item.price <= left) { addBottle(lines, i, best[i]); left -= best[i].item.price; }
+  }
   for (const i of order) {
     while ((lines[i]?.drinks || 0) < T[fams[i]] && drinksOf(lines) < target && best[i].item.price <= left) { addBottle(lines, i, best[i]); left -= best[i].item.price; }
   }
@@ -261,13 +272,26 @@ function cheapestFirst(fams, T, choices, money, target, keep) {
  * @param exclude  ["cat:id"] bottles the host took out
  * @param skip     [family] families the host doesn't want (their drinks go to the rest)
  * @param pins     { family | "family#1": "cat:id" } bottles the host swapped in
+ * @param optional [family] the quiz added on its own (tequila for shots): left out when the money
+ *                 can't cover everything and the bar does better without it
  * @returns { lines, cost, drinks, target, left, short, feasible, trimmed, unsynced: [catId],
- *            alternatives: { lineId: lines }, brands: { family: [{ key, label, rank, pick }] },
+ *            alternatives: { lineId: lines }, brands: { family: [{ key, label, rank, pick, diff }] },
  *            tier (used), asked, autoTier, tiers: { family: tier }, tierShort: { tier, cost } | null,
  *            nextTier: { tier, cost } | null, varietyFamily, legacy: [catId] (no ranks cached),
- *            score, rating, unrated, mix, fellBack }
+ *            dropped: [family] (optional ones left out), score, rating, unrated, mix, fellBack }
  */
-export function fillBar({ catalog = {}, drinks, budget, mix = "mixed", shares: wantShares = null, keep = [], profile = {}, stepDown = true,
+export function fillBar(args = {}) {
+  const out = fillOnce(args || {});
+  const skip = new Set(args?.skip || []);
+  const optional = [...new Set(args?.optional || [])].filter((f) => FAMILIES[f] && !skip.has(f)).sort(byOrder);
+  if (!optional.length || !out.lines.length || (out.feasible && !out.trimmed)) return { ...out, dropped: [] };
+  const alt = fillOnce({ ...args, skip: [...skip, ...optional] });
+  const full = (r) => r.feasible && !r.trimmed;
+  const covered = (r) => Math.min(r.target, r.drinks);
+  return alt.lines.length > 0 && (full(alt) || covered(alt) > covered(out)) ? { ...alt, dropped: optional } : { ...out, dropped: [] };
+}
+
+function fillOnce({ catalog = {}, drinks, budget, mix = "mixed", shares: wantShares = null, keep = [], profile = {}, stepDown = true,
   pegMl = 60, menu = [], have = {}, exclude = [], skip = [], pins = {} } = {}) {
   const want = Math.max(0, Math.floor(Number(drinks) || 0));
   const money = Math.floor(Number(budget) || 0);
@@ -294,7 +318,16 @@ export function fillBar({ catalog = {}, drinks, budget, mix = "mixed", shares: w
   // A spirit the cocktail menu needs is also scored for cocktails (white rum for the Mojitos).
   const ctxs = {}, cache = {};
   const ctx = (f) => (ctxs[f] ||= familyContext(catalog, f, peg));
-  const profOf = (f) => (served[f] > 0 && !prof.style.cocktails ?{ ...prof, style: { ...prof.style, cocktails: true } } : prof);
+  // The menu's rum: Mojitos want white, a Dark 'n' Stormy dark ("60 ml white rum" in the recipe).
+  const rumWants = { white: 0, dark: 0 };
+  for (const m of menu || []) {
+    const c = m && COCKTAIL[m.id];
+    if (!c || c.mocktail || !(m.servings > 0) || c.needs[0] !== "rum") continue;
+    const kind = /white/i.test(c.spirit || "") ? "white" : /dark/i.test(c.spirit || "") ? "dark" : null;
+    if (kind) rumWants[kind] += m.servings;
+  }
+  const menuRum = rumWants.white > rumWants.dark ? "white" : rumWants.dark > rumWants.white ? "dark" : null;
+  const profOf = (f) => (served[f] > 0 ? { ...prof, style: { ...prof.style, cocktails: true, ...(f === "rum" && menuRum ? { menuRum } : {}) } } : prof);
   const pool = (f, tier) => {
     const k = `${f}|${tier}`;
     if (!cache[k]) {
@@ -313,7 +346,9 @@ export function fillBar({ catalog = {}, drinks, budget, mix = "mixed", shares: w
   if (!Object.keys(shares).length) shares = Object.fromEntries(ORDER.filter((f) => !skipped.has(f) && has(f)).map((f) => [f, 1]));
   const mins = Object.fromEntries(Object.entries(menuMin).filter(([f]) => has(f)));
   const kept = new Set((keep || []).filter((f) => shares[f] > 0));
-  const legacy = [...new Set(Object.keys(shares).filter((f) => ctx(f).legacy).flatMap((f) => FAMILIES[f].cats.filter((c) => catalog?.[c]?.length)))];
+  // Categories cached before ranks were parsed (each one, so a half-synced family still asks).
+  const old = new Set(Object.keys(shares).flatMap((f) => ctx(f).legacyCats));
+  const legacy = Object.keys(CAT).filter((c) => old.has(c));
 
   const asked = TIERS[prof.tier] ? prof.tier : "auto";
   const empty = { lines: [], cost: 0, drinks: 0, target: want, left: Math.max(0, money), short: want, feasible: false, trimmed: false, unsynced,
@@ -327,11 +362,12 @@ export function fillBar({ catalog = {}, drinks, budget, mix = "mixed", shares: w
     T = { ...mins };
     for (const [f, n] of Object.entries(rest)) T[f] = (T[f] || 0) + n;
   } else T = familyTargets(want, shares, mins);
-  // A family the host asked for isn't rounded away: it takes a drink from the biggest one.
+  // A family the host asked for isn't rounded away: it takes a drink from the biggest family above
+  // its cocktail minimum — or, when the menu holds every family at its minimum, adds one drink.
   for (const f of [...kept].sort(byOrder)) {
     if (T[f] > 0) continue;
-    const big = Object.keys(T).sort((a, b) => T[b] - T[a] || byOrder(a, b))[0];
-    if (big && T[big] > 1) { T[big] -= 1; T[f] = 1; }
+    const giver = Object.keys(T).filter((x) => T[x] > Math.max(1, mins[x] || 0)).sort((a, b) => T[b] - T[a] || byOrder(a, b))[0];
+    if (giver) { T[giver] -= 1; T[f] = 1; } else if (Object.keys(mins).length) T[f] = 1;
   }
   const fams = Object.keys(T).filter((f) => T[f] > 0).sort(byOrder);
   const target = sum(fams.map((f) => T[f]));
@@ -351,31 +387,38 @@ export function fillBar({ catalog = {}, drinks, budget, mix = "mixed", shares: w
       return kind === "beer" ? n >= VARIETY.minBeer : n >= (prof.style.sip && !prof.style.mix ? VARIETY.minSip : VARIETY.minBottles);
     };
     const variety = (f) => prof.variety !== false && f === big && enough(f);
-    const optionsFor = (f) => {
-      const a = pinned(f, 0), b = variety(f) ? pinned(f, 1) : null;
-      const opts = b ? [] : choices(f).map((c) => option(c, T[f]));
-      if (variety(f)) { const top = best(f).slice(0, VARIETY.pool); opts.push(...pairOptions(a ? [a] : top, b ? [b] : top, T[f])); }
-      return frontier(opts.length ? opts : choices(f).map((c) => option(c, T[f])));
+    // The family's options, cheapest first; `a` = the first slot's bottle (pinned, or one being priced).
+    const optionsFor = (f, a = pinned(f, 0)) => {
+      const b = variety(f) ? pinned(f, 1) : null, one = a ? [a] : fam(f).list;
+      const opts = b ? [] : one.map((c) => option(c, T[f]));
+      if (variety(f)) { const top = best(f).slice(0, VARIETY.pool); opts.push(...pairOptions(a ? [a] : top, b ? [b] : top, T[f], !a && !b)); }
+      return frontier(opts.length ? opts : one.map((c) => option(c, T[f])));
     };
-    const fronts = fams.map(optionsFor);
+    const fronts = fams.map((f) => optionsFor(f));
     const pick = bestBasket(fronts, cash);
     let lines;
     if (pick) lines = fams.flatMap((f, i) => toLines(fronts[i][pick[i]]));
     else {
-      const a = scaleDown(fams, T, choices, cash, target, kept), b = cheapestFirst(fams, T, choices, cash, target, kept);
+      // Families to keep a bottle of: one the host swapped a bottle into first, then the ones they
+      // asked for, cheapest bottle first (so the money keeps as many as it can).
+      const swapped = fams.filter((f) => pinned(f, 0) || pinned(f, 1));
+      const cheapest = (f) => Math.min(...choices(f).map((c) => c.item.price));
+      const keepNow = [...swapped, ...fams.filter((f) => kept.has(f) && !swapped.includes(f)).sort((x, y) => cheapest(x) - cheapest(y) || byOrder(x, y))];
+      const a = scaleDown(fams, T, choices, cash, target, keepNow), b = cheapestFirst(fams, T, choices, cash, target, keepNow);
       const covers = (ls) => Math.min(target, drinksOf(ls));
-      lines = (covers(b) > covers(a) ? b : a).filter((l) => l && l.qty > 0).map((l) => ({ ...l, need: l.drinks }));
+      const keeps = (ls) => keepNow.filter((f) => ls[fams.indexOf(f)]?.qty > 0).length;
+      const useB = covers(b) > covers(a) || (covers(b) === covers(a) && keeps(b) > keeps(a));
+      lines = (useB ? b : a).filter((l) => l && l.qty > 0).map((l) => ({ ...l, need: l.drinks }));
     }
     // In band: the host's own picks (a swap, their usual) count as in, whatever they cost.
     const mine = (l) => l.fav || pinMap[l.id] === l.key;
     const needs = sum(lines.map((l) => l.need));
     const inBand = needs ? sum(lines.map((l) => (mine(l) ? 1 : l.parts?.band ?? 1) * l.need)) / needs : 0;
-    // How close each family got to its best bottle at this tier (1 = the money forced nothing).
-    const fit = Math.min(1, ...[...new Set(lines.map((l) => l.family))].map((f) => {
-      const ls = lines.filter((l) => l.family === f), top = Math.max(1e-9, ...choices(f).map((c) => c.sc));
-      return sum(ls.map((l) => l.score * l.need)) / Math.max(1, sum(ls.map((l) => l.need))) / top;
-    }));
-    return { tier, lines, trimmed: !pick, tiers, inBand, fit, fam, choices, enough };
+    // How close the bar got to the tier's best bar (1 = the money forced nothing). The knapsack's own
+    // value, so more money never lowers it — and "auto" never steps down a tier as the money rises.
+    const top = sum(fronts.map((o) => o[o.length - 1].value));
+    const fit = pick && top > 0 ? sum(fronts.map((o, i) => o[pick[i]].value)) / top : 0;
+    return { tier, lines, trimmed: !pick, tiers, inBand, fit, fam, choices, enough, optionsFor };
   };
   const costAt = (t) => runTier(t, BIG).lines.reduce((s, l) => s + l.cost, 0);
 
@@ -385,7 +428,9 @@ export function fillBar({ catalog = {}, drinks, budget, mix = "mixed", shares: w
   let run;
   for (const t of tries) {
     run = runTier(t, money);
-    const good = !run.trimmed && run.inBand >= IN_BAND && (asked !== "auto" || run.fit >= AUTO_FIT);
+    // A picked tier holds while its bar stays in its band; "auto" takes a tier once the bar is close
+    // to the tier's best (a measure more money never lowers, so it never steps down as money rises).
+    const good = !run.trimmed && (asked === "auto" ? run.fit >= AUTO_FIT : run.inBand >= IN_BAND);
     if (good) break;
   }
   const { lines, trimmed, tiers, fam, choices } = run;
@@ -423,16 +468,22 @@ export function fillBar({ catalog = {}, drinks, budget, mix = "mixed", shares: w
     alternatives[l.id] = [...others, ...same].slice(0, 3).map((o) => toLine(o, l.slot));
   }
 
-  // "Or their usual": the family's best-known brands here, each with its best-fitting bottle.
+  // "Or their usual": the family's best-known brands here, each with its best-scored bottle that
+  // fits — the family's cheapest way with it in the first slot and the rest of the bar as it is
+  // (bottle for bottle on a tight budget), so tapping one never leaves the bar short. The starred
+  // brand always shows, so it can be unstarred. `diff` = ₹ more (or less) than the family costs now.
   const brands = {};
   for (const f of [...new Set(lines.map((l) => l.family))]) {
-    const l = lines.find((x) => x.family === f && !x.slot) || lines.find((x) => x.family === f);
-    const room = left + sum(lines.filter((x) => x.family === f).map((x) => x.cost));
+    const ls = lines.filter((x) => x.family === f);
+    const now = sum(ls.map((x) => x.cost)), room = left + now, covered = sum(ls.map((x) => x.drinks));
+    const costWith = (c) => (trimmed ? option(c, covered).cost : run.optionsFor(f, c)[0].cost);
     brands[f] = topBrands(ctx(f)).map((b) => {
       const mine = fam(f).all.filter((c) => brandKey(c.item.brand || c.item.name.split(" ")[0]) === b.key && !c.flav).sort((x, y) => y.sc - x.sc || cmp(x.key, y.key));
-      const fits = mine.find((c) => option(c, l.need).cost <= room);
-      return { ...b, pick: (fits || mine[0])?.key || null };
-    }).filter((b) => b.pick);
+      let pick = null;
+      for (const c of mine) { const k = costWith(c); if (k <= room) { pick = { c, k }; break; } }
+      if (!pick && prof.favs?.[f] === b.key && mine[0]) pick = { c: mine[0], k: costWith(mine[0]) };
+      return pick ? { ...b, pick: pick.c.key, diff: pick.k - now } : null;
+    }).filter(Boolean);
   }
 
   const unrated = [...new Set([...lines, ...Object.values(alternatives).flat()].filter((l) => l.unrated).map((l) => l.key))];
@@ -453,7 +504,8 @@ export function barCost(args = {}, tier = "classic") {
 // The best-scored bottle of a family at a tier (the quiz's "e.g. Royal Stag ₹570").
 export function topPick({ catalog = {}, family, profile = {}, tier = "classic", pegMl = 60 } = {}) {
   if (!FAMILIES[family]) return null;
-  const { rows } = scoreFamily(familyContext(catalog, family, Number(pegMl) === 30 ? 30 : 60), { style: { mix: true }, origin: "any", ...profile }, tier);
+  // (their usual brand isn't an example of a tier)
+  const { rows } = scoreFamily(familyContext(catalog, family, Number(pegMl) === 30 ? 30 : 60), { style: { mix: true }, origin: "any", ...profile, favs: {} }, tier);
   const { list } = candidates(rows, family, new Set());
   return [...list].filter((c) => !c.flav).sort((a, b) => b.sc - a.sc || cmp(a.key, b.key))[0] || null;
 }

@@ -5,6 +5,7 @@ import {
   syncCatsFor, menuByFamily, templateLabel, COCKTAIL_SHARES, DEFAULT_QUIZ, STEPS,
 } from "../src/lib/barQuiz.js";
 import { fillBar, MIXES } from "../src/lib/optimise.js";
+import { familyContext, originChoice } from "../src/lib/barScore.js";
 import { applyTemplate } from "../src/lib/templates.js";
 import { loadCatalog } from "./fixtures/livcheers/catalog.mjs";
 
@@ -81,6 +82,13 @@ test("seeding: last answers, then the template, then the guests' tastes, then de
   assert.deepEqual(re.answers.money, { kind: "amount", value: 9000 });
   assert.deepEqual(re.answers.favs, { gin: "bombaysapphire" });
   assert.deepEqual(re.answers.answered, ["vibe"]);
+  // The generic "Mixed bar" style doesn't overwrite what the host said they drink…
+  const generic = seedQuiz({ saved, party: { mix: "mixed", name: "House party" } });
+  assert.equal(generic.reseeded, false);
+  assert.deepEqual(generic.answers.families, { gin: 2 });
+  assert.deepEqual(generic.answers.style, ["sip"]);
+  // …but it does fill in answers the host skipped.
+  assert.equal(seedQuiz({ saved: { ...saved, answered: [] }, party: { mix: "mixed" } }).reseeded, true);
   // Nothing at all: the defaults.
   assert.deepEqual(seedQuiz({}).answers, DEFAULT_QUIZ);
 });
@@ -132,13 +140,20 @@ test("answers → shares: lots and some, wine, shots, not sure", () => {
   assert.deepEqual(syncCatsFor({ families: { wine: 1 } }), ["redwine", "whitewine", "rose"]);
 });
 
-test("Q4 only shows up when a spirit or wine they drink comes both ways", () => {
+test("Q4 only shows up when a spirit or wine they drink has well-known bottles both ways", () => {
+  const noQ4 = ["families", "style", "vibe", "budget"];
   assert.deepEqual(stepsFor({}), STEPS);
-  assert.deepEqual(stepsFor({ families: { beer: 2, tequila: 1 } }), ["families", "style", "vibe", "budget"]);
-  assert.deepEqual(stepsFor({ families: { bubbly: 1 } }), ["families", "style", "vibe", "budget"]);
+  assert.deepEqual(stepsFor({ families: { beer: 2, tequila: 1 } }), noQ4);     // both ignore the answer
+  assert.deepEqual(stepsFor({ families: { rum: 1 } }), noQ4);                    // no well-known imported rum
   assert.ok(stepsFor({ families: { whisky: 1 } }).includes("origin"));
+  assert.ok(stepsFor({ families: { wine: 1 } }).includes("origin"));             // Sula or Jacob's Creek
   // What's synced wins over the built-in guess.
-  assert.ok(!stepsFor({ families: { gin: 1 } }, { desiShare: { gin: 0.05 } }).includes("origin"));
+  assert.ok(!stepsFor({ families: { gin: 1 } }, { choice: { gin: false } }).includes("origin"));
+  assert.ok(stepsFor({ families: { rum: 1 } }, { choice: { rum: true } }).includes("origin"));
+  // Gurgaon: whisky, gin and wine come both ways; rum, beer and tequila don't.
+  const choice = (f) => originChoice(familyContext(GGN, f));
+  for (const f of ["whisky", "gin", "vodka", "redwine", "whitewine"]) assert.ok(choice(f), f);
+  for (const f of ["rum", "beer", "tequila"]) assert.ok(!choice(f), f);
 });
 
 test("the budget: their pick, else what's left, else the full bar, else ₹10k", () => {
@@ -156,8 +171,9 @@ test("the answers strip", () => {
   const labels = (a, o) => quizSummary(a, o).map((c) => c.label);
   assert.deepEqual(labels({ families: { whisky: 2, beer: 1 }, style: ["mix"], tier: "classic", origin: "desi" }, { amount: 12000 }),
     ["🥃 Whisky-heavy", "🥤 With mixers", "✨ Crowd favourites", "🇮🇳 Indian", "💰 ₹12k"]);
+  // (the budget picked the tier — not "fits ₹12k", which read as if the bar cost that)
   assert.deepEqual(labels({ families: { whisky: 2, beer: 2 }, style: ["sip", "mix"] }, { amount: 12000, tier: "classic", steps: ["families", "style", "vibe", "budget"] }),
-    ["🥃 Whisky & beer", "🧊 Neat & mixers", "✨ Crowd favourites · fits ₹12k", "💰 ₹12k"]);
+    ["🥃 Whisky & beer", "🧊 Neat & mixers", "✨ Crowd favourites · budget's pick", "💰 ₹12k"]);
   assert.deepEqual(labels({}, {}), ["🍹 Mixed bar", "🥤 With mixers", "✨ Best for my budget", "🌐 Made anywhere"]);
   assert.equal(labels({ families: { gin: 1 } }, {})[0], "🌿 Gin only");
   assert.equal(labels({ families: { gin: 1, rum: 1, beer: 1 } }, {})[0], "🍺 Beer, rum +1");
@@ -167,11 +183,18 @@ test("the answers strip", () => {
 test("reasons: short, honest, never two of a kind", () => {
   const base = { family: "vodka", cat: "vodka", costPerDrink: 117, item: { name: "Absolut Vodka", brand: "Absolut", rating: 4.6, origin: "Sweden", flag: "🇸🇪", sub: "Plain" } };
   const texts = (line, ctx) => reasonsFor(line, ctx).map((r) => r.text);
-  assert.deepEqual(texts({ ...base, from: "own", rank: 23, pos: 1 }, { profile: { style: { mix: true } } }), ["Most popular vodka on Livcheers", "Great with mixers"]);
-  assert.deepEqual(texts({ ...base, from: "own", rank: 23, pos: 18 }, {}), ["Top-25 vodka on Livcheers", "Imported · Sweden 🇸🇪"]);
-  assert.deepEqual(texts({ ...base, from: "own", rank: 300, pos: 40 }, { profile: { style: {} } }), ["4.6★ on Livcheers", "Imported · Sweden 🇸🇪"]);
+  assert.deepEqual(texts({ ...base, from: "own", rank: 23, pos: 1, of: 63 }, { profile: { style: { mix: true } } }), ["Most popular vodka on Livcheers", "Great with mixers"]);
+  assert.deepEqual(texts({ ...base, from: "own", rank: 23, pos: 18, of: 80 }, {}), ["Top-25 vodka on Livcheers", "Imported · Sweden 🇸🇪"]);
+  assert.deepEqual(texts({ ...base, from: "own", rank: 300, pos: 40, of: 63 }, { profile: { style: {} } }), ["4.6★ on Livcheers", "Imported · Sweden 🇸🇪"]);
+  // A place only means something with plenty ranked (≥ 3 × N) and well up the list (≤ #300):
+  // Gurgaon ranks 23 rums, so Red Indian XXX (#531) isn't "Top-25 rum".
+  assert.deepEqual(texts({ ...base, from: "own", rank: 23, pos: 18, of: 63 }, {}), ["Popular on Livcheers", "Imported · Sweden 🇸🇪"]);
+  const redIndian = { family: "rum", cat: "rum", costPerDrink: 38, from: "own", rank: 531, pos: 8, of: 23, item: { name: "Red Indian XXX Deluxe Rum", brand: "Red Indian", rating: 4.3, origin: "India", sub: "Aged" } };
+  assert.ok(!texts(redIndian, {}).some((t) => /Top-|popular/i.test(t)), texts(redIndian, {}).join());
+  assert.deepEqual(texts({ ...base, from: "own", rank: 180, pos: 1, of: 2 }, {}), ["Popular on Livcheers", "Imported · Sweden 🇸🇪"]);
   // A borrowed rank or a household name says so, and a rating without a rank is never shown.
   assert.deepEqual(texts({ ...base, from: "brand", rank: 69, pos: null }, {}), ["Popular brand", "Imported · Sweden 🇸🇪"]);
+  assert.deepEqual(texts({ ...base, from: "brand", rank: 999, pos: null }, {}), ["Imported · Sweden 🇸🇪"]);   // a brand Livcheers ranks #333
   const monk = { family: "rum", cat: "rum", costPerDrink: 48, cheap: true, from: "staple", rank: 60, pos: null, item: { name: "Old Monk XXX", brand: "Old Monk", rating: 4.7, origin: "India", sub: "Dark" } };
   assert.deepEqual(texts(monk, {}), ["A household name", "≈ ₹48 a drink"]);
   assert.deepEqual(texts({ ...monk, from: null, rank: null }, { profile: { origin: "desi" } }), ["Made in India", "≈ ₹48 a drink"]);
@@ -192,6 +215,8 @@ test("reasons: short, honest, never two of a kind", () => {
       assert.equal(new Set(rs.map((x) => x.kind)).size, rs.length, label);
       if (l.from !== "own") assert.ok(!rs.some((x) => /on Livcheers/.test(x.text)), label);
       for (const x of rs) assert.ok(x.text.length <= 40, label);
+      const n = rs.map((x) => x.text.match(/^Top-(\d+)/)).find(Boolean);
+      if (n) assert.ok(l.of >= 3 * Number(n[1]) && l.rank <= 300, label);
     }
   }
 });

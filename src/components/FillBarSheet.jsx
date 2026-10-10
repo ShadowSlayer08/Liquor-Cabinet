@@ -8,7 +8,7 @@ import Sheet from "./Sheet.jsx";
 import { CAT, cityName } from "../lib/parse/livcheers.js";
 import { COCKTAIL, FAMILIES } from "../lib/cocktails.js";
 import { fillBar, barCost, topPick, haveByFamily, joinLabels } from "../lib/optimise.js";
-import { TIERS, TIER_IDS, familyContext } from "../lib/barScore.js";
+import { TIERS, TIER_IDS, familyContext, originChoice } from "../lib/barScore.js";
 import {
   normalizeQuiz, seedQuiz, profileFromQuiz, stepsFor, quizSummary, resolveMoney, syncCatsFor, menuByFamily, templateLabel, shortName,
 } from "../lib/barQuiz.js";
@@ -45,6 +45,7 @@ export default function FillBarSheet({ catalog, city, plan, party, budget, spent
   const [skip, setSkip] = useState([]);         // families the host doesn't want
   const [lock, setLock] = useState(null);       // the tier "auto" had when the host started changing picks
   const [open, setOpen] = useState(null);       // the line whose swap panel is open
+  const [keepAuto, setKeepAuto] = useState(false);   // keep the tequila the quiz added for shots, even when money's tight
   // A template applied since the last answers re-seeded them: keep that (once, on open).
   useEffect(() => { if (seed.reseeded) setQuiz?.(seed.answers); }, [seed]);
 
@@ -56,12 +57,12 @@ export default function FillBarSheet({ catalog, city, plan, party, budget, spent
   // What the whole bar costs at the tier they picked ("Let the budget decide" → Treat them).
   const enoughFor = (a) => { const t = a.tier === "auto" ? "premium" : a.tier; return { tier: t, cost: barCost(argsFor(a), t) }; };
   const moneyOf = (a, enough) => resolveMoney(a.money, { left, drinkers: plan.drinkers, enough });
-  // Q4 is only asked where the city has both kinds: what's synced says, else a built-in guess.
-  const desiOf = (a) => Object.fromEntries(Object.keys(profileFromQuiz(a).shares)
-    .filter((f) => FAMILIES[f]?.cats.some((c) => catalog?.[c]?.length)).map((f) => [f, familyContext(catalog, f, peg).desiShare]));
+  // Q4 is only asked where the city has well-known bottles both ways: what's synced says, else a guess.
+  const choiceOf = (a) => Object.fromEntries(Object.keys(profileFromQuiz(a).shares)
+    .filter((f) => FAMILIES[f]?.cats.some((c) => catalog?.[c]?.length)).map((f) => [f, originChoice(familyContext(catalog, f, peg))]));
 
   // ── The quiz ──
-  const steps = useMemo(() => stepsFor(draft, { desiShare: desiOf(draft) }), [draft, catalog, peg]);
+  const steps = useMemo(() => stepsFor(draft, { choice: choiceOf(draft) }), [draft, catalog, peg]);
   const at = Math.min(step, steps.length - 1);
   const stepId = single || steps[at];
   const last = !!single || at >= steps.length - 1;
@@ -90,9 +91,9 @@ export default function FillBarSheet({ catalog, city, plan, party, budget, spent
   const money = moneyOf(answers, ansEnough.cost);
   const r = useMemo(() => fillBar({
     catalog, drinks, budget: money, shares: prof.shares, keep: prof.keep, pegMl: peg, menu: cocktailMenu, have, skip, pins,
-    profile: { ...prof.profile, tier: lock || prof.profile.tier },
-  }), [catalog, drinks, money, prof, peg, cocktailMenu, have, skip, pins, lock]);
-  const answerSteps = useMemo(() => stepsFor(answers, { desiShare: desiOf(answers) }), [answers, catalog, peg]);
+    optional: keepAuto ? [] : prof.auto, profile: { ...prof.profile, tier: lock || prof.profile.tier },
+  }), [catalog, drinks, money, prof, peg, cocktailMenu, have, skip, pins, lock, keepAuto]);
+  const answerSteps = useMemo(() => stepsFor(answers, { choice: choiceOf(answers) }), [answers, catalog, peg]);
   const strip = quizSummary(answers, { amount: money, tier: r.tier, steps: answerSteps });
   const bottles = r.lines.reduce((s, l) => s + l.qty, 0);
   const changed = skip.length > 0 || Object.keys(pins).length > 0;
@@ -100,7 +101,7 @@ export default function FillBarSheet({ catalog, city, plan, party, budget, spent
   const pairs = new Set(r.lines.filter((l) => l.slot).map((l) => l.family));
 
   // ── Answers ──
-  const resetPicks = () => { setPins({}); setSkip([]); setLock(null); setOpen(null); };
+  const resetPicks = () => { setPins({}); setSkip([]); setLock(null); setOpen(null); setKeepAuto(false); };
   const save = (a, { keepPicks = false } = {}) => {
     const n = normalizeQuiz(a);
     setAnswers(n); setQuiz?.(n);
@@ -116,6 +117,8 @@ export default function FillBarSheet({ catalog, city, plan, party, budget, spent
   const skipStep = () => { tap(); if (last) finish(draft); else setStep(at + 1); };   // keeps the pre-filled answer
   const back = () => { if (single) { setSingle(null); setView("results"); } else if (at > 0) setStep(at - 1); };
   useBackHandler(back, view === "quiz" && (!!single || at > 0));
+  // "Pick cocktails" from Q2 leaves the sheet: keep what's answered so far.
+  const toBar = goBar && ((kind) => { save({ ...draft, answered: [...new Set([...(draft.answered || []), "style"])] }, { keepPicks: true }); goBar(kind); });
   const editStep = (s) => { tap(); setDraft(answers); setSingle(s); setView("quiz"); };
   const redo = () => { tap(); setDraft(answers); setStep(0); setSingle(null); setView("quiz"); };
   const setAmount = (value) => { tap(); save({ ...answers, money: { kind: "amount", value } }); };
@@ -179,16 +182,24 @@ export default function FillBarSheet({ catalog, city, plan, party, budget, spent
       <span className="opt-fill" hidden />
       {view === "quiz" ? (
         <>
-          {!single && (
-            <div className="quiz-top">
-              <div className="quiz-dots" aria-hidden="true">{steps.map((s, i) => <i key={s} className={i === at ? "on" : i < at ? "done" : ""} />)}</div>
-              <button className="quiz-link small" onClick={skipStep}>Skip</button>
-            </div>
-          )}
+          {/* On-screen Back too: iOS has no hardware back button */}
+          <div className="quiz-top">
+            {single ? (
+              <button className="quiz-link small" onClick={() => { tap(); back(); }}>‹ Cancel</button>
+            ) : (
+              <>
+                <div className="quiz-dots" aria-hidden="true">{steps.map((s, i) => <i key={s} className={i === at ? "on" : i < at ? "done" : ""} />)}</div>
+                <div className="quiz-top-acts">
+                  {at > 0 && <button className="quiz-link small dim" onClick={() => { tap(); back(); }}>‹ Back</button>}
+                  <button className="quiz-link small" onClick={skipStep}>Skip</button>
+                </div>
+              </>
+            )}
+          </div>
           {stepId === "families" && (
             <FamiliesStep draft={draft} setDraft={setDraft} seedNote={!single && sameFamilies(draft, seed.answers) ? seedNote : null} />
           )}
-          {stepId === "style" && <StyleStep draft={draft} setDraft={setDraft} cocktailMenu={cocktailMenu} goBar={goBar} />}
+          {stepId === "style" && <StyleStep draft={draft} setDraft={setDraft} cocktailMenu={cocktailMenu} goBar={toBar} />}
           {stepId === "vibe" && <VibeStep draft={draft} setDraft={setDraft} examples={examples} />}
           {stepId === "origin" && <OriginStep draft={draft} setDraft={setDraft} />}
           {stepId === "budget" && (
@@ -237,7 +248,7 @@ export default function FillBarSheet({ catalog, city, plan, party, budget, spent
               )}
               {r.legacy.length > 0 && (
                 <div className="note note-info opt-note quiz-note">
-                  <span className="grow">Sync prices for better picks: these were saved before the app knew what's popular on Livcheers (use ↻ Force Refresh).</span>
+                  <span className="grow">Sync for better picks: {joinLabels(r.legacy.map((c) => CAT[c]?.label))} prices were saved before the app knew what's popular on Livcheers.</span>
                   <button className="btn btn-xs btn-ghost" onClick={() => syncWith(r.legacy)}><Icon.bolt size={13} /> Sync</button>
                 </div>
               )}
@@ -279,6 +290,12 @@ export default function FillBarSheet({ catalog, city, plan, party, budget, spent
                 </div>
               )}
               {r.fellBack && <div className="note note-info quiz-note">Nothing's synced for what they drink yet, so this is a mixed bar.</div>}
+              {r.dropped.length > 0 && (
+                <div className="note note-info opt-note quiz-note">
+                  <span className="grow">No {joinLabels(r.dropped.map((f) => FAMILIES[f]?.label.toLowerCase()))} for shots: {fmtShort(money)} goes further without it.</span>
+                  <button className="btn btn-xs btn-ghost" onClick={() => { tap(); setKeepAuto(true); }}>Add it</button>
+                </div>
+              )}
               {!r.feasible && r.lines.length > 0 && (
                 <div className="note note-warn quiz-note">
                   {fmt(money)} covers about <b>{r.drinks}</b> of {r.target} drinks. Raise the amount{peg === 60 ? " or switch to 30 ml pegs (Food tab)" : ""}.

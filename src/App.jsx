@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { App as CapApp } from "@capacitor/app";
 import { CATEGORIES, CITIES, cityName } from "./lib/parse/livcheers.js";
-import { loadCachedCatalog, STALE_MS } from "./lib/sources.js";
+import { loadCachedCatalog, priceKey, STALE_MS } from "./lib/sources.js";
 import { store } from "./lib/store.js";
 import { DEFAULT_PARTY, planParty } from "./lib/food.js";
 import { nextSaturday, todayISO } from "./lib/drydays.js";
@@ -14,6 +14,7 @@ import { DEFAULT_OUT, withOut } from "./lib/outModel.js";
 import { outForDate } from "./lib/out.js";
 import { AGE_LINE } from "./lib/age.js";
 import { normalizeQuiz } from "./lib/barQuiz.js";
+import { ranklessCats } from "./lib/barScore.js";
 import ScraperPanel from "./components/ScraperPanel.jsx";
 import CabinetTab from "./components/CabinetTab.jsx";
 import BarTab from "./components/BarTab.jsx";
@@ -44,6 +45,19 @@ const withDate = (p) => ({ ...p, date: p.date && p.date >= todayISO() ? p.date :
 const DEFAULT_SPLIT = { include: { liquor: true, food: true, supplies: true }, people: null, drinkers: null, mode: "fair" };
 // v1.0/1.1 food lines used `servings`; everything is `qty` now.
 const migrateFood = (lines) => (lines || []).map((l) => (l.qty == null && l.servings != null ? { ...l, qty: l.servings, restaurant: l.restaurant && { ...l.restaurant, costForOne: l.restaurant.costForOne ?? l.unitPrice } } : l));
+// The city's cached prices. Ones saved before the parser kept Livcheers' popularity rank (v1.5)
+// count as stale, so the next Smart Sync re-downloads them: Fill my bar picks by popularity.
+async function loadPrices(slug) {
+  const { catalog, ages } = await loadCachedCatalog(slug, CATEGORIES);
+  const old = Date.now() - STALE_MS - 1;
+  for (const cat of ranklessCats(catalog)) {
+    if (!(ages[cat] > old)) continue;
+    ages[cat] = old;
+    const cached = await store.get(priceKey(slug, cat));
+    if (cached) await store.set(priceKey(slug, cat), { ...cached, fetchedAt: old });
+  }
+  return { catalog, ages };
+}
 
 export default function App() {
   const [ready, setReady] = useState(false);
@@ -109,7 +123,7 @@ export default function App() {
       if (cfg.syncIds) setSyncIds(cfg.syncIds);
       if (cfg.activeCat) setActiveCat(cfg.activeCat);
       if (cfg.loc) setLoc(cfg.loc);
-      const { catalog, ages } = await loadCachedCatalog(c, CATEGORIES);
+      const { catalog, ages } = await loadPrices(c);
       setCatalog(catalog); setAges(ages);
       // First launch (or upgrading from a version without onboarding) → welcome screen.
       // (a launch link may have landed while this was loading — it wins)
@@ -195,7 +209,7 @@ export default function App() {
 
   const switchCity = async (slug) => {
     setCity(slug);
-    const { catalog, ages } = await loadCachedCatalog(slug, CATEGORIES);
+    const { catalog, ages } = await loadPrices(slug);
     setCatalog(catalog); setAges(ages);
     return Object.keys(catalog).length;
   };
