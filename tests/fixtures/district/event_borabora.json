@@ -1,0 +1,194 @@
+{
+ "_source": "GET https://www.district.in/gw/consumer/events/v1/event/getBySlug/bandra-after-dark-ft-dj-sam-oct10-2026 (research capture only — the app reads the event page) (2026-10-03). Same object as the event page's flight \"data\"; trimmed to the fields the parser reads.",
+ "result": "ok",
+ "data": {
+  "_id": "6ab7d1191fdae8f823da0457",
+  "name": "Bandra After Dark ft. DJ Sam   ",
+  "slug": "bandra-after-dark-ft-dj-sam-oct10-2026",
+  "city": "Mumbai",
+  "sold_out": false,
+  "event_state": "available",
+  "is_free": false,
+  "price_display_string": "499 onwards",
+  "price_string": "499 onwards",
+  "date_string_v2": "Sat, 10 Oct, 9:00 PM – Sun, 11 Oct, 1:00 AM",
+  "least_show_start_time": 1791646200,
+  "max_show_end_time": 1791660600,
+  "is_event_recurring": false,
+  "total_active_shows": 1,
+  "components": [
+   {
+    "type": "event_guide_v2",
+    "content": {
+     "icon_type_heading_subheading": [
+      {
+       "icon_url": "",
+       "type": "age_restriction_entry",
+       "heading": "Entry allowed for ages 21 and above",
+       "value": "21",
+       "tags": []
+      },
+      {
+       "icon_url": "",
+       "type": "age_restriction_tickets",
+       "heading": "Tickets required for ages 21 and above",
+       "value": "21",
+       "tags": []
+      },
+      {
+       "icon_url": "",
+       "type": "pets_allowed",
+       "heading": "Pets are not allowed",
+       "value": "no",
+       "tags": []
+      },
+      {
+       "icon_url": "",
+       "type": "id_requirement",
+       "heading": "ID (Aadhaar/PAN/DL/Passport) is required for entry",
+       "value": "required",
+       "tags": []
+      },
+      {
+       "icon_url": "",
+       "type": "indoor_or_outdoor",
+       "heading": "Indoor venue with AC with both seated and standing areas",
+       "value": "indoor_with_ac",
+       "tags": []
+      },
+      {
+       "icon_url": "",
+       "type": "photography_allowed",
+       "heading": "Photography and recording allowed",
+       "value": "yes",
+       "tags": []
+      },
+      {
+       "icon_url": "",
+       "type": "music_genre",
+       "heading": "Bollywood music played at the event",
+       "value": "bollywood",
+       "tags": []
+      },
+      {
+       "icon_url": "",
+       "type": "stag_policy",
+       "heading": "Stag entry is not allowed at this event",
+       "value": "stag_entry_not_allowed",
+       "tags": []
+      },
+      {
+       "icon_url": "",
+       "type": "re_entry_policy",
+       "heading": "Re-entry allowed with the same ticket",
+       "value": "re_entry_allowed",
+       "tags": []
+      }
+     ]
+    },
+    "is_hidden": false
+   }
+  ],
+  "event_metadata": {
+   "nps_config": {
+    "questions": []
+   },
+   "is_cover_charge_enabled": true,
+   "is_cover_charge_redemption_disabled": false
+  },
+  "venue": {
+   "geolocation": {
+    "latitude": 19.0622,
+    "longitude": 72.8345
+   },
+   "name": "Bora Bora | Linking Road, Bandra West, Mumbai",
+   "address": "Linking Road, Bandra West, Mumbai",
+   "city": "Mumbai",
+   "restaurant_id": 19294334,
+   "shows": [
+    {
+     "_id": "6ab7d12c2be9f45d5f16ff9c",
+     "start_utc_timestamp": 1791646200,
+     "end_utc_timestamp": 1791660600,
+     "date_string": "October 10 | 9PM - October 11 | 1AM",
+     "sold_out": false,
+     "items_for_sale": [
+      {
+       "name": "Tickets",
+       "item_group_type": "ticket",
+       "is_available": true,
+       "items": [
+        {
+         "_id": "6ab7d25499071f5ff3252c7e",
+         "name": "Female Entry Cover",
+         "price": 499,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "• Above ticket price is redeemable on food &amp; beverages.<br />̐• T&amp;C apply. <br />• This ticket cannot be clubbed with any other offer. ",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [
+          {
+           "service_type": "COVER_CHARGE",
+           "price": 499,
+           "pay_bill_display_amount": 0,
+           "redemption_type": "single"
+          }
+         ],
+         "item_service_types": [
+          "₹499 cover"
+         ],
+         "convenience_fee_percentage": 0.04,
+         "gst": [],
+         "availability_date": "2026-10-10T15:29:00.000Z"
+        },
+        {
+         "_id": "6ab7d2aab2a790db6bc87d48",
+         "name": "Couple Entry Cover",
+         "price": 999,
+         "strike_price": 0,
+         "min_purchase_amount": 1,
+         "max_purchase_amount": 10,
+         "quantity_available_for_purchase": 10,
+         "description": "• Above ticket price is redeemable on food &amp; beverages.<br />̐• T&amp;C apply. <br />• This ticket cannot be clubbed with any other offer. ",
+         "item_state": "available",
+         "is_available": true,
+         "is_hidden": false,
+         "locked": false,
+         "services": [
+          {
+           "service_type": "COVER_CHARGE",
+           "price": 999,
+           "pay_bill_display_amount": 0,
+           "redemption_type": "single"
+          }
+         ],
+         "item_service_types": [
+          "₹999 cover"
+         ],
+         "convenience_fee_percentage": 0.04,
+         "gst": [],
+         "availability_date": "2026-10-10T15:29:00.000Z"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "terms": [
+   "Please carry a valid ID proof along with you.",
+   "All ticket purchases are final and non-refundable. If an event is cancelled, you will receive a full refund. If an event is rescheduled, you may choose to retain your ticket for the rescheduled date or opt for a refund.",
+   "Security procedures, including frisking remain the right of the management.",
+   "No dangerous or potentially hazardous objects including but not limited to weapons, knives, guns, fireworks, helmets, lazer devices, bottles, musical instruments will be allowed in the venue and may be ejected with or without the owner from the venue",
+   "The sponsors/performers/organizers are not responsible for any injury or damage occurring due to the event. Any claims regarding the same would be settled in courts in Mumbai.",
+   "People in an inebriated state may not be allowed entry.",
+   "Organizers hold the right to deny late entry to the event.",
+   "Venue rules apply."
+  ]
+ }
+}

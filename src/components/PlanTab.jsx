@@ -39,7 +39,7 @@ export default function PlanTab({
   batches, activeBatch, setActiveBatch, addBatch, ages, openScraper, clearCache, openCity,
   party, setParty, customDry, setCustomDry, cocktailMenu, liquorLines, liquorTotal, foodCart,
   reminders, setReminders, split, setSplit, bubble, setBubble, zomatoExact, setZomatoExact, toast,
-  settle, openSettle, openLegal,
+  settle, openSettle, openLegal, out,
 }) {
   const [draft, setDraft] = useState(String(budget));
   const [editing, setEditing] = useState(false);
@@ -96,12 +96,12 @@ export default function PlanTab({
         )}
       </div>
 
-      <InviteCard party={party} setParty={setParty} city={city} loc={loc} plan={plan} cocktailMenu={cocktailMenu} liquorLines={liquorLines} foodCart={foodCart} toast={toast} />
+      <InviteCard party={party} setParty={setParty} city={city} loc={loc} plan={plan} cocktailMenu={cocktailMenu} liquorLines={liquorLines} foodCart={foodCart} toast={toast} out={out} />
       <SplitCard party={party} setParty={setParty} plan={plan} split={split} setSplit={setSplit}
         liquorTotal={liquorTotal} zomatoTotal={zomatoTotal} blinkitTotal={blinkitTotal} toast={toast}
-        settle={settle} openSettle={openSettle} />
-      <RemindersCard party={party} city={city} customDry={customDry} reminders={reminders} setReminders={setReminders} toast={toast} />
-      <RidesCard party={party} setParty={setParty} plan={plan} loc={loc} locating={locating} onLocate={onLocate} toast={toast} />
+        settle={settle} openSettle={openSettle} out={out} />
+      <RemindersCard party={party} city={city} customDry={customDry} reminders={reminders} setReminders={setReminders} toast={toast} out={out} loc={loc} />
+      <RidesCard party={party} setParty={setParty} plan={plan} loc={loc} locating={locating} onLocate={onLocate} toast={toast} out={out} />
       <DryDaysCard party={party} city={city} customDry={customDry} setCustomDry={setCustomDry} toast={toast} />
 
       <div className="card fade-up">
@@ -158,7 +158,7 @@ export default function PlanTab({
         <div>🛒 <b style={{ color: "var(--blinkit)" }}>Blinkit</b> — mixers, ice & munchies at usual MRP, or the live price read from Blinkit on your phone (beta); each opens in Blinkit.</div>
         <div>🗓️ <b className="gold">Dry days</b> — national days are certain; festival and state days vary, so check your state's notice.</div>
         <div className="tiny dim" style={{ marginTop: 10 }}>Not affiliated with or endorsed by any of these services. <button className="gold tiny" onClick={openLegal}>Legal notice & privacy ›</button></div>
-        <div className="tiny dim" style={{ marginTop: 4 }}>Liquor Cabinet v1.4.1 · Prices are indicative. Drink responsibly, and only where it's legal for you.</div>
+        <div className="tiny dim" style={{ marginTop: 4 }}>Liquor Cabinet v1.5 · Prices are indicative. Drink responsibly, and only where it's legal for you.</div>
       </div>
     </div>
   );

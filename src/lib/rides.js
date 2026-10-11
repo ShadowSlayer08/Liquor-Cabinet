@@ -8,8 +8,11 @@
 //  assetlinks name com.ubercab / com.olacabs.customer; Uber's iOS
 //  apple-app-site-association covers /looking, Ola's only /app/* (Safari then).
 //  Pure (no Capacitor), so node --test covers it; lib/order.js opens the links.
+//  A party out (v1.5): rides start from the picked venue (lib/outModel.js outPlace),
+//  never from home — so no venue pin means no pickup, not the host's front door.
 // ═══════════════════════════════════════════════════════════════════════════════
 import { prettyWhen } from "./when.js";
+import { isOut, outPlace } from "./outModel.js";
 
 // `launch`: no pickup link — the app opens (Android: by package; iOS: its universal link) or `home`.
 export const RIDES = [
@@ -30,6 +33,17 @@ export function pickupOf(loc) {
   if (Math.abs(lat) > 90 || Math.abs(lon) > 180 || (lat === 0 && lon === 0)) return null;
   const label = String(loc.label || "").trim();
   return { lat: r4(lat), lon: r4(lon), label: label || "Party pickup", named: !!label };
+}
+
+// Where rides home start: the picked venue on a night out ({ lat, lon, label: venue }, or null
+// when it has no pin), else the party's own location.
+export const ridePickup = (out, loc) => (isOut(out) ? outPlace(out) : loc);
+
+// The picked place's name on a night out, pin or not ("" at home): an event's venue, else the event.
+export function outVenueName(out) {
+  if (!isOut(out)) return "";
+  const p = out.pick;
+  return String((p.type === "event" ? p.venue || p.name : p.name) || "").trim();
 }
 
 // Drivers stay sober, so they can't outnumber the guests (when the party says how many).
@@ -59,16 +73,20 @@ export const ridePrefills = (id, loc) => !!pickupOf(loc) && !RIDE[id]?.launch;
 const plural = (n, one, many) => (n === 1 ? one : many);
 
 // Plain text for WhatsApp & co: https links only (chat apps don't linkify custom schemes).
-export function homeSafeMessage({ party, loc, host, drivers = 0 } = {}) {
-  const name = String(party?.name || "").trim() || "the party";
+// With `out` (a party out), the venue is named and is the pickup.
+export function homeSafeMessage({ party, loc, host, drivers = 0, out = null } = {}) {
+  const venue = outVenueName(out);
+  const from = ridePickup(out, loc);
+  const title = String(party?.name || "").trim();
+  const name = title && venue ? `${title} at ${venue}` : title || venue || "the party";
   const when = prettyWhen(party);
-  const p = pickupOf(loc);
+  const p = pickupOf(from);
   const who = String(host || "").trim() || "the host";
   const d = Math.max(0, Math.round(Number(drivers) || 0));
   const lines = [`🚕 *Getting home from ${name}*${when ? ` — ${when}` : ""}`];
   if (p?.named) lines.push(`Pickup: ${p.label}`);
   lines.push("");
-  for (const id of ["uber", "ola", "rapido"]) lines.push(`${RIDE[id].name}: ${rideLink(id, loc)}`);
+  for (const id of ["uber", "ola", "rapido"]) lines.push(`${RIDE[id].name}: ${rideLink(id, from)}`);
   lines.push(`Drove here? DriveU sends a driver for your car: ${RIDE.driveu.home}`);
   lines.push("", `Please don't drive if you've been drinking.${d ? ` ${d} of us ${plural(d, "is", "are")} driving tonight.` : ""}`);
   lines.push(`Text ${who} when you're home 🏠`);

@@ -7,23 +7,32 @@
 //  App state `settle` (null = none):
 //    { title, when, createdAt, mode: "fair" | "equal", paid: { [transferKey]: true },
 //      people:   [{ id, name, drinks, upi }],
-//      expenses: [{ id, what, part: "liquor" | "food" | "supplies" | "other", amount, paidBy, planned }] }
+//      expenses: [{ id, what, part: keyof PARTS, amount, paidBy, planned }] }
 //  Amounts are whole rupees. Shares are worked out in paise so nothing is lost to
 //  rounding; payments are rounded to the rupee. "fair" splits liquor among the
 //  drinkers (everyone, if nobody drank) and the rest among everyone, like split.js.
+//  A party out (v1.5) adds the venue bill, tickets and cabs (shared by everyone);
+//  startSettle() seeds the venue estimate and planned tickets for the host to correct.
 //  Shared text has no upi:// links (NPCI, see split.js); the sheet shows a QR instead.
 //  Pure (no Capacitor), so node --test covers it.
 // ═══════════════════════════════════════════════════════════════════════════════
 import { fmt } from "./format.js";
-import { resolveSplit, validVpa } from "./split.js";
+import { homeParts, resolveSplit, validVpa } from "./split.js";
 import { partyStart, partyWhen, prettyWhen } from "./when.js";
+import { isOut, outSpend } from "./outModel.js";
+import { outVenueName } from "./rides.js";
 
 export const PARTS = {
-  liquor:   { label: "Liquor",   emoji: "🥃" },
-  food:     { label: "Food",     emoji: "🍽️" },
-  supplies: { label: "Supplies", emoji: "🛒" },
-  other:    { label: "Other",    emoji: "🧾" },
+  liquor:   { label: "Liquor",     emoji: "🥃" },
+  food:     { label: "Food",       emoji: "🍽️" },
+  supplies: { label: "Supplies",   emoji: "🛒" },
+  venue:    { label: "Venue bill", emoji: "📍" },
+  tickets:  { label: "Tickets",    emoji: "🎟️" },
+  cabs:     { label: "Cabs",       emoji: "🚕" },
+  other:    { label: "Other",      emoji: "🧾" },
 };
+// The night-out parts: the sheet offers them on a party out, or once a bill uses one.
+export const OUT_PARTS = ["venue", "tickets", "cabs"];
 export const MAX_AMOUNT = 10000000; // ₹1 crore — a typo guard, not a limit anyone should hit
 const MAX_PEOPLE = 100;             // a bigger party doesn't settle up person by person
 
@@ -71,7 +80,11 @@ export function normalizeSettle(s) {
 // A fresh settle-up from the plan: the host plus "Guest 2…N" (the first `drinkers` of them
 // drinking, as in the split card), and one expense per planned bill, all paid by the host.
 // Parts left out of the split card stay out. Bistro is priced in its app, so it starts at ₹0.
-export function startSettle({ party, split, plan, liquorTotal = 0, foodCart = [], blinkitTotal = 0 } = {}, now = Date.now()) {
+// A party out (`out`, v1.5) starts with the venue bill (the venue's estimate, or ₹0 to fill
+// in) for a venue and the tickets as planned (₹0 if none were) for an event — both planned,
+// so the sheet asks for the real figures. The home carts stay out of it (split.js homeParts),
+// except a BYOB night's bottles.
+export function startSettle({ party, split, plan, liquorTotal = 0, foodCart = [], blinkitTotal = 0, out = null } = {}, now = Date.now()) {
   const r = resolveSplit(split, plan);
   const n = Math.min(r.people, MAX_PEOPLE);
   const host = String(party?.host || "").trim() || "Host";
@@ -81,9 +94,17 @@ export function startSettle({ party, split, plan, liquorTotal = 0, foodCart = []
 
   const expenses = [];
   const add = (what, part, amount) => expenses.push({ id: `e${expenses.length + 1}`, what, part, amount: rupees(amount), paidBy: "p1", planned: true });
+  const away = isOut(out);
+  if (away) {
+    const spend = outSpend(out, r.people);
+    const isEvent = out.pick.type === "event";
+    if (r.include.venue !== false && !isEvent) add(outVenueName(out) || PARTS.venue.label, "venue", spend.venue || 0);
+    if (r.include.tickets !== false && (isEvent || spend.tickets > 0)) add(PARTS.tickets.label, "tickets", spend.tickets);
+  }
   const lines = Array.isArray(foodCart) ? foodCart : [];
-  if (r.include.liquor && liquorTotal > 0) add("Bottles", "liquor", liquorTotal);
-  if (r.include.food) {
+  const home = homeParts(out);
+  if (home.liquor && r.include.liquor && liquorTotal > 0) add("Bottles", "liquor", liquorTotal);
+  if (home.food && r.include.food) {
     const rest = new Map();
     for (const l of lines) {
       if (l?.kind !== "zomato") continue;
@@ -95,14 +116,14 @@ export function startSettle({ party, split, plan, liquorTotal = 0, foodCart = []
     for (const { name, total } of rest.values()) add(name, "food", total);
     if (lines.some((l) => l?.kind === "bistro")) add("Bistro", "food", 0);
   }
-  if (r.include.supplies && blinkitTotal > 0) add("Supplies", "supplies", blinkitTotal);
+  if (home.supplies && r.include.supplies && blinkitTotal > 0) add("Supplies", "supplies", blinkitTotal);
   if (!expenses.length) add("Bottles", "liquor", 0);
 
   // The morning after, App has already rolled the party date on to next Saturday, so a date
   // still ahead isn't the party being settled: leave it out rather than show the wrong day.
   const start = partyStart(party);
   return {
-    title: String(party?.name || "").trim() || "House party",
+    title: String(party?.name || "").trim() || (away ? "Night out" : "House party"),
     when: start && start.getTime() <= now + 6 * 3600000 ? partyWhen(party) : null,
     createdAt: now,
     mode: r.mode,

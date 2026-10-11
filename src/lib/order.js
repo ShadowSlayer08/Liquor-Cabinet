@@ -64,6 +64,17 @@ export async function launchApp(pkg, fallback) {
   return { opened: "browser" };
 }
 
+// District (Zomato's going-out app): bars, clubs, BYOB and events — v1.5's Out tab.
+// www.district.in links are App Links (Android, opened pinned to District's package) and
+// universal links (iOS); without the app they open the page, which has its own app banner.
+// edition://r/<resId> is District's own venue link, untested from outside the app, so it
+// stays off until a phone shows it works. Never framed (InAppBrowser/WebRender): District's
+// terms allow linking, not framing.
+export const DISTRICT = { name: "District", pkg: "com.application.zomato.district", url: "https://www.district.in/" };
+const USE_EDITION = false;
+export const openDistrict = ({ web, app } = {}) =>
+  open(USE_EDITION && app && !isIOS() ? app : web || DISTRICT.url, DISTRICT.pkg, web || DISTRICT.url);
+
 export async function isInstalled(app) {
   if (!isNative()) return false;
   try { return (await ExternalApp.isInstalled({ pkg: app.pkg })).installed; } catch { return false; }

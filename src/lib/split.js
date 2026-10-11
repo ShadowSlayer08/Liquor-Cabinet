@@ -3,23 +3,49 @@
 //  "equal": everything ÷ everyone. "fair": food & supplies ÷ everyone, liquor
 //  ÷ drinkers only (non-drinkers don't pay for the bar).
 //  Shares are rounded up to the rupee, so the host never ends up short.
+//
+//  A party out (v1.5) adds two parts: `venue`, the venue's own estimate (cost for two
+//  ÷ 2 a head × people, lib/outModel.js outSpend), and `tickets`, the tickets planned on
+//  District. Both are split equally among everyone, in either mode: a bar bill doesn't
+//  say who drank what, and District tickets are per person (the host buys them for the
+//  group). Missing include keys count as on; at home both amounts are 0, so a party at
+//  home splits exactly as before.
+//  The home carts mostly stay home on a night out (homeParts): a bar or club serves its own
+//  drinks and food, so only a BYOB night's bottles join the split, as on the invite and in
+//  the Out tab's cost lines. That's decided here, not by switching parts off in the shared
+//  `split.include`, which the next party at home would inherit.
 // ═══════════════════════════════════════════════════════════════════════════════
 import { fmt } from "./format.js";
 import { prettyWhen } from "./when.js";
+import { isOut } from "./outModel.js";
+import { byobNight } from "./reminderPlan.js";
 
-export function splitBill({ liquor = 0, food = 0, supplies = 0, people = 1, drinkers = 1, mode = "fair", include = {} }) {
-  const inc = { liquor: true, food: true, supplies: true, ...include };
+const ALL_ON = { liquor: true, food: true, supplies: true, venue: true, tickets: true };
+const OUT_KEYS = ["venue", "tickets"];
+
+// Which home carts count towards the bill: all three at home (or with nothing picked); on a
+// night out none, except the bottles you bring to a BYOB place.
+export function homeParts(out) {
+  if (!isOut(out)) return { liquor: true, food: true, supplies: true };
+  return { liquor: byobNight(out), food: false, supplies: false };
+}
+
+export function splitBill({ liquor = 0, food = 0, supplies = 0, venue = 0, tickets = 0, people = 1, drinkers = 1, mode = "fair", include = {} }) {
+  const inc = { ...ALL_ON, ...include };
   const L = inc.liquor ? liquor : 0;
   const F = (inc.food ? food : 0) + (inc.supplies ? supplies : 0);
+  const V = inc.venue ? venue || 0 : 0;
+  const T = inc.tickets ? tickets || 0 : 0;
   const n = Math.max(1, Math.round(people));
   const d = Math.min(n, Math.max(0, Math.round(drinkers)));
-  const total = L + F;
+  const total = L + F + V + T;
+  const base = { total, people: n, drinkers: d, nonDrinkers: n - d, venue: V, tickets: T };
   if (mode === "fair" && d > 0) {
-    const shared = F / n;
-    return { mode, total, people: n, drinkers: d, nonDrinkers: n - d, perDrinker: Math.ceil(shared + L / d), perNonDrinker: Math.ceil(shared) };
+    const shared = (F + V + T) / n;
+    return { mode, ...base, perDrinker: Math.ceil(shared + L / d), perNonDrinker: Math.ceil(shared) };
   }
   const each = Math.ceil(total / n);
-  return { mode: "equal", total, people: n, drinkers: d, nonDrinkers: n - d, perDrinker: each, perNonDrinker: each };
+  return { mode: "equal", ...base, perDrinker: each, perNonDrinker: each };
 }
 
 export const validVpa = (v) => /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z][a-zA-Z0-9.-]{1,64}$/.test(String(v || "").trim());
@@ -50,27 +76,46 @@ export function shareRows(r) {
   return [{ key: "everyone", label: "Everyone", emoji: "🎉", count: r.people, amount: r.perDrinker }];
 }
 
-// "liquor, food & supplies"
+// What a split covers, every part spelled out, for the labels (includedLabel, the payment card).
+// At home: the switches as they are. On a night out (`away`, or a venue or ticket amount): only
+// the parts that are switched on and have something in them, so a bar night reads "the venue",
+// not "liquor, food, supplies & the venue" — and a BYOB night with no venue estimate "liquor".
+export function splitParts(include, totals = {}, away = false) {
+  const inc = { ...ALL_ON, ...include };
+  const out = away || OUT_KEYS.some((k) => (totals[k] || 0) > 0);
+  return Object.fromEntries(Object.keys(ALL_ON).map((k) => [k, !!inc[k] && (out ? (totals[k] || 0) > 0 : !OUT_KEYS.includes(k))]));
+}
+
+// "liquor, food & supplies". The venue and tickets are named only when `include` says so
+// outright (splitParts), so a v1.4.1 include reads as before.
 export function includedLabel(include) {
   const inc = { liquor: true, food: true, supplies: true, ...include };
-  const parts = [inc.liquor && "liquor", inc.food && "food", inc.supplies && "supplies"].filter(Boolean);
+  const parts = [inc.liquor && "liquor", inc.food && "food", inc.supplies && "supplies", inc.venue === true && "the venue", inc.tickets === true && "tickets"].filter(Boolean);
   return parts.length > 1 ? `${parts.slice(0, -1).join(", ")} & ${parts[parts.length - 1]}` : parts[0] || "";
 }
 
 // Plain-text split for WhatsApp & co. No upi://pay links: NPCI has disallowed P2P payments
 // started from such links since April 2024 (circular OC/76A), so guests pay the UPI ID —
 // or scan the payment card's QR code (lib/paycard.js), which is still allowed.
-export function splitMessage({ party, result, include, host, vpa }) {
+// `venue`: the picked place's name on a night out; its estimate and the tickets get a line each.
+export function splitMessage({ party, result, include, host, vpa, venue = "" }) {
   const rows = shareRows(result);
   const pay = validVpa(vpa);
   const who = (host || "").trim();
-  const name = (party?.name || "").trim() || "House party";
+  const place = String(venue || "").trim();
+  const name = (party?.name || "").trim() || (place ? "Night out" : "House party");
   const when = prettyWhen(party);
-  const lines = [
-    `🎉 *${name}*${when ? ` — ${when}` : ""}`,
-    `Splitting about ${fmt(result.total)} (${includedLabel(include)}, at planned prices) between ${result.people} of us.`,
-  ];
-  if (rows.length > 1) lines.push("Drinks are split among the drinkers only.");
+  const V = result.venue > 0 ? result.venue : 0, T = result.tickets > 0 ? result.tickets : 0;
+  const lines = [`🎉 *${name}*${when ? ` — ${when}` : ""}`];
+  if (place) lines.push(`📍 ${place}`);
+  lines.push(`Splitting about ${fmt(result.total)} (${includedLabel(include)}, at planned prices) between ${result.people} of us.`);
+  if (V) lines.push(`🍽️ Venue: about ${fmt(V)}, the venue's own estimate. The real bill comes at the table.`);
+  if (T) lines.push(`🎟️ Tickets: ${fmt(T)} as planned on District, before its fee.`);
+  if (rows.length > 1) {
+    lines.push(V || T
+      ? `Drinks you bring are split among the drinkers; ${[V && "the venue", T && "tickets"].filter(Boolean).join(" and ")} among everyone.`
+      : "Drinks are split among the drinkers only.");
+  }
   lines.push("");
   for (const r of rows) {
     lines.push(r.amount > 0 ? `${r.emoji} ${r.label} (${r.count}): *${fmt(r.amount)}* each` : `${r.emoji} ${r.label} (${r.count}): nothing to pay`);

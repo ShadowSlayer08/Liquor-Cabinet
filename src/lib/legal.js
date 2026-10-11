@@ -14,11 +14,12 @@ export const ISSUES_URL = `${REPO_URL}/issues`;
 // `hosts` cover their subdomains (www., m., static. …).
 export const LEGAL_SERVICES = [
   { name: "Livcheers", hosts: ["livcheers.com", "static.livcheers.com"], use: "Liquor prices, ratings and tasting notes for your city" },
-  { name: "Zomato", hosts: ["zomato.com"], use: "Your delivery zone, restaurants that deliver a dish to you and their menus; opening your order in Zomato" },
+  { name: "Zomato", hosts: ["zomato.com"], use: "Your delivery zone, restaurants that deliver a dish to you and their menus, and bars and BYOB places near you; opening your order in Zomato" },
+  { name: "District", hosts: ["district.in"], use: "Bars, clubs and BYOB places: venue details, club nights and food & drink events read from district.in pages; booking a table or buying tickets in the District app" },
   { name: "Blinkit / Bistro", hosts: ["blinkit.com", "bistro.blinkit.com"], use: "Opening your supply list or order in their apps; an optional live price check (beta)" },
   { name: "Zepto", hosts: ["zeptonow.com", "zepto.com"], use: "Opening your supply list in Zepto, if you pick it" },
   { name: "Swiggy Instamart", hosts: ["swiggy.com"], use: "Opening your supply list in Instamart, if you pick it" },
-  { name: "Google Maps", hosts: ["google.com"], use: "Liquor stores near you, and the dry-day check (a Google search)" },
+  { name: "Google Maps", hosts: ["google.com"], use: "Liquor stores near you, directions to a venue, and the dry-day check (a Google search)" },
   { name: "WhatsApp", hosts: ["wa.me"], use: "Sharing lists, invites, ride links and the bill split" },
   { name: "Uber", hosts: ["m.uber.com"], use: "Opening a ride home with your pickup filled in" },
   { name: "Ola", hosts: ["book.olacabs.com"], use: "Opening a ride home with your pickup filled in" },
@@ -43,7 +44,8 @@ export const LEGAL_INTRO = "Liquor Cabinet is a free hobby project: no ads, subs
 export const LEGAL_DATA = [
   "The app connects to these services from your phone, only when you use the feature, and keeps what it fetches only on this phone.",
   "There's no Liquor Cabinet server: nothing is collected, sold or shared by this project.",
-  "Your location goes to Zomato, rounded to about 10 m, to find restaurants that deliver to you, and to a ride app as the pickup when you open one.",
+  "Your location goes to Zomato, rounded to about 10 m, to find restaurants that deliver to you and bars near you, and to a ride app as the pickup when you open one.",
+  "District pages are fetched by venue and city; your location isn't sent to District.",
   "Zomato sign-in and live Blinkit prices (beta) use your own account and connection.",
   "The services still see what any website sees, like your IP address. Clear cached data any time in the Plan tab.",
 ];
@@ -52,7 +54,8 @@ export const LEGAL_POINTS = [
   { id: "affiliation", title: "Not affiliated", text: "Liquor Cabinet isn't affiliated with, endorsed or sponsored by any of these services. Product names, prices, ratings, menus, logos and trademarks belong to their owners." },
   { id: "terms", title: "Their terms still apply", text: "Using a service through the app is subject to that service's own terms of use, and you're responsible for how you use it." },
   { id: "prices", title: "Prices are indicative", text: "Prices and availability can be out of date. The shop, restaurant or app has the final word." },
+  { id: "outing", title: "Going out", text: "Bookings, tickets, cover charges, fees and refunds are between you, District and the venue. District refunds only the ticket price, not convenience fees. Entry (ID, age, stag or couple rules, dress code) is the venue's call. An event's \"21+\" is the organiser's rule, not the legal age." },
   { id: "takedown", title: "Represent one of these services?", text: "If you'd like the app to stop using your data or change how it does, open an issue on GitHub. It will be honoured promptly." },
-  { id: "age", title: "Adults only", text: "For adults of legal drinking age in their state. Not for use where alcohol is prohibited. Please drink responsibly." },
+  { id: "age", title: "Adults only", text: "For adults of legal drinking age in their state: 18 to 25 in India, depending on the state, and bars and clubs check ID. The ages, dry days and BYOB rules the app shows are information, not legal advice. Not for use where alcohol is prohibited. Please drink responsibly." },
   { id: "warranty", title: "No warranty", text: "The app and its source are provided as is, without warranty of any kind. This notice is not legal advice." },
 ];

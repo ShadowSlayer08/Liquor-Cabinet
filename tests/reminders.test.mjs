@@ -2,6 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildReminders, reminderSig, reminderState, reminderExtra, isOn, lastCallAt, settleAt, BASE_ID } from "../src/lib/reminderPlan.js";
 import { partyStart, partyWhen, prettyTime, prettyWhen, clockOf } from "../src/lib/when.js";
+import { leaveBy, closesAt, lastCallFor, freeCancelUntil, placeKey, placeState, byobNight, LEAVE_MAX_KM } from "../src/lib/reminderPlan.js";
+import { DEFAULT_OUT, slimVenue, slimEvent } from "../src/lib/outModel.js";
+import { dryNote } from "../src/lib/reminderPlan.js";
+import { dryDayOn } from "../src/lib/drydays.js";
+import { templateToast } from "../src/lib/templates.js";
 
 const party = { date: "2027-06-12", time: "20:00", hours: 4, dinner: true };
 const mins = (list, key) => (list.find((r) => r.key === key).at - partyStart(party)) / 60000;
@@ -146,4 +151,198 @@ test("festival dry days are worded as 'often', not certain", () => {
   assert.match(diwali.body, /Diwali — often a dry day in Maharashtra, so shops may be shut/);
   const gj = buildReminders({ ...party, date: "2027-10-02" }, "delhi", []).find((r) => r.key === "stock");
   assert.match(gj.body, /liquor shops will be shut/);
+});
+
+// ── v1.5: a party out ────────────────────────────────────────────────────────
+const now = new Date("2027-06-01T09:00:00").getTime();
+const T = (s) => new Date(s).getTime();
+const home = { lat: 28.4595, lon: 77.0266, label: "Sector 57" };
+const soi7 = slimVenue({
+  resId: 18383940, zcity: "ncr", slug: "soi-7-pub-brewery-dlf-cyber-city", name: "Soi 7 Pub & Brewery", locality: "DLF Cyber City",
+  lat: 28.495, lon: 77.0895, costForTwo: 2400, bookable: true, closes: "01:00",
+}, "https://www.district.in/dining/ncr/soi-7-pub-brewery-dlf-cyber-city");
+const xlive = slimEvent({ slug: "giada-brince-xlive", name: "Giada Brince at XLive", venue: "XLive", lat: 28.4683, lon: 77.064, rules: { ageEntry: 21 } });
+const outAt = (pick, more = {}) => ({ ...DEFAULT_OUT, active: true, pick, ...more });
+const outList = (out, p = party, loc = home) => buildReminders(p, "gurgaon", [], now, { out, loc });
+
+test("out: the home-only nudges go; leave by, last call and settle-up stay", () => {
+  const list = outList(outAt(soi7));
+  assert.deepEqual(list.map((r) => r.key), ["leave", "winddown", "settle"]);
+  assert.deepEqual(list.map((r) => r.id), [BASE_ID, BASE_ID + 1, BASE_ID + 2]);
+  assert.equal(list.find((r) => r.key === "settle").at.getTime(), T("2027-06-13T11:00:00"));   // the morning after, as at home
+  // Not out (switched off, or nothing picked): exactly the home list.
+  const homeList = buildReminders(party, "gurgaon", [], now);
+  assert.deepEqual(outList({ ...outAt(soi7), active: false }), homeList);
+  assert.deepEqual(outList({ ...DEFAULT_OUT, active: true }), homeList);
+  assert.deepEqual(buildReminders(party, "gurgaon", [], now, {}), homeList);
+});
+
+test("leave by: start − travel time, on a 5-minute mark; skipped without both pins", () => {
+  // Sector 57 → Cyber City: 7.3 km → 10 + 7.3 × 1.4 / 20 × 60 = 40.7 → 45 min.
+  const leave = outList(outAt(soi7)).find((r) => r.key === "leave");
+  assert.equal(leave.at.getTime(), T("2027-06-12T19:15:00"));
+  assert.equal(leave.title, "🚕 Leave by 7:15 pm");
+  assert.equal(leave.body, "About 45 min to Soi 7 Pub & Brewery. Be on time — the venue may give away a late table.");
+  // An odd start rounds down to the 5-minute mark before it.
+  const odd = leaveBy({ ...party, time: "20:07" }, outAt(soi7), home);
+  assert.deepEqual([odd.at.getTime(), odd.minutes, odd.place], [T("2027-06-12T19:20:00"), 45, "Soi 7 Pub & Brewery"]);
+  // An event: its venue, and the door's ID check.
+  const ev = outList(outAt(xlive, { kind: "club" })).find((r) => r.key === "leave");
+  assert.equal(ev.at.getTime(), T("2027-06-12T19:30:00"));   // 3.8 km → 30 min
+  assert.equal(ev.body, "About 30 min to XLive. Be on time, and carry ID: the door checks.");
+  // No location fix, no venue pin, or a fix implausibly far away → no "Leave by".
+  for (const [out, loc] of [[outAt(soi7), null], [outAt(soi7), {}], [outAt({ ...soi7, lat: null }), home], [outAt(soi7), { lat: 28.9, lon: 77.5 }]]) {
+    assert.ok(!outList(out, party, loc).some((r) => r.key === "leave"), JSON.stringify(loc));
+  }
+  assert.equal(leaveBy(party, outAt(soi7), { lat: 28.9, lon: 77.5 }), null);                     // 67 km
+  assert.ok(leaveBy(party, outAt(soi7), { lat: 28.6315, lon: 77.2167 }).km < LEAVE_MAX_KM);     // Connaught Place, 27 km
+  assert.equal(leaveBy({ date: null }, outAt(soi7), home), null);
+  assert.equal(leaveBy(party, { ...outAt(soi7), active: false }, home), null);
+});
+
+test("free cancellation: only for a booked table, 2 h before the 24-hour cut-off", () => {
+  assert.ok(!outList(outAt(soi7)).some((r) => r.key === "cancel"));
+  const list = outList(outAt(soi7, { booked: true }));
+  assert.deepEqual(list.map((r) => r.key), ["cancel", "leave", "winddown", "settle"]);
+  const c = list[0];
+  assert.equal(c.at.getTime(), T("2027-06-11T18:00:00"));
+  assert.equal(freeCancelUntil(party).getTime(), T("2027-06-11T20:00:00"));
+  assert.equal(c.title, "⏳ Free cancellation ends at 8:00 pm");
+  assert.match(c.body, /cancelled at least 24 hours ahead, but not the convenience fee/);
+  assert.equal(freeCancelUntil({}), null);
+  // Event tickets follow the organiser's terms, so a booked event gets none.
+  assert.ok(!outList(outAt(xlive, { booked: true })).some((r) => r.key === "cancel"));
+  // Booked with under 26 h to go: it has passed, so it isn't set.
+  assert.ok(buildReminders(party, "gurgaon", [], T("2027-06-11T19:00:00"), { out: outAt(soi7, { booked: true }), loc: home }).find((r) => r.key === "cancel").past);
+});
+
+test("last call: 45 min before the venue's listed closing, after midnight too", () => {
+  const wd = outList(outAt(soi7), { ...party, drivers: 2 }).find((r) => r.key === "winddown");
+  assert.equal(wd.at.getTime(), T("2027-06-13T00:15:00"));   // closes 01:00 the next morning
+  assert.equal(wd.title, "🚕 Last call in 45 minutes");
+  assert.equal(wd.body, "Soi 7 Pub & Brewery closes at 1:00 am (listed hours). Order water, settle the tab, and sort rides home (2 driving tonight).");
+  const close = (closes, p = party) => closesAt(p, closes)?.getTime() ?? null;
+  assert.equal(close("01:00"), T("2027-06-13T01:00:00"));
+  assert.equal(close("23:30"), T("2027-06-12T23:30:00"));
+  assert.equal(close("02:00", { ...party, time: "23:00" }), T("2027-06-13T02:00:00"));
+  assert.equal(close("24:00"), T("2027-06-13T00:00:00"));
+  assert.equal(close("16:00"), null);   // 20 h on: a listing for another shift
+  assert.equal(close(""), null);
+  assert.equal(close("late"), null);
+  assert.equal(close("25:00"), null);
+  assert.equal(closesAt({ date: null }, "01:00"), null);
+  // No listed hours (or an event, or not out): the party's own end, as at home.
+  assert.equal(lastCallFor(party, outAt({ ...soi7, closes: "" })).getTime(), lastCallAt(party).getTime());
+  assert.equal(lastCallFor(party, outAt(xlive)).getTime(), lastCallAt(party).getTime());
+  assert.equal(lastCallFor(party, null).getTime(), lastCallAt(party).getTime());
+  assert.equal(outList(outAt({ ...soi7, closes: "" })).find((r) => r.key === "winddown").body, "Order water, settle the tab, and sort rides home.");
+  // Closing within the first 1¾ hours leaves no room for a last call.
+  assert.equal(lastCallFor(party, outAt({ ...soi7, closes: "21:30" })), null);
+  assert.ok(!outList(outAt({ ...soi7, closes: "21:30" })).some((r) => r.key === "winddown"));
+});
+
+test("a BYOB night keeps buying and chilling the bottles you bring", () => {
+  const out = outAt({ ...soi7, kind: "byob" });   // picked off the BYOB list (venuePick sets pick.kind)
+  assert.ok(byobNight(out));
+  assert.ok(byobNight(outAt({ ...soi7, tags: ["BYOB", "DJ"] })));
+  assert.ok(!byobNight(outAt(soi7)));
+  assert.ok(!byobNight({ ...out, active: false }));
+  const list = outList(out);
+  assert.deepEqual(list.map((r) => r.key), ["stock", "chill", "leave", "winddown", "settle"]);
+  assert.equal(list[0].title, "🍾 Buy the bottles you're bringing");
+  assert.equal(list[0].at.getTime(), T("2027-06-11T18:00:00"));
+  assert.equal(list[1].body, "Into the fridge now so they're cold when you get to Soi 7 Pub & Brewery.");
+  assert.deepEqual(list[1].extra, { tab: "out", card: "night-out" });
+  // A dry day still moves the bottle run.
+  const gj = buildReminders({ ...party, date: "2027-10-02" }, "delhi", [], now, { out, loc: home }).find((r) => r.key === "stock");
+  assert.equal(gj.at.getTime(), T("2027-10-01T12:00:00"));
+  assert.match(gj.body, /Gandhi Jayanti/);
+  // Everything a night out can have fits the 12 ids reminders.js cancels.
+  const all = outList(outAt({ ...soi7, kind: "byob" }, { booked: true }));
+  assert.equal(all.length, 6);
+  assert.ok(all.every((r) => r.id < BASE_ID + 12));
+});
+
+test("BYOB comes from the pick, not the outing-type chip that's on now", () => {
+  // A club night stays a club night when the host taps the BYOB chip to browse.
+  const club = outAt(xlive, { kind: "byob" });
+  assert.ok(!byobNight(club));
+  assert.ok(!byobNight(outAt({ ...xlive, kind: "byob", tags: ["BYOB"] })));   // events never are
+  assert.deepEqual(outList(club).map((r) => r.key), ["leave", "winddown", "settle"]);
+  // A bar picked off the bars list: the chip changing doesn't add the bottle run (or dirty the reminders).
+  assert.ok(!byobNight(outAt({ ...soi7, kind: "bar" }, { kind: "byob" })));
+  assert.deepEqual(outList(outAt({ ...soi7, kind: "bar" }, { kind: "byob" })), outList(outAt({ ...soi7, kind: "bar" })));
+  // A BYOB place picked off the BYOB list keeps its bottles when the chip moves on.
+  const byob = outAt({ ...soi7, kind: "byob", tags: [] }, { kind: "club" });
+  assert.ok(byobNight(byob));
+  assert.deepEqual(outList(byob).map((r) => r.key), ["stock", "chill", "leave", "winddown", "settle"]);
+});
+
+// ── Dry days that end at 5 pm (Haryana's 26 Jan and 15 Aug) ──────────────────
+test("a part-day dry day: the 'buy today' nudge waits for the shops to open", () => {
+  const stock = (p, city = "gurgaon", custom = []) => buildReminders({ ...party, ...p }, city, custom, now).find((r) => r.key === "stock");
+  const election = [{ date: "2027-01-27", name: "Election" }];
+  // Party on an election day: the last open day is 26 Jan, shut until 5 pm → 5 pm, not noon.
+  const onDay = stock({ date: "2027-01-27", time: "13:00" }, "gurgaon", election);
+  assert.equal(onDay.at.getTime(), T("2027-01-26T17:00:00"));
+  assert.match(onDay.body, /27 Jan is a dry day \(Election\) — liquor shops will be shut\. Buy your bottles today after 5 pm\.$/);
+  // The day before is the election, with no time on the party morning → 26 Jan, after 5 pm.
+  const eve = stock({ date: "2027-01-28", time: "12:30" }, "gurgaon", election);
+  assert.equal(eve.at.getTime(), T("2027-01-26T17:00:00"));
+  assert.match(eve.body, /Buy your bottles today after 5 pm\.$/);
+  // In Delhi 26 Jan is shut all day, so it's the 25th at noon, as before.
+  const delhi = stock({ date: "2027-01-27", time: "13:00" }, "delhi", election);
+  assert.equal(delhi.at.getTime(), T("2027-01-25T12:00:00"));
+  assert.match(delhi.body, /Buy your bottles today\.$/);
+  // A party on 26 Jan itself: buy the day before, and the note says when the shops open.
+  const repDay = stock({ date: "2027-01-26" });
+  assert.equal(repDay.at.getTime(), T("2027-01-25T12:00:00"));
+  assert.match(repDay.body, /26 Jan is Republic Day — liquor shops in Haryana will be shut until 5 pm\. Buy your bottles today\.$/);
+  // The usual nudge the evening before (6 pm on 26 Jan) is after the shops open, so it stays.
+  const after = stock({ date: "2027-01-27" });
+  assert.equal(after.at.getTime(), T("2027-01-26T18:00:00"));
+  assert.equal(after.body, "Pick up the bottles on your Liquor Cabinet list.");
+  // …but at 4:30 pm they're still shut: the party morning instead.
+  const before = stock({ date: "2027-01-27", time: "18:30" });
+  assert.equal(before.at.getTime(), T("2027-01-27T11:00:00"));
+  assert.match(before.body, /26 Jan is Republic Day — liquor shops in Haryana will be shut until 5 pm\. Pick up your bottles this morning\.$/);
+  // The template toast names the same opening time for its "buy by" day.
+  assert.match(templateToast({ party: { name: "Election-day lunch", date: "2027-01-27" }, note: null }, "gurgaon", election),
+    /buy bottles by .*26 Jan \(after 5 pm\)$/);
+  assert.match(templateToast({ party: { name: "Election-day lunch", date: "2027-01-27" }, note: null }, "delhi", election),
+    /buy bottles by .*25 Jan$/);
+});
+
+test("dry-day notes: a part-day closure says when the shops open", () => {
+  const note = (date, city, custom = []) => dryNote(dryDayOn(date, city, custom), date, city);
+  assert.match(note("2027-01-26", "gurgaon"), /^.*26 Jan is Republic Day — liquor shops in Haryana will be shut until 5 pm\.$/);
+  assert.match(note("2027-08-15", "faridabad"), /Independence Day — liquor shops in Haryana will be shut until 5 pm\.$/);
+  assert.match(note("2026-10-02", "gurgaon"), /Gandhi Jayanti — liquor shops will be shut\.$/);   // 2 Oct: all day
+  assert.match(note("2027-01-26", "delhi"), /Republic Day — liquor shops will be shut\.$/);
+  // An election ban on 26 Jan outranks the part-day closure: shut all day.
+  assert.match(note("2027-01-26", "gurgaon", [{ date: "2027-01-26", name: "Election" }]), /a dry day \(Election\) — liquor shops will be shut\.$/);
+});
+
+test("taps on night-out reminders land on the Out tab", () => {
+  assert.deepEqual(reminderExtra("leave"), { tab: "out", card: "night-out" });
+  assert.deepEqual(reminderExtra("cancel"), { tab: "out", card: "night-out" });
+  assert.deepEqual(reminderExtra("winddown"), { tab: "plan", card: "rides" });
+});
+
+test("reminders remember their place, and a new one asks once", () => {
+  assert.equal(placeKey(null), "home");
+  assert.equal(placeKey({ ...outAt(soi7), active: false }), "home");
+  assert.equal(placeKey(outAt(soi7)), "venue:18383940");
+  assert.equal(placeKey(outAt(xlive)), "event:giada-brince-xlive");
+  const today = "2027-06-01";
+  const set = { enabled: {}, scheduledFor: "2027-06-12 20:00" };   // set before v1.5: no place = home
+  const st = reminderState(set, party, null, today);
+  assert.deepEqual(placeState(set, null, st), { place: "home", changed: false, ask: false });
+  assert.deepEqual(placeState(set, outAt(soi7), st), { place: "venue:18383940", changed: true, ask: true });
+  assert.equal(placeState({ ...set, keptPlace: "venue:18383940" }, outAt(soi7), st).ask, false);   // said "Keep"
+  assert.equal(placeState({ ...set, scheduledPlace: "venue:18383940" }, outAt(soi7), st).changed, false);
+  assert.equal(placeState({ ...set, scheduledPlace: "venue:18383940" }, null, st).ask, true);      // back home
+  // A date change asks first; nothing set, nothing to ask.
+  assert.equal(placeState(set, outAt(soi7), reminderState(set, { ...party, time: "21:00" }, null, today)).changed, false);
+  assert.equal(placeState({}, outAt(soi7), reminderState({}, party, null, today)).changed, false);
 });

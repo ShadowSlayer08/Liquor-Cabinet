@@ -6,7 +6,10 @@
 //  pages.search[<path>].sections.SECTION_SEARCH_RESULT is the list of
 //  restaurants delivering that dish, each with rating, "₹200 for one", delivery
 //  time, the web order URL and a zomato://order/<resId> app deeplink.
+//  The going-out pages  /{city}/drinks-and-nightlife  and  /{city}/byob  use the
+//  same store for bars and BYOB places (parseVenueList, v1.5's Out tab).
 // ═══════════════════════════════════════════════════════════════════════════════
+import { fromZomatoUrl } from "./district.js";
 
 export const ZOMATO_BASE = "https://www.zomato.com";
 
@@ -159,4 +162,93 @@ export function parseMenuPage(html) {
     pricesHidden: !!r.order.price_login_blocker,
     menus,
   };
+}
+
+// ── Places to go out  (/{city}/drinks-and-nightlife, /{city}/byob) ────────────
+// Same search store as the dish pages, but dine-out cards: cost for two, opening
+// time, a dine-out offer, and the card link /<zcity>/<slug>/info — the slug and
+// city segment District's venue page uses too (lib/parse/district.js). The city
+// comes from that link, not from our zone: Gurugram searches list Sohna places.
+// The result list also holds a collections rail and banners (skipped), and the
+// cards' order links are delivery links, so they're not used. Page titles are
+// templated junk ("Best Pubs & Bars in #Location") and aren't read either.
+// A city without the page doesn't get a 404: Zomato quietly serves another list
+// (see isVenueList), so the page also reports which filters Zomato applied.
+
+// "540" / "1,190" / "15.6K" → 540 / 1190 / 15600
+export const parseVotes = (v) => {
+  const m = String(v ?? "").replace(/,/g, "").trim().match(/^([\d.]+)\s*([kKlL]?)/);
+  if (!m) return null;
+  const n = Math.round(parseFloat(m[1]) * ({ k: 1e3, l: 1e5 }[m[2].toLowerCase()] || 1));
+  return n > 0 ? n : null;
+};
+
+/**
+ * A venue list page: the cards plus Zomato's total (paging needs Zomato's own XHR, so it's one page of ~9).
+ * `path` is the search entry the cards came from ("/ncr/byob", or "/jaipur/restaurants?category=3&context=nightlife"
+ * after a redirect); `filters` are the rail filters Zomato applied ({ category_sheet: "go_out_home",
+ * context: "nightlife_home" }), null when the page doesn't say.
+ * @returns {{ venues: import("../outModel.js").VenueListItem[], total: number|null, hasMore: boolean,
+ *   path: string, filters: Object<string, string>|null }|null}  null = not a search page
+ */
+export function parseVenueListPage(html) {
+  const search = parsePreloadedState(html)?.pages?.search;
+  if (!search) return null;
+  const key = Object.keys(search).find((k) => Array.isArray(search[k]?.sections?.SECTION_SEARCH_RESULT));
+  if (!key) return null;
+  const sec = search[key].sections;
+  const venues = [], seen = new Set();
+  for (const card of sec.SECTION_SEARCH_RESULT) {
+    const info = card?.info;
+    if (card?.type !== "restaurant" || !info?.resId || !info.name) continue;
+    // null for a delivery link (/<zcity>/<slug>/order) and for a vanity link with no city (/24-7RestaurantNewDelhi/info)
+    const at = fromZomatoUrl(card.cardAction?.clickUrl);
+    const resId = Number(info.resId);
+    if (!at || seen.has(resId)) continue;
+    seen.add(resId);
+    const cft = parseRupees(info.cft?.text) ?? (parseRupees(info.cfo?.text) ? parseRupees(info.cfo.text) * 2 : null);
+    const rating = parseFloat(info.rating?.aggregate_rating) || null;
+    const meters = parseDistance(card.distance);
+    const gold = card.gold && !Array.isArray(card.gold) ? card.gold : {};
+    venues.push({
+      resId, name: String(info.name).trim(), zcity: at.zcity, slug: at.slug,
+      locality: info.locality?.name || "",
+      costForTwo: cft,
+      rating, votes: rating ? parseVotes(info.rating?.votes) : null,
+      distanceKm: meters == null ? null : Math.round(meters / 100) / 10,
+      timing: info.timing?.text || "",
+      offer: String(gold.offerValue || "").trim(),
+      promoted: !!card.isPromoted,
+      cuisines: (info.cuisine || []).map((c) => c?.name).filter(Boolean),
+    });
+  }
+  const meta = sec.SECTION_SEARCH_META_INFO?.searchMetaData || {};
+  const rail = meta.filterInfo?.railFilters;
+  const filters = Array.isArray(rail)
+    ? Object.fromEntries(rail.filter((f) => f?.isApplied && f.filterType).map((f) => [f.filterType, String(f.filterValue ?? "")]))
+    : null;
+  return { venues, total: Number.isFinite(meta.totalResults) ? meta.totalResults : null, hasMore: !!meta.hasMore, path: key, filters };
+}
+
+/** @returns {import("../outModel.js").VenueListItem[]} */
+export const parseVenueList = (html) => parseVenueListPage(html)?.venues || [];
+
+/**
+ * Is this page really the list we asked for? A city without it still answers 200 with something else:
+ * delivery restaurants (category_sheet delivery_home, /order links — Warangal and Hubli "BYOB"), or a redirect
+ * to /<city>/restaurants?category=3&context=nightlife that lists every dine-out place (context dineout_home —
+ * Jaipur, Indore and Kota "bars"). So a list counts only when Zomato says it applied the right category:
+ *   drinks-and-nightlife  go_out_home + nightlife_home (Hubli's redirect keeps that context: real bars)
+ *   byob                  go_out_home + dineout_home, on /<zcity>/byob itself (no redirect)
+ * @param {ReturnType<typeof parseVenueListPage>} page
+ * @param {{ zcity: string, path: "drinks-and-nightlife"|"byob" }} want
+ * @returns {boolean|null}  null = the page doesn't say which filters it applied (its format changed)
+ */
+export function isVenueList(page, { zcity, path }) {
+  const f = page?.filters;
+  if (!f) return null;
+  if (f.category_sheet !== "go_out_home") return false;
+  if (path === "drinks-and-nightlife") return f.context === "nightlife_home";
+  if (path === "byob") return f.context === "dineout_home" && String(page.path).split("?")[0] === `/${zcity}/byob`;
+  return false;
 }

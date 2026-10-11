@@ -5,10 +5,13 @@
 //  full product list for the city inside the React Server Components "flight"
 //  payload: a series of  self.__next_f.push([1,"…"])  script tags. Concatenated,
 //  that payload contains an  "items":[ … ]  array whose rows look like
-//    { city_liquors:{price,priceCategory}, liquors:{displayName,size,slug,code,
+//    { city_liquors:{price,priceCategory,rank}, liquors:{displayName,size,slug,code,
 //      tastingNotes,description}, liquor_groups:{averageOverallRating,…},
 //      brands:{name}, country:{name,code}, liquor_types:{name}, category:{…} }
 //  We pull that array out and normalise each row into the planner's item shape.
+//  `rank` is Livcheers' popularity (1 = most popular). It's one all-India list —
+//  the same number in every city — with gaps, and most bottles have none (null).
+//  Ratings carry no vote counts, so Fill my bar leans on it (lib/barScore.js).
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const LC_BASE = "https://www.livcheers.com";
@@ -36,7 +39,7 @@ export const CATEGORIES = [
   { id: "malts",       slug: "single-malts",         label: "Single Malts",   emoji: "🥃", color: "#d4872a", serve: { kind: "spirit", mixer: "soda" }, sync: true },
   { id: "worldwhisky", slug: "world-whisky",         label: "World Whisky",   emoji: "🌍", color: "#b87c20", serve: { kind: "spirit", mixer: "soda" }, sync: true },
   { id: "scotch",      slug: "blended-scotch",       label: "Blended Scotch", emoji: "🏴", color: "#a8741c", serve: { kind: "spirit", mixer: "soda" }, sync: true },
-  { id: "indian",      slug: "made-in-india-whisky", label: "Indian Whisky",  emoji: "🐅", color: "#c0602a", serve: { kind: "spirit", mixer: "soda" }, sync: false },
+  { id: "indian",      slug: "made-in-india-whisky", label: "Indian Whisky",  emoji: "🐅", color: "#c0602a", serve: { kind: "spirit", mixer: "soda" }, sync: true },  // v1.5: Royal Stag, Blenders Pride… (Fill my bar)
   { id: "gin",         slug: "gin",                  label: "Gin",            emoji: "🌿", color: "#20c970", serve: { kind: "spirit", mixer: "tonic" }, sync: true },
   { id: "tequila",     slug: "tequila",              label: "Tequila",        emoji: "🌵", color: "#e0c020", serve: { kind: "shot", mixer: null }, sync: true },
   { id: "rum",         slug: "rum",                  label: "Rum",            emoji: "🍹", color: "#e03060", serve: { kind: "spirit", mixer: "cola" }, sync: true },
@@ -136,6 +139,7 @@ export function normalizeRow(row, citySlug) {
   if (!price || !val(L.displayName)) return null;
   const rating = Number(val(G.averageOverallRating)) || 0;
   const priceCategory = val(C.priceCategory) || null;
+  const rank = parseInt(val(C.rank), 10);
   const country = row.country || {};
   return {
     id: String(L.id),
@@ -156,6 +160,7 @@ export function normalizeRow(row, citySlug) {
     origin: val(country.name) || "",
     flag: flagEmoji(val(country.code)),
     priceCategory,
+    rank: rank > 0 ? rank : null,
     tier: tierFor(rating, priceCategory),
     notes: val(L.tastingNotes) || "",
     description: val(L.description) || "",

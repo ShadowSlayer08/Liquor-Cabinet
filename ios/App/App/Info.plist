@@ -77,6 +77,7 @@
 		<string>whatsapp</string>
 		<string>uber</string>
 		<string>olacabs</string>
+		<string>edition</string>
 	</array>
 	<key>CFBundleURLTypes</key>
 	<array>

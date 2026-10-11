@@ -11,8 +11,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest"><b>⬇ Download v1.4.1 — Android APK &amp; iPhone IPA</b></a><br>
-  <sub>or straight from the repo: <a href="release/LiquorCabinet-1.4.1.apk">APK</a> · <a href="release/LiquorCabinet-1.4.1-unsigned.ipa">IPA</a> · free, non-commercial, personal use — see <a href="#data-sources--legal-notice">legal notice</a></sub>
+  <a href="https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest"><b>⬇ Download v1.5 — Android APK &amp; iPhone IPA</b></a><br>
+  <sub>or straight from the repo: <a href="release/LiquorCabinet-1.5.apk">APK</a> · <a href="release/LiquorCabinet-1.5-unsigned.ipa">IPA</a> · free, non-commercial, personal use — see <a href="#data-sources--legal-notice">legal notice</a></sub>
 </p>
 
 ---
@@ -21,18 +21,18 @@
 
 ### Android
 
-1. On your Android phone, download `LiquorCabinet-1.4.1.apk` from the [latest release](https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest) (or [`release/`](release/LiquorCabinet-1.4.1.apk) in the repo).
+1. On your Android phone, download `LiquorCabinet-1.5.apk` from the [latest release](https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest) (or [`release/`](release/LiquorCabinet-1.5.apk) in the repo).
 2. Open it. When Android asks, allow installs from that source.
 3. Launch **Liquor Cabinet**, tap **Use my location**, then **⚡ Smart Sync** to pull today's prices.
 
-It needs **Android 8.0 or newer** and an internet connection. v1.4.1 installs over v1.0–v1.4 and keeps your carts.
+It needs **Android 8.0 or newer** and an internet connection. v1.5 installs over v1.0–v1.4.1 and keeps your carts.
 It asks for **location** (restaurants that deliver to you), **notifications** (order checklist and party reminders) and, only if you turn on the floating checklist, **display over other apps**. All are optional.
 
 ### iPhone (beta, sideload)
 
 The same app runs on iPhone (iOS 15+). There's no App Store listing, and an iPhone won't install an app file the way Android does — it has to be signed with an Apple ID when you install it:
 
-1. Download `LiquorCabinet-1.4.1-unsigned.ipa` from the [latest release](https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest) (every push also builds one: [iOS workflow](https://github.com/ShadowSlayer08/Liquor-Cabinet/actions/workflows/ios.yml) → Artifacts).
+1. Download `LiquorCabinet-1.5-unsigned.ipa` from the [latest release](https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest) (every push also builds one: [iOS workflow](https://github.com/ShadowSlayer08/Liquor-Cabinet/actions/workflows/ios.yml) → Artifacts).
 2. Install it with [Sideloadly](https://sideloadly.io/) (Windows / Mac) or [AltStore](https://altstore.io/), signing in with your own Apple ID.
 3. On the iPhone: Settings → General → VPN & Device Management → trust your Apple ID; on iOS 16+ also turn on Settings → Privacy & Security → **Developer Mode**.
 
@@ -40,6 +40,21 @@ With a free Apple ID the app runs for 7 days before it must be re-signed (AltSto
 
 Different on iPhone: there's no floating checklist bubble — iOS doesn't let apps draw over other apps — so the order checklist arrives as a notification. Everything else is the same app; the beta features (Zomato sign-in, live Blinkit prices) are as untested on iPhone as on Android.
 
+## What's new in v1.5
+
+**🌃 Out — plan the party outside.** A sixth tab for a night at a bar, a club night, a BYOB place or a food & drink event, with **District** (Zomato's going-out app):
+
+- **Bars & pubs and BYOB places near you**, from Zomato's own lists for your delivery zone, each with the venue's "for two" estimate, District's offer and opening time. Open one to see what District lists for it (BYOB, full bar, DJ, large-group seating…), its hours that night and live offers; **Book a table on District** appears only where District takes bookings.
+- **Club nights and food & drink events** on your party date first, with the tickets (stag, couple, group, guest list), whether a ticket is a cover charge or an entry fee, any extra paid at the gate, and the organiser's door rules.
+- **Your night out**: the cost a head (estimates and exact ticket prices labelled as such), **leave by** time from your location, the venue's closing time and last call, and a "Booked on District" tick. Booking and buying always happen in the District app.
+- The rest of the app follows the night out: the **invite** carries the venue and its District link, **reminders** say when to leave and when free cancellation ends, **Getting home** picks you up from the venue, and the **split** and **settle-up** count the venue bill and tickets — and your own bottles only on a BYOB night.
+- **Rules that differ by state**: the legal drinking age (18 to 25 — the welcome screen no longer says "21+"), Delhi bars that stay open on festival dry days when shops shut, Haryana's 26 Jan and 15 Aug dry only until 5 pm, and what BYOB means where you are. All of it is information with its source, not legal advice — it's also in the in-app legal notice.
+
+**🪄 Fill my bar, rebuilt.** It now asks up to five quick questions — what your guests drink (tap once for some, twice for lots), how they drink it, how fancy, Indian or imported, and the budget — and remembers the answers for next time.
+
+- Picks go by what people actually buy (Livcheers' popularity ranking), not by a handful of 5★ reviews: a crowd-favourites bar for 40 drinks in Gurugram is now Blenders Pride, Smirnoff and Bira instead of bottles nobody has heard of.
+- Every bottle says why it's there ("Top-10 whisky on Livcheers"). Swap it for the next best, or for their usual brand, with the price difference shown. It still never goes over your budget.
+- Indian whisky (Royal Stag, Blenders Pride, Black Dog…) is now synced by default.
 ## What's new in v1.4.1
 
 Host features — the app now helps before, during and after the party:
@@ -85,6 +100,7 @@ Host features — the app now helps before, during and after the party:
 | 🍽️ **Food** | The calculator. Start from a party template or set the party name, date and time, guests, hours, how many are drinking (and driving), vegetarian share, appetite, peg size (30/60 ml), whether there's dinner, and what your guests like. It tells you whether your bottles cover the night, then works out mixers, soft drinks, ice, water, lemons, cocktail extras, munchies, cups/plates/napkins, starter plates, main servings, breads and desserts. 60 dishes, ranked for your party, each saying why ("pairs with your whisky", "your guests like Chinese"). Pick a dish to see Zomato restaurants that deliver **to your GPS location**, open a restaurant's **real menu** and add exact dishes. A **Bistro** tab lists 10-minute snacks where Bistro operates. |
 | 🛒 **Cart** | Your liquor list (share it, or find a store nearby) plus the food & supplies cart: exact Zomato dishes grouped by restaurant, the Bistro order and the supplies checklist for Blinkit, Zepto or Instamart, each with a **Send order** button. |
 | 📊 **Plan** | Budget ring and spend donut, invite card, bill split and **settle up**, reminders, **getting home** (rides and designated drivers), dry days ahead, location, shopping batches, Zomato account, floating checklist, how fresh the price data is, and the legal notice. |
+| 🌃 **Out** | Plan the party outside instead: **bars & pubs**, **club nights**, **BYOB places** and **food & drink events** near you. Venues show the venue's own "for two" estimate, rating, distance, hours, offers and what District lists (BYOB, full bar, DJ, large-group seating); club nights show their tickets, door rules (age, stag, ID, dress code) and any cover charge at the gate. Set a budget per head or a big group, and see your state's dry-day, drinking-age and BYOB rules. "Your night out" adds it up (each line marked exact, estimate or unknown, BYOB bottles from your Cabinet included) and says when to leave. Book the table or buy tickets in the **District** app; the invite, reminders, rides home and the bill split then use the venue. |
 
 ## Where the data comes from
 
@@ -95,8 +111,10 @@ The app collects its own data on the phone. There are no API keys and no AI serv
 - **Food: Zomato.** For each dish, the app loads Zomato's page for it and lists the restaurants that deliver it to you, with rating, "₹X for one", delivery time and distance. Restaurant menus come from the restaurant's Zomato page. Zomato hides item prices from logged-out visitors, so dishes are estimated with the restaurant's "cost for one" — unless you sign in to Zomato inside the app (beta).
 - **Food: Bistro.** Bistro publishes no menu or prices online, so it has a list of its canteen-style items, marked "price in app".
 - **Supplies: Blinkit, Zepto or Instamart.** These apps block automated price lookups, so the planner comes with common mixers, snacks, ice and disposables at their usual MRP. On the phone you can check a live Blinkit price (beta): the app opens Blinkit's search page in a hidden browser on your own connection and reads the product cards.
-- **Rides: Uber, Ola, Rapido, DriveU.** Nothing is fetched — the app only opens their app (Uber and Ola with the party's location as the pickup).
-- **Dry days.** National dry days are certain; everything else is notified by each state (often quarterly), so festival and state days are shown as "check", with a link to verify.
+- **Going out: Zomato and District.** The bars & pubs and BYOB places near you come from Zomato's own category pages for your delivery zone (about 10 places at a time; the rest are a tap away in Zomato or District). When you open a venue, the app reads its public **District** page for the details: listed hours, amenities (BYOB, full bar, DJ, large-group seating…), offers and whether it takes table bookings. Club nights and food & drink events come from District's public event pages for your city, and an event's tickets and door rules from its own page, read when you tap it. Only plain page reads: no District account, no hidden APIs, no photos, and your location isn't sent to District. A venue's "for two" is its own estimate; ticket prices are exact as of when the page was read, plus District's fee; table availability and cover charges for a slot show in District when you book.
+- **Rides: Uber, Ola, Rapido, DriveU.** Nothing is fetched — the app only opens their app (Uber and Ola with the party's location, or the venue, as the pickup).
+- **Dry days.** National dry days are certain; everything else is notified by each state (often quarterly), so festival and state days are shown as "check", with a link to verify. Bars don't always shut with the shops: in Delhi licensed bars close only on 26 Jan, 15 Aug and 2 Oct, and in Haryana 26 Jan and 15 Aug are dry only until 5 pm.
+- **Drinking age, BYOB and bar hours.** Set by each state's excise law or policy, and built into the app (checked Oct 2026). Rules that rest on secondary sources say "reportedly"; a venue's own hours always win over a state's usual closing time.
 
 ## Ordering
 
@@ -108,14 +126,18 @@ Zomato, Bistro, Blinkit, Zepto and Instamart don't let other apps add items to y
 
 Liquor itself isn't sold on any of them. Share the liquor list and tap **Find a liquor store near you**.
 
+Going out works the same way. **District** doesn't let other apps book tables or buy tickets, so **Book a table on District** and **Buy tickets on District** open that venue's or event's `www.district.in` page: in the District app when it's installed, otherwise in your browser (where District offers its own app). The app never shows District inside itself and never fills in its booking or checkout. Venues that don't take table bookings on District get **Open in District** instead, and **Directions** opens Google Maps.
+
 ## Project layout
 
 ```
 src/
-  App.jsx                 app shell: header, 5 tabs, carts, persistence
-  components/             Cabinet, Bar, Food, Cart, Plan tabs + sheets; plan/ holds the Plan tab's cards
+  App.jsx                 app shell: header, 6 tabs, carts, persistence
+  components/             Cabinet, Bar, Food, Cart, Plan, Out tabs + sheets; plan/ holds the Plan tab's cards, out/ the Out tab's
   lib/parse/livcheers.js  Livcheers page parser (categories, cities, tiers)
-  lib/parse/zomato.js     Zomato dish-page + restaurant-menu parser (menu prices when signed in)
+  lib/parse/zomato.js     Zomato dish-page + restaurant-menu parser (menu prices when signed in), bars / BYOB lists
+  lib/parse/district.js   District venue, event-list and event pages (Out tab);  lib/outSources.js fetches and caches them
+  lib/out.js, outModel.js the Out tab's ranking, costs and shared shapes;  lib/age.js drinking age, BYOB rules, bar hours per state
   lib/location.js         GPS → nearest city + Zomato delivery zone, Bistro areas
   lib/food.js             party calculator, Blinkit supply list;  lib/dishes.js the 60 dishes and their tags
   lib/cocktails.js        cocktails and mocktails, what's makeable, cocktail supplies
@@ -123,13 +145,13 @@ src/
   lib/optimise.js         "Fill my bar" budget optimiser;  lib/templates.js party templates
   lib/rides.js            rides home + designated drivers;  lib/settle.js settle-up after the party
   lib/grocers.js          Blinkit / Zepto / Instamart;  lib/legal.js the in-app legal notice (tested against the source)
-  lib/drydays.js          dry-day tiers per state, custom dry days
+  lib/drydays.js          dry-day tiers per state, custom dry days, which days bars shut too
   lib/pricehist.js        price-change badges and history between syncs
   lib/split.js            bill split + UPI links;  lib/paycard.js, invite.js, canvas.js, shareImage.js draw and share the images
   lib/reminders.js        party reminders (reminderPlan.js / when.js hold the pure parts)
   lib/blinkitLive.js      live Blinkit prices (beta);  lib/bubble.js floating checklist;  lib/zomatoAccount.js Zomato sign-in
   lib/sources.js          scrapers with on-device caching
-  lib/order.js            Zomato / Bistro / Blinkit / Maps hand-off, checklist notification, haptics
+  lib/order.js            Zomato / Bistro / Blinkit / District / Maps hand-off, checklist notification, haptics
 android/                  Capacitor Android project; native plugins in app/src/main/java/…/liquorcabinet:
                           ExternalAppPlugin (open other apps), WebRenderPlugin (hidden page reader), OrderBubblePlugin (overlay)
 ios/                      Capacitor iOS project (Swift Package Manager); ios/App/App has the Swift plugins:
@@ -177,29 +199,33 @@ To do its job, the app connects — from your own phone, only when you use the r
 | Service | What the app uses it for |
 | --- | --- |
 | **Livcheers** (livcheers.com) | Liquor prices, ratings and tasting notes for your city |
-| **Zomato** (zomato.com) | Your delivery zone, restaurants that deliver a dish to you, restaurant menus; opening your order in the Zomato app |
+| **Zomato** (zomato.com) | Your delivery zone, restaurants that deliver a dish to you, restaurant menus, and bars and BYOB places near you; opening your order in the Zomato app |
+| **District** (district.in) | Bars, clubs and BYOB places: venue details, club nights and food & drink events read from district.in pages; booking a table or buying tickets in the District app |
 | **Blinkit** / **Bistro** (blinkit.com) | Opening your supply list or order in their apps; an optional live price check (beta) |
 | **Zepto** (zeptonow.com) | Opening your supply list in Zepto, if you pick it |
 | **Swiggy Instamart** (swiggy.com) | Opening your supply list in Instamart, if you pick it |
 | **Uber** (m.uber.com) / **Ola** (book.olacabs.com) | Opening a ride home with your pickup filled in |
 | **Rapido** (rapido.bike) | Opening the Rapido app for a ride home |
 | **DriveU** (driveu.in) | Opening DriveU for a driver for your own car |
-| **Google Maps** | Searching for liquor stores near you, and the dry-day check (a Google search) |
+| **Google Maps** | Searching for liquor stores near you, directions to a venue, and the dry-day check (a Google search) |
 | **WhatsApp** / your share sheet | Sharing lists, invites, ride links and the bill split |
 
-- Your location goes to Zomato (rounded to about 10 m) to find restaurants that deliver to you, and to Uber or Ola as the pickup when you open a ride.
+- Your location goes to Zomato (rounded to about 10 m) to find restaurants that deliver to you and bars near you, and to Uber or Ola as the pickup when you open a ride. District pages are fetched by venue and city; your location isn't sent to District.
 - Data is fetched on demand and cached **only on your device**. There is no Liquor Cabinet server: nothing is collected, stored, resold or redistributed by this project. Every bottle links back to its source page.
-- All product names, prices, ratings, menus, logos and trademarks belong to their respective owners. This project is **not affiliated with, endorsed by or sponsored by** Livcheers, Zomato, Blinkit, Bistro, Zepto, Swiggy, Uber, Ola, Rapido, DriveU, Google or WhatsApp.
+- All product names, prices, ratings, menus, logos and trademarks belong to their respective owners. This project is **not affiliated with, endorsed by or sponsored by** Livcheers, Zomato, District, Blinkit, Bistro, Zepto, Swiggy, Uber, Ola, Rapido, DriveU, Google or WhatsApp.
 - Using a service through the app remains subject to that service's own terms of use; you're responsible for how you use it. The beta features (Zomato sign-in, live Blinkit prices) act with your own account and connection.
 - Prices and availability shown are **indicative** and may be out of date — the store, restaurant or app has the final word.
+- Bookings, tickets, cover charges, fees and refunds are between you, District and the venue. District refunds only the ticket price, not convenience fees. Entry (ID, age, stag or couple rules, dress code) is the venue's call; an event's "21+" is the organiser's rule, not the legal age.
 - If you represent one of these services and want the app to stop using your data or change how it does, please [open an issue](https://github.com/ShadowSlayer08/Liquor-Cabinet/issues) — it will be honoured promptly.
-- For adults of legal drinking age in their state only. Not for use where alcohol is prohibited. Please drink responsibly.
-- The app and its source are provided "as is", without warranty of any kind. This notice is not legal advice.
+- For adults of legal drinking age in their state only (18 to 25 in India, depending on the state). Not for use where alcohol is prohibited. Please drink responsibly.
+- The app and its source are provided "as is", without warranty of any kind. This notice — like the drinking ages, dry days and BYOB rules the app shows — is not legal advice.
 
 ## Notes
 
 - Prices are indicative. In some states (e.g. Haryana) there is no MRP on liquor and shops set their own prices. Zomato's "for one" is an average; exact menu prices show in Zomato (or in the app once you sign in).
 - The beta features (Zomato sign-in, live Blinkit prices, floating checklist) depend on those sites and on Android behaviour that could only be fully checked on a real phone. If one doesn't work, the app falls back to the estimates.
-- If Livcheers or Zomato changes its pages, the scraper log says so ("page loaded but no products found") instead of failing silently.
+- If Livcheers or Zomato changes its pages, the scraper log says so ("page loaded but no products found") instead of failing silently. If a District page can't be read, the venue or event still opens in District.
+- The legal drinking age varies by state, from 18 (Rajasthan) to 25 (Delhi, and reportedly Maharashtra for spirits), and bars and clubs check ID. BYOB is regulated too: Delhi doesn't allow liquor in a place that isn't licensed for drinking, and Haryana's BYOB places are licensed taverns that can't sell or serve liquor. The Out tab shows your state's rules as information, not legal advice; corkage is the venue's to set.
+- District shows table availability, how many guests a table takes and any cover charge for a slot only when you book there. Club-night listings cover the whole region (all of NCR, for example), so the app keeps the ones near you and puts the party date first.
 - Not affiliated with or endorsed by any of the services above.
 - Drink responsibly, and only where it's legal for you.
