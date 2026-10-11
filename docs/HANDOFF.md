@@ -38,6 +38,8 @@ Lead fixes from the browser check: without a zone, Zomato's list is its default 
 
 - `npm test` (offline + live District/Zomato parser tests), `npx vite build`.
 - Browser (375×812, live data, GPS stubbed to Sector 57 Gurugram): bars & pubs and BYOB lists with real distances, a BYOB venue sheet from its District page (amenities, listed hours "closes 4 am", offers "as of", not bookable → "Open in District"), club nights on the party date, an event sheet (male/female/couple entry tickets, door rules, legal age, fee line), "Make this the party" → night-out card (leave by, last call), Plan cards (invite, split = venue estimate only, rides pickup at the venue, reminders). No console errors, no images, no horizontal scroll.
+- Browser, Fill my bar: the five-question quiz → whisky-heavy, mixers, crowd favourites, Indian, 40 drinks → Blenders Pride ×2, Smirnoff, Bira White ×4 (₹3,400) after syncing Indian whisky from the sheet's prompt; swaps and "their usual" brands with ₹ differences; distinct "How fancy?" examples per tier (Royal Stag / Blenders Pride / JW Blonde / Indri).
+- Android emulator (Android 16): the signed v1.5 APK installed **over v1.4.1** (data kept, `USE_EXACT_ALARM` granted); Out tab bar list and a District venue page over native HTTP (amenities, "closes 2 am", offers with slots left, "Book a table on District"); with District not installed, the hand-off opened the page in Chrome.
 
 ## v1.4.1 — host features (what was built)
 
