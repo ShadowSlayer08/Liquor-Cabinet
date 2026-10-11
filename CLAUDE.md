@@ -27,7 +27,7 @@ On the maintainer's Windows PC: JDK at `%LOCALAPPDATA%\Programs\jdk-21`, SDK at 
 ## Release signing & versioning
 
 - `android/keystore.properties` + `android/keystore/liquor-cabinet.jks` sign release builds. Both are **git-ignored and must never be committed**. Without them, `assembleRelease` falls back to the debug key (such an APK won't install over the user's current one).
-- Bump **both** `versionCode` and `versionName` in `android/app/build.gradle`, plus `version` in `package.json`, `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `ios/App/App.xcodeproj/project.pbxproj`, and the "Liquor Cabinet vX" line in `src/components/PlanTab.jsx`, for every APK you hand over. Current: v1.5 = versionCode 7 (iOS build 7).
+- Bump **both** `versionCode` and `versionName` in `android/app/build.gradle`, plus `version` in `package.json`, `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `ios/App/App.xcodeproj/project.pbxproj`, and the "Liquor Cabinet vX" line in `src/components/PlanTab.jsx`, for every APK you hand over. Current: v1.5.1 = versionCode 8 (iOS build 8).
 - The user sideloads APKs (no Play Store — alcohol-app policies). GitHub: https://github.com/ShadowSlayer08/Liquor-Cabinet (public; renamed from liquor-cabinet, old URLs redirect) — push only when the user asks. Releases page carries the APK + unsigned IPA per version (`gh release create vX.Y …`). The README's "Data sources & legal notice" (free, non-profit, personal use) must stay accurate when data sources change.
 
 ## Architecture
