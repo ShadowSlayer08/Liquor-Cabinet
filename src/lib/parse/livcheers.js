@@ -11,7 +11,8 @@
 //  We pull that array out and normalise each row into the planner's item shape.
 //  `rank` is Livcheers' popularity (1 = most popular). It's one all-India list —
 //  the same number in every city — with gaps, and most bottles have none (null).
-//  Ratings carry no vote counts, so Fill my bar leans on it (lib/barScore.js).
+//  Ratings carry no vote counts, so Fill my bar (lib/barScore.js) and the Cabinet's
+//  badges and carousel (lib/editorsPicks.js) lean on it.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const LC_BASE = "https://www.livcheers.com";
