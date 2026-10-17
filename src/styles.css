@@ -961,3 +961,63 @@ body:has(.share-ask) .toast { bottom: calc(var(--safe-bottom) + var(--nav-h) + 1
 .chip.on .opt-chip-diff { color: inherit; }
 
 /* (end v1.5 Fill my bar quiz) */
+
+/* ── v1.6 Party history ── */
+/* Plan tab "Past parties" card (rows with a date tile, planned · spent) and HistorySheet:
+   planned vs actual, what was bought, the outcome editor (leftovers / ran out per family), plan-again notes */
+.hist-empty { line-height: 1.55; }
+.hist-list { display: grid; }
+.hist-row { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; padding: 10px 0; text-align: left; border-bottom: 1px solid var(--stroke); }
+.hist-row:last-child { border-bottom: none; }
+.hist-row:active { opacity: .7; }
+.hist-row .grow { display: grid; gap: 2px; }
+.hist-day { width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  line-height: 1.05; background: var(--panel-2); border: 1px solid var(--stroke); }
+.hist-day b { font-size: 16px; }
+.hist-day span { font-size: 9.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); text-align: center; }
+.hist-money { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 1px; }
+.hist-money b { font-variant-numeric: tabular-nums; }
+.hist-chev { color: var(--dim); flex-shrink: 0; display: grid; place-items: center; }
+.hist-more { display: block; margin: 8px 0 2px; padding: 4px 0; }
+.hist-save { margin-top: 12px; }
+.hist-save-note { margin-top: 6px; text-align: center; }
+
+.hist-sheet { padding-top: 6px; }
+.hist-totals { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.hist-total { display: grid; gap: 3px; align-content: start; min-width: 0; padding: 12px 14px; border-radius: 18px; background: rgba(0, 0, 0, .3); border: 1px solid var(--stroke); }
+.hist-total .h2 { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.hist-total .tiny { line-height: 1.4; }
+.hist-head { margin-top: 8px; padding: 0 2px; }
+.hist-sec { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 20px 2px 6px; }
+.hist-line { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--stroke); }
+.hist-line .grow { display: grid; gap: 1px; }
+.hist-line > .small.b, .hist-line > .tiny { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.hist-emo { width: 34px; height: 34px; border-radius: 11px; flex-shrink: 0; display: grid; place-items: center; font-size: 17px; background: var(--panel-2); }
+.hist-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.hist-pill { background: var(--panel-2); color: var(--soft); border: 1px solid var(--stroke); font-weight: 500; white-space: normal; }
+
+.hist-amt { position: relative; max-width: 180px; }
+.hist-amt span { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--muted); font-weight: 600; pointer-events: none; }
+.hist-amt .input { padding-left: 27px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.hist-help { margin-top: 6px; line-height: 1.5; }
+.hist-fam { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px dashed var(--stroke); }
+.hist-fam .grow { display: grid; gap: 1px; }
+.hist-left { display: flex; flex-direction: column; align-items: center; gap: 3px; flex-shrink: 0; }
+.hist-left .qty button { width: 28px; height: 28px; }
+.hist-left .qty .n { min-width: 20px; }
+.hist-ran { padding: 7px 11px; font-size: 12px; align-self: flex-start; margin-top: 2px; }
+.hist-note-field { margin-top: 14px; }
+.hist-note { font: inherit; font-size: 13.5px; line-height: 1.45; resize: vertical; min-height: 62px; }
+.hist-notes { list-style: none; display: grid; gap: 6px; }
+.hist-notes li { position: relative; padding: 8px 10px 8px 26px; border-radius: 12px; font-size: 12.5px; line-height: 1.45; color: var(--soft);
+  background: rgba(255, 255, 255, .035); border: 1px solid var(--stroke); }
+.hist-notes li::before { content: "↺"; position: absolute; left: 10px; top: 8px; color: var(--gold); font-size: 11px; }
+.hist-foot { margin-top: 20px; display: grid; gap: 8px; }
+.hist-foot .row .btn { flex-shrink: 0; }
+.hist-foot .btn.red { color: var(--red); border-color: rgba(255, 93, 98, .35); }
+.hist-saved { text-align: center; }
+.hist-ask { margin-bottom: 10px; line-height: 1.45; color: var(--soft); }
+.hist-acts { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.hist-acts .btn { padding: 12px 12px; font-size: 13px; }
+
+/* (end v1.6 Party history) */
