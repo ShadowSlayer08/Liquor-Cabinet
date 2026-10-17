@@ -8,7 +8,10 @@
 //  per spirit family (two labels for the biggest one), and how many:
 //    1. targets — the drinks are split across families by the shares, with the
 //       cocktail menu's servings as minimums. A family with nothing synced is
-//       dropped, its share goes to the rest, and its categories are reported;
+//       dropped, its share goes to the rest, and its categories are reported.
+//       A small party doesn't buy a bottle for two drinks: a family whose drinks
+//       are a small part of one bottle is folded into the others (`folded`, see
+//       foldSmall — the host can add it back);
 //    2. the best basket that fits: each bottle is worth score × drinks (score from
 //       lib/barScore.js — popularity, a shrunk rating, the price band of the tier,
 //       how the crowd drinks, desi or imported), one option per family, chosen by an
@@ -31,6 +34,7 @@
 import { CAT } from "./parse/livcheers.js";
 import { COCKTAIL, FAMILIES, familyOfCat, servingsByFamily } from "./cocktails.js";
 import { TIERS, TIER_DOWN, brandKey, familyContext, scoreFamily, topBrands } from "./barScore.js";
+import { servingsInBottle } from "./food.js";
 
 // Bar styles templates store on party.mix (labels for the template sheet). The quiz turns one
 // into family shares (barQuiz.js MIX_SEEDS); old callers still pass `mix` straight in.
@@ -140,6 +144,85 @@ function familyTargets(drinks, shares, mins) {
     if (!low.length) return { ...pinned, ...allocate(rest, Object.fromEntries(free.map((f) => [f, shares[f]]))) };
     for (const f of low) pinned[f] = mins[f];
   }
+}
+
+// ── Small parties ──
+// A bottle bought for two drinks is mostly wasted: 10 drinks on a mixed bar used to buy whisky, rum,
+// gin, vodka and a beer. A family whose drinks fit in a third of a standard 750 ml bottle (4 pegs
+// at 60 ml, 8 at 30 ml or of tequila shots, a glass of wine — beer is bought by the drink, so never)
+// is folded into the other families of its kind (spirits, wine): into what their bottles hold beyond
+// their own drinks (`spare`, counted for the smallest bottle the family could get, so it never adds
+// a bottle), else into the biggest of them. The plan (every way of folding is tried) buys the fewest
+// bottles, then folds the fewest drinks (variety that costs no bottle stays), then leaves the fewest
+// families bought for a few drinks. Never folded: the biggest family of its kind, and (`can`) one
+// the host wants lots of, one with a cocktail-menu minimum, a swapped-in bottle's, one added back.
+// One the host wants some of (`spareOnly`) only goes into spare drinks, and never into a family
+// that could get two labels (a pair's bottles can shift). It depends on neither money nor tier, so
+// the knapsack's guarantees (never over, more money never worse, "auto" never drops) still hold.
+export const FOLD = { share: 1 / 3, ml: 750 };
+export const foldKind = (f) => {
+  const k = CAT[FAMILIES[f]?.cats[0]]?.serve.kind;
+  return f === "liqueur" ? f : k === "spirit" || k === "shot" ? "spirit" : k || f;
+};
+
+/**
+ * @param T   { family: drinks }
+ * @param o   { std(f): drinks in a 750 ml bottle, spare(f, n): drinks f's bottles hold beyond n,
+ *              can(f), spareOnly(f), pairable(f) }
+ * @returns { T, folded: [{ family, drinks, into: [family], split: { family: drinks }, fits }] }
+ *          (`fits`: all of it went into spare drinks)
+ */
+function foldSmall(T, { std, spare, can, spareOnly, pairable }) {
+  const fams = Object.keys(T).filter((f) => T[f] > 0).sort(byOrder);
+  const small = (f, n) => n <= Math.floor(std(f) * FOLD.share);
+  // The biggest family of each kind stays: the others fold into it, not it into a cocktail's rum.
+  const heads = {};
+  for (const f of fams) { const k = foldKind(f); if (!heads[k] || T[f] > T[heads[k]]) heads[k] = f; }
+  const head = new Set(Object.values(heads));
+  const cands = fams.filter((f) => !head.has(f) && small(f, T[f]) && can(f));
+  if (!cands.length) return { T, folded: [] };
+  const bottles = (t) => sum(Object.keys(t).map((f) => Math.ceil(t[f] / std(f))));
+  // One way to fold `X`: the "some" families first, bigger first; each into one bottle that holds it
+  // all (the smallest family's — that lifts it too), else across their spare, else the biggest.
+  const place = (X) => {
+    const t = Object.fromEntries(fams.filter((f) => !X.includes(f)).map((f) => [f, T[f]]));
+    const order = [...X].sort((a, b) => spareOnly(b) - spareOnly(a) || T[b] - T[a] || byOrder(a, b));
+    const folded = [];
+    for (const f of order) {
+      const rs = Object.keys(t).filter((r) => foldKind(r) === foldKind(f)).sort(byOrder);
+      const ok = spareOnly(f) ? rs.filter((r) => !pairable(r)) : rs;
+      if (!rs.length) return null;
+      const room = Object.fromEntries(ok.map((r) => [r, spare(r, t[r])]));
+      const split = {};
+      let left = T[f];
+      const one = ok.filter((r) => room[r] >= left).sort((a, b) => t[a] - t[b] || byOrder(a, b))[0];
+      if (one) { split[one] = left; left = 0; }
+      else for (const r of [...ok].sort((a, b) => room[b] - room[a] || byOrder(a, b))) {
+        const k = Math.min(left, room[r]);
+        if (k > 0) { split[r] = k; left -= k; }
+      }
+      const fits = left === 0;
+      if (!fits) {
+        if (spareOnly(f)) return null;
+        const big = [...rs].sort((a, b) => t[b] + (split[b] || 0) - t[a] - (split[a] || 0) || byOrder(a, b))[0];
+        split[big] = (split[big] || 0) + left;
+      }
+      for (const [r, k] of Object.entries(split)) t[r] += k;
+      folded.push({ family: f, drinks: T[f], into: Object.keys(split).sort((a, b) => split[b] - split[a] || byOrder(a, b)), split, fits });
+    }
+    return { t, folded, key: [bottles(t), sum(X.map((f) => T[f])), Object.keys(t).filter((f) => small(f, t[f])).length] };
+  };
+  // Every subset (≤ 11 families). Ties: fold the later families (whisky stays before gin, red before white).
+  let best = null, bestBits = -1;
+  for (let mask = 0; mask < 1 << cands.length; mask++) {
+    const X = cands.filter((_, i) => mask & (1 << i));
+    const p = place(X);
+    if (!p) continue;
+    const bits = sum(X.map((f) => 2 ** fams.indexOf(f)));
+    const d = best ? p.key.map((x, i) => x - best.key[i]).find((x) => x !== 0) || 0 : -1;
+    if (d < 0 || (d === 0 && bits > bestBits)) { best = p; bestBits = bits; }
+  }
+  return { T: best.t, folded: best.folded.sort((a, b) => byOrder(a.family, b.family)) };
 }
 
 // Exact multiple-choice knapsack: one option per family, the most Σ value within `budget`, the
@@ -262,7 +345,11 @@ function cheapestFirst(fams, T, choices, money, target, keep) {
  * @param budget   ₹ to spend at most
  * @param shares   { family: weight } from the quiz (profileFromQuiz); else MIXES[mix]
  * @param mix      a MIXES key, for callers without shares; unknown → "mixed"
- * @param keep     [family] the host asked for: kept on a tight budget while the money covers a bottle
+ * @param keep     [family] the host asked for: kept on a tight budget while the money covers a bottle,
+ *                 and never folded into the others on a small party (they asked for lots)…
+ * @param some     …unless the host asked for only some of it: [family] folded only into the drinks
+ *                 the other bottles hold anyway (foldSmall). Families not kept fold freely.
+ * @param unfold   [family] the host added back: bought as their own bottle, however few the drinks
  * @param profile  { tier: "auto"|"value"|"classic"|"premium"|"top", style: { sip, mix, cocktails, shots },
  *                   origin: "any"|"desi"|"imported", favs: { family: brandKey }, variety: bool }
  * @param stepDown a picked tier steps down when the money is short (false: stay, for tests)
@@ -278,7 +365,9 @@ function cheapestFirst(fams, T, choices, money, target, keep) {
  *            alternatives: { lineId: lines }, brands: { family: [{ key, label, rank, pick, diff }] },
  *            tier (used), asked, autoTier, tiers: { family: tier }, tierShort: { tier, cost } | null,
  *            nextTier: { tier, cost } | null, varietyFamily, legacy: [catId] (no ranks cached),
- *            dropped: [family] (optional ones left out), score, rating, unrated, mix, fellBack }
+ *            dropped: [family] (optional ones left out), score, rating, unrated, mix, fellBack,
+ *            folded: [{ family, drinks, into: [family], split: { family: drinks }, fits }] (a small
+ *            party's families poured from the others' bottles; `fits`: no bottle added for it) }
  */
 export function fillBar(args = {}) {
   const out = fillOnce(args || {});
@@ -291,8 +380,8 @@ export function fillBar(args = {}) {
   return alt.lines.length > 0 && (full(alt) || covered(alt) > covered(out)) ? { ...alt, dropped: optional } : { ...out, dropped: [] };
 }
 
-function fillOnce({ catalog = {}, drinks, budget, mix = "mixed", shares: wantShares = null, keep = [], profile = {}, stepDown = true,
-  pegMl = 60, menu = [], have = {}, exclude = [], skip = [], pins = {} } = {}) {
+function fillOnce({ catalog = {}, drinks, budget, mix = "mixed", shares: wantShares = null, keep = [], some = [], unfold = [], profile = {},
+  stepDown = true, pegMl = 60, menu = [], have = {}, exclude = [], skip = [], pins = {} } = {}) {
   const want = Math.max(0, Math.floor(Number(drinks) || 0));
   const money = Math.floor(Number(budget) || 0);
   const ex = new Set(exclude || []);
@@ -353,7 +442,7 @@ function fillOnce({ catalog = {}, drinks, budget, mix = "mixed", shares: wantSha
   const asked = TIERS[prof.tier] ? prof.tier : "auto";
   const empty = { lines: [], cost: 0, drinks: 0, target: want, left: Math.max(0, money), short: want, feasible: false, trimmed: false, unsynced,
     alternatives: {}, brands: {}, unrated: [], rating: 0, score: 0, mix: mixKey, fellBack, tier: null, asked, autoTier: asked === "auto",
-    tiers: {}, tierShort: null, nextTier: null, varietyFamily: null, legacy };
+    tiers: {}, tierShort: null, nextTier: null, varietyFamily: null, legacy, folded: [] };
   if (!want || money <= 0 || !Object.keys(shares).length) return empty;
 
   let T;
@@ -369,6 +458,25 @@ function fillOnce({ catalog = {}, drinks, budget, mix = "mixed", shares: wantSha
     const giver = Object.keys(T).filter((x) => T[x] > Math.max(1, mins[x] || 0)).sort((a, b) => T[b] - T[a] || byOrder(a, b))[0];
     if (giver) { T[giver] -= 1; T[f] = 1; } else if (Object.keys(mins).length) T[f] = 1;
   }
+  // A small party doesn't buy a bottle for a few drinks (foldSmall). Bottle sizes as candidates()
+  // sees them: every size the family could get, so `spare` holds whichever one is picked.
+  const someSet = new Set(some || []), unfolded = new Set(unfold || []);
+  const sizes = {};
+  const sizesOf = (f) => (sizes[f] ||= (() => {
+    const rows = ctx(f).rows.filter((r) => !ex.has(lineKey(r.cat, r.item)));
+    const full = rows.some((r) => r.full && CAT[r.cat]?.serve.kind !== "beer") ? rows.filter((r) => r.full) : rows;
+    return [...new Set(full.map((r) => r.s))];
+  })());
+  const swappedIn = (f) => [lineId(f, 0), lineId(f, 1)].some((id) => pinMap[id] && ctx(f).rows.some((r) => lineKey(r.cat, r.item) === pinMap[id]));
+  const pairsAt = (f) => (foldKind(f) === "beer" ? VARIETY.minBeer : prof.style.sip && !prof.style.mix ? VARIETY.minSip : VARIETY.minBottles);
+  const fold = foldSmall(T, {
+    std: (f) => servingsInBottle(FAMILIES[f].cats[0], FOLD.ml, peg),
+    spare: (f, n) => (sizesOf(f).length ? Math.min(...sizesOf(f).map((s) => s * Math.ceil(n / s) - n)) : 0),
+    can: (f) => !(mins[f] > 0) && !(kept.has(f) && !someSet.has(f)) && !unfolded.has(f) && !swappedIn(f),
+    spareOnly: (f) => someSet.has(f),
+    pairable: (f) => prof.variety !== false && sizesOf(f).length > 0 && Math.ceil(T[f] / Math.min(...sizesOf(f))) >= pairsAt(f),
+  });
+  T = fold.T;
   const fams = Object.keys(T).filter((f) => T[f] > 0).sort(byOrder);
   const target = sum(fams.map((f) => T[f]));
   const big = [...fams].sort((a, b) => T[b] - T[a] || byOrder(a, b))[0];
@@ -493,7 +601,7 @@ function fillOnce({ catalog = {}, drinks, budget, mix = "mixed", shares: wantSha
   const short = Math.max(0, target - provided);
   return { lines, cost, drinks: provided, target, left, short, feasible: lines.length > 0 && short === 0, trimmed, unsynced,
     alternatives, brands, unrated, rating, score, mix: mixKey, fellBack, tier, asked, autoTier: asked === "auto", tiers,
-    tierShort, nextTier, varietyFamily: big && run.enough(big) ? big : null, legacy };
+    tierShort, nextTier, varietyFamily: big && run.enough(big) ? big : null, legacy, folded: fold.folded };
 }
 
 // What the whole bar costs at a tier when money is no object ("Enough for crowd favourites · ₹4.4k").

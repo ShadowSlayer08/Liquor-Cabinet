@@ -10,7 +10,8 @@
 //  template applied since the last answers re-seeds what they drink and how.
 //  profileFromQuiz() turns the answers into family shares, the families to keep
 //  and the scoring profile for lib/optimise.js; reasonsFor() writes the two short
-//  "why this bottle" pills, and never claims Livcheers popularity it doesn't have.
+//  "why this bottle" pills, and never claims Livcheers popularity it doesn't have;
+//  foldNote() says when a small party pours a family from another one's bottle.
 // ═══════════════════════════════════════════════════════════════════════════════
 import { CAT } from "./parse/livcheers.js";
 import { COCKTAIL, FAMILIES, servingsByFamily } from "./cocktails.js";
@@ -347,4 +348,28 @@ export function reasonsFor(line, { profile = {}, menu = {}, max = 2 } = {}) {
   // The price per drink when it's the cheapest in its band — or when nothing else can be said.
   if ((line.cheap || !out.length) && line.costPerDrink > 0) add("price", `≈ ${fmt(line.costPerDrink)} a drink`);
   return out;
+}
+
+// ── A small party (optimise.js foldSmall) ─────────────────────────────────────
+const famName = (f) => (FAMILIES[f]?.label || f).toLowerCase();
+const drinksText = (n) => `${n} ${n === 1 ? "drink" : "drinks"}`;
+const or = (xs) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} or ${xs.at(-1)}`);
+
+/**
+ * "For 10 drinks, no separate gin or rum: their 4 drinks fit in the whisky bottle." — the note over
+ * a bar that folded families into others' bottles. "fit in" only when no bottle was added for them
+ * (and the money bought the whole plan); null when nothing was folded, or the bar doesn't buy every
+ * family they went into (a tight budget can leave one out — its own note says so).
+ * @param r  a fillBar() result ({ folded, lines, target, trimmed })
+ */
+export function foldNote(r) {
+  const folded = r?.folded || [], lines = r?.lines || [];
+  if (!folded.length || !folded.every((x) => x.into.length && x.into.every((f) => lines.some((l) => l.family === f)))) return null;
+  const n = folded.reduce((s, x) => s + x.drinks, 0);
+  const into = [...new Set(lines.map((l) => l.family))].filter((f) => folded.some((x) => x.into.includes(f)));
+  const where = and(into.map(famName)), one = n === 1;
+  const how = !r.trimmed && folded.every((x) => x.fits)
+    ? `${one ? "fits" : "fit"} in the ${where} ${into.length === 1 ? "bottle" : "bottles"}`
+    : `${one ? "comes" : "come"} out of the ${where}`;
+  return `For ${drinksText(r.target)}, no separate ${or(folded.map((x) => famName(x.family)))}: ${folded.length === 1 ? "its" : "their"} ${drinksText(n)} ${how}.`;
 }
