@@ -351,25 +351,29 @@ export function reasonsFor(line, { profile = {}, menu = {}, max = 2 } = {}) {
 }
 
 // ── A small party (optimise.js foldSmall) ─────────────────────────────────────
-const famName = (f) => (FAMILIES[f]?.label || f).toLowerCase();
+const FOLD_NAME = { redwine: "red wine", whitewine: "white wine", bubbly: "bubbly" };
+const famName = (f) => FOLD_NAME[f] || (FAMILIES[f]?.label || f).toLowerCase();
 const drinksText = (n) => `${n} ${n === 1 ? "drink" : "drinks"}`;
 const or = (xs) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} or ${xs.at(-1)}`);
 
 /**
  * "For 10 drinks, no separate gin or rum: their 4 drinks fit in the whisky bottle." — the note over
  * a bar that folded families into others' bottles. "fit in" only when no bottle was added for them
- * (and the money bought the whole plan); null when nothing was folded, or the bar doesn't buy every
- * family they went into (a tight budget can leave one out — its own note says so).
+ * (and the money bought the whole plan), else "come out of". When the bar doesn't buy a family they
+ * went into (a tight budget can leave one out — its own note says so) it only says which families
+ * it left out, so "Add it back" is always there. null when nothing was folded or nothing is bought.
  * @param r  a fillBar() result ({ folded, lines, target, trimmed })
  */
 export function foldNote(r) {
   const folded = r?.folded || [], lines = r?.lines || [];
-  if (!folded.length || !folded.every((x) => x.into.length && x.into.every((f) => lines.some((l) => l.family === f)))) return null;
+  if (!folded.length || !lines.length) return null;
+  const lead = `For ${drinksText(r.target)}, no separate ${or(folded.map((x) => famName(x.family)))}`;
+  if (!folded.every((x) => x.into.length && x.into.every((f) => lines.some((l) => l.family === f)))) return `${lead}.`;
   const n = folded.reduce((s, x) => s + x.drinks, 0);
   const into = [...new Set(lines.map((l) => l.family))].filter((f) => folded.some((x) => x.into.includes(f)));
   const where = and(into.map(famName)), one = n === 1;
   const how = !r.trimmed && folded.every((x) => x.fits)
     ? `${one ? "fits" : "fit"} in the ${where} ${into.length === 1 ? "bottle" : "bottles"}`
     : `${one ? "comes" : "come"} out of the ${where}`;
-  return `For ${drinksText(r.target)}, no separate ${or(folded.map((x) => famName(x.family)))}: ${folded.length === 1 ? "its" : "their"} ${drinksText(n)} ${how}.`;
+  return `${lead}: ${folded.length === 1 ? "its" : "their"} ${drinksText(n)} ${how}.`;
 }

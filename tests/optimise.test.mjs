@@ -670,8 +670,9 @@ const NOT_SURE = { shares: MIXES.mixed.shares, pegMl: 60, profile: { tier: "auto
 const count = (r, pred = () => true) => r.lines.filter(pred).reduce((s, l) => s + l.qty, 0);
 const notBeer = (l) => l.family !== "beer";
 const third = (f, pegMl = 60) => Math.floor(servingsInBottle(FAMILIES[f].cats[0], FOLD.ml, pegMl) * FOLD.share);
-// What the sheet passes: the quiz's shares and keep, and the families the host wants "some" of.
-const someOf = (a) => Object.entries(a.families || {}).filter(([, n]) => n === 1).flatMap(([id]) => QUIZ_FAMILY[id].fams);
+// What the sheet passes (FillBarSheet someOf): the quiz's shares and keep, and the families a small
+// party may pour from spare drinks — the ones the host wants "some" of, and red and white for "lots of wine".
+const someOf = (a) => Object.entries(a.families || {}).filter(([id, n]) => n === 1 || QUIZ_FAMILY[id].fams.length > 1).flatMap(([id]) => QUIZ_FAMILY[id].fams);
 const quizArgs = (answers) => {
   const p = profileFromQuiz(answers);
   return { shares: p.shares, keep: p.keep, some: someOf(answers), optional: p.auto, profile: p.profile };
@@ -754,6 +755,15 @@ test("small parties: 'lots' never folds, 'some' only into spare drinks, and it c
   const shots = ask({ families: { whisky: 2 }, style: ["shots"] }, 10);
   assert.deepEqual(shots.folded.map((x) => [x.family, x.into]), [["tequila", ["whisky"]]], names(shots));
   assert.deepEqual(shots.dropped, []);
+  // Lots of wine is one answer: 6 drinks of beer and wine buy one red (5 glasses for 2), and the
+  // white's glass is poured from it — before, a ₹1,200 Chardonnay for one glass. The red stays.
+  const bw = { families: { beer: 2, wine: 2 }, style: [] };
+  const w6 = ask(bw, 6);
+  assert.deepEqual(w6.folded.map((x) => [x.family, x.drinks, x.into, x.fits]), [["whitewine", 1, ["redwine"], true]], names(w6));
+  assert.ok(fam(w6, "redwine").length && fam(w6, "beer").length && !fam(w6, "whitewine").length, names(w6));
+  assert.equal(fam(ask(bw, 6, { unfold: ["whitewine"] }), "whitewine").length, 1);
+  // A glass that doesn't fit in the red's spare keeps its bottle (wine lots → only spare drinks).
+  for (const drinks of [6, 8, 10, 15, 24]) for (const x of ask(bw, drinks).folded) assert.ok(x.fits, `${drinks}: ${JSON.stringify(x)}`);
 });
 
 test("small parties: cocktail minimums, swaps, the main spirit and kinds of drink stay", () => {
@@ -807,12 +817,15 @@ test("small asks on real prices: never over, covered or honestly short, same inp
       assert.equal(Object.values(x.split).reduce((s, n) => s + n, 0), x.drinks, label);
       if (p.some.includes(x.family)) assert.ok(x.fits, `"some" ${x.family} bought a bottle: ${label}`);
     }
-    // Folds of "some" families add no bottle: each family they went into has the bottles its own drinks need.
-    if (out.feasible && !out.trimmed && out.folded.length && out.folded.every((x) => p.some.includes(x.family))) {
+    // A fold that `fits` adds no bottle (all of "some" families' do): a family only such folds went
+    // into has one label, and the bottles its own drinks need.
+    if (out.feasible && !out.trimmed) {
       for (const f of new Set(out.folded.flatMap((x) => x.into))) {
+        const into = out.folded.filter((x) => x.split[f] > 0);
+        if (!into.every((x) => x.fits)) continue;
         const ls = fam(out, f);
-        if (ls.length !== 1) continue;
-        const took = out.folded.reduce((s, x) => s + (x.split[f] || 0), 0);
+        assert.equal(ls.length, 1, `${f}: ${label}`);
+        const took = into.reduce((s, x) => s + x.split[f], 0);
         assert.equal(ls[0].qty, Math.ceil((ls[0].need - took) / ls[0].perBottle), `${f}: ${label}`);
       }
     }

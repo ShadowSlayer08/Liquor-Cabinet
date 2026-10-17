@@ -26,8 +26,11 @@ const VALUE_CATS = ["brandy"];   // not synced by default, and often the best va
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const roundUp = (n) => Math.ceil(n / 100) * 100;
 const sameFamilies = (a, b) => JSON.stringify(a?.families ?? null) === JSON.stringify(b?.families ?? null);
-// Families the host wants "some" of (Q1's first tap): a small party may pour them from another bottle.
-const someOf = (a) => Object.entries(a?.families || {}).filter(([, n]) => n === 1).flatMap(([id]) => QUIZ_FAMILY[id]?.fams || []);
+// Families a small party may pour from another bottle's spare drinks (optimise.js `some`): the ones
+// the host wants "some" of (Q1's first tap), and red and white when they want lots of wine — "Wine"
+// is one answer, and the red bought for three glasses holds the white's one.
+const someOf = (a) => Object.entries(a?.families || {}).filter(([id, n]) => n === 1 || QUIZ_FAMILY[id]?.fams.length > 1)
+  .flatMap(([id]) => QUIZ_FAMILY[id]?.fams || []);
 
 export default function FillBarSheet({ catalog, city, plan, party, budget, spent, cocktailMenu, batchName, addItems, toast, onClose,
   openScraper, openScraperWith, quiz, setQuiz, goBar }) {
@@ -58,7 +61,7 @@ export default function FillBarSheet({ catalog, city, plan, party, budget, spent
   const have = useMemo(() => haveByFamily(plan.byCat), [plan.byCat]);
   const argsFor = (a) => {
     const p = profileFromQuiz(a);
-    return { catalog, drinks, shares: p.shares, keep: p.keep, some: someOf(a), pegMl: peg, menu: cocktailMenu, have, profile: p.profile };
+    return { catalog, drinks, shares: p.shares, keep: p.keep, some: someOf(a), unfold, pegMl: peg, menu: cocktailMenu, have, profile: p.profile };
   };
   // What the whole bar costs at the tier they picked ("Let the budget decide" → Treat them).
   const enoughFor = (a) => { const t = a.tier === "auto" ? "premium" : a.tier; return { tier: t, cost: barCost(argsFor(a), t) }; };
@@ -73,7 +76,7 @@ export default function FillBarSheet({ catalog, city, plan, party, budget, spent
   const stepId = single || steps[at];
   const last = !!single || at >= steps.length - 1;
   const draftEnough = useMemo(() => (view === "quiz" && stepId === "budget" ? enoughFor(draft) : { tier: "premium", cost: 0 }),
-    [view, stepId, draft, catalog, drinks, peg, cocktailMenu, have]);
+    [view, stepId, draft, catalog, drinks, peg, cocktailMenu, have, unfold]);
   const draftAmount = draft.money?.kind === "amount" ? draft.money.value : moneyOf(draft, draftEnough.cost);
   // "e.g. Royal Stag ₹570 · Magic Moments ₹570": the best bottle at each tier of the two biggest families.
   // Worked out from the top tier down, and a tier skips the bottle the tier above showed when it has
@@ -98,8 +101,9 @@ export default function FillBarSheet({ catalog, city, plan, party, budget, spent
   const prof = useMemo(() => profileFromQuiz(answers), [answers]);
   const cats = useMemo(() => syncCatsFor(answers), [answers]);
   const synced = cats.some((c) => catalog?.[c]?.length);
+  // (families added back count: "Enough for…" is the bar they're looking at)
   const ansEnough = useMemo(() => (view === "results" && synced ? enoughFor(answers) : { tier: "premium", cost: 0 }),
-    [view, synced, answers, catalog, drinks, peg, cocktailMenu, have]);
+    [view, synced, answers, catalog, drinks, peg, cocktailMenu, have, unfold]);
   const money = moneyOf(answers, ansEnough.cost);
   const r = useMemo(() => fillBar({
     catalog, drinks, budget: money, shares: prof.shares, keep: prof.keep, some: someOf(answers), unfold, pegMl: peg, menu: cocktailMenu, have,

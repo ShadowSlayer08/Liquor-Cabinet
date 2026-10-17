@@ -156,9 +156,10 @@ function familyTargets(drinks, shares, mins) {
 // bottles, then folds the fewest drinks (variety that costs no bottle stays), then leaves the fewest
 // families bought for a few drinks. Never folded: the biggest family of its kind, and (`can`) one
 // the host wants lots of, one with a cocktail-menu minimum, a swapped-in bottle's, one added back.
-// One the host wants some of (`spareOnly`) only goes into spare drinks, and never into a family
-// that could get two labels (a pair's bottles can shift). It depends on neither money nor tier, so
-// the knapsack's guarantees (never over, more money never worse, "auto" never drops) still hold.
+// One the host wants some of (`spareOnly`) only goes into spare drinks. Spare drinks are never
+// counted in a family that could get two labels (a pair's bottles can shift), so `fits` stays true
+// to the bottles bought. It depends on neither money nor tier, so the knapsack's guarantees (never
+// over, more money never worse, "auto" never drops) still hold.
 export const FOLD = { share: 1 / 3, ml: 750 };
 export const foldKind = (f) => {
   const k = CAT[FAMILIES[f]?.cats[0]]?.serve.kind;
@@ -168,7 +169,7 @@ export const foldKind = (f) => {
 /**
  * @param T   { family: drinks }
  * @param o   { std(f): drinks in a 750 ml bottle, spare(f, n): drinks f's bottles hold beyond n,
- *              can(f), spareOnly(f), pairable(f) }
+ *              can(f), spareOnly(f), pairable(f, n): n drinks of f could be two labels }
  * @returns { T, folded: [{ family, drinks, into: [family], split: { family: drinks }, fits }] }
  *          (`fits`: all of it went into spare drinks)
  */
@@ -190,7 +191,7 @@ function foldSmall(T, { std, spare, can, spareOnly, pairable }) {
     const folded = [];
     for (const f of order) {
       const rs = Object.keys(t).filter((r) => foldKind(r) === foldKind(f)).sort(byOrder);
-      const ok = spareOnly(f) ? rs.filter((r) => !pairable(r)) : rs;
+      const ok = rs.filter((r) => !pairable(r, t[r]));
       if (!rs.length) return null;
       const room = Object.fromEntries(ok.map((r) => [r, spare(r, t[r])]));
       const split = {};
@@ -209,6 +210,12 @@ function foldSmall(T, { std, spare, can, spareOnly, pairable }) {
       }
       for (const [r, k] of Object.entries(split)) t[r] += k;
       folded.push({ family: f, drinks: T[f], into: Object.keys(split).sort((a, b) => split[b] - split[a] || byOrder(a, b)), split, fits });
+    }
+    // A later fold can grow a family into two labels: spare drinks counted in it no longer hold.
+    for (const x of folded) {
+      if (!x.fits || !Object.keys(x.split).some((r) => pairable(r, t[r]))) continue;
+      if (spareOnly(x.family)) return null;
+      x.fits = false;
     }
     return { t, folded, key: [bottles(t), sum(X.map((f) => T[f])), Object.keys(t).filter((f) => small(f, t[f])).length] };
   };
@@ -474,7 +481,7 @@ function fillOnce({ catalog = {}, drinks, budget, mix = "mixed", shares: wantSha
     spare: (f, n) => (sizesOf(f).length ? Math.min(...sizesOf(f).map((s) => s * Math.ceil(n / s) - n)) : 0),
     can: (f) => !(mins[f] > 0) && !(kept.has(f) && !someSet.has(f)) && !unfolded.has(f) && !swappedIn(f),
     spareOnly: (f) => someSet.has(f),
-    pairable: (f) => prof.variety !== false && sizesOf(f).length > 0 && Math.ceil(T[f] / Math.min(...sizesOf(f))) >= pairsAt(f),
+    pairable: (f, n) => prof.variety !== false && sizesOf(f).length > 0 && Math.ceil(n / Math.min(...sizesOf(f))) >= pairsAt(f),
   });
   T = fold.T;
   const fams = Object.keys(T).filter((f) => T[f] > 0).sort(byOrder);
