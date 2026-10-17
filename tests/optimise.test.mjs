@@ -1,10 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fillBar, barCost, topPick, haveByFamily, joinLabels, MIXES, VARIETY, FOLD, foldKind } from "../src/lib/optimise.js";
+import { fillBar, barCost, topPick, haveByFamily, joinLabels, MIXES, VARIETY, FOLD, foldKind, UNFOLD_ALL } from "../src/lib/optimise.js";
 import { flavoured, importedLevel, brandKey, familyContext, typeOf, ranklessCats } from "../src/lib/barScore.js";
 import { FAMILIES, servingsByFamily } from "../src/lib/cocktails.js";
 import { servingsInBottle } from "../src/lib/food.js";
-import { profileFromQuiz, QUIZ_FAMILIES, QUIZ_FAMILY, STYLES } from "../src/lib/barQuiz.js";
+import { profileFromQuiz, foldNote, QUIZ_FAMILIES, STYLES } from "../src/lib/barQuiz.js";
 import { normalizeRow } from "../src/lib/parse/livcheers.js";
 import { loadCatalog } from "./fixtures/livcheers/catalog.mjs";
 
@@ -670,18 +670,25 @@ const NOT_SURE = { shares: MIXES.mixed.shares, pegMl: 60, profile: { tier: "auto
 const count = (r, pred = () => true) => r.lines.filter(pred).reduce((s, l) => s + l.qty, 0);
 const notBeer = (l) => l.family !== "beer";
 const third = (f, pegMl = 60) => Math.floor(servingsInBottle(FAMILIES[f].cats[0], FOLD.ml, pegMl) * FOLD.share);
-// What the sheet passes (FillBarSheet someOf): the quiz's shares and keep, and the families a small
-// party may pour from spare drinks — the ones the host wants "some" of, and red and white for "lots of wine".
-const someOf = (a) => Object.entries(a.families || {}).filter(([id, n]) => n === 1 || QUIZ_FAMILY[id].fams.length > 1).flatMap(([id]) => QUIZ_FAMILY[id].fams);
+// What the sheet passes: the quiz's shares and keep, and the families a small party may pour from
+// spare drinks (profileFromQuiz `some` — the ones the host wants "some" of, red and white for "lots of wine").
 const quizArgs = (answers) => {
   const p = profileFromQuiz(answers);
-  return { shares: p.shares, keep: p.keep, some: someOf(answers), optional: p.auto, profile: p.profile };
+  return { shares: p.shares, keep: p.keep, some: p.some, optional: p.auto, profile: p.profile };
 };
 const ask = (answers, drinks, extra = {}) => fillBar({ catalog: GGN, drinks, budget: 20000, pegMl: 60, ...quizArgs(answers), ...extra });
+const covered = (r) => Math.min(r.drinks, r.target);
+const familiesOf = (r) => [...new Set(r.lines.map((l) => l.family))].sort();
+// Random quiz answers for the property tests.
+const randomAnswers = (r, tiers = ["auto", "value", "classic", "premium", "top"]) => {
+  const families = r() < 0.3 ? null : Object.fromEntries(QUIZ_FAMILIES.filter(() => r() < 0.35).map((q) => [q.id, r() < 0.5 ? 1 : 2]));
+  return { families: families && Object.keys(families).length ? families : null, style: STYLES.map((s) => s.id).filter(() => r() < 0.4),
+    tier: pick(r, tiers), origin: pick(r, ["any", "desi", "imported"]), variety: r() < 0.8 };
+};
 
 test("a small mixed bar buys a few bottles, not one of every spirit (real Gurgaon)", () => {
   // Before: 10 drinks on ₹15k = JW Black, Roku, Grey Goose, Bacardi and a Corona (5 bottles, ₹9,590).
-  const old = fillBar({ catalog: GGN, drinks: 10, budget: 15000, ...NOT_SURE, unfold: Object.keys(FAMILIES) });
+  const old = fillBar({ catalog: GGN, drinks: 10, budget: 15000, ...NOT_SURE, unfold: UNFOLD_ALL });
   assert.equal(count(old), 5, names(old));
   // Spirit bottles at most 1 / 1 / 2 / 2; beer is bought by the drink (a 650 ml Kingfisher is two,
   // a 330 ml Corona one), so with Coronas 15 and 24 drinks take one bottle more than 3 / 4.
@@ -706,7 +713,7 @@ test("a small mixed bar buys a few bottles, not one of every spirit (real Gurgao
     }
     for (const l of r.lines) assert.ok(l.from === "own" || l.from === "staple", label);
     // Same tier as buying every family: fewer bottles and never more money.
-    const before = fillBar({ ...args, unfold: Object.keys(FAMILIES) });
+    const before = fillBar({ ...args, unfold: UNFOLD_ALL });
     if (before.tier === r.tier && !before.trimmed) assert.ok(count(r) < count(before) && r.cost <= before.cost, `${label} | before ${names(before)}`);
   }
   // The bars themselves (₹15k, "Let the budget decide"): one whisky for 10, a whisky and a rum for 15 and 24.
@@ -829,13 +836,110 @@ test("small asks on real prices: never over, covered or honestly short, same inp
         assert.equal(ls[0].qty, Math.ceil((ls[0].need - took) / ls[0].perBottle), `${f}: ${label}`);
       }
     }
-    // "Add them back": none of them is folded again, and the guarantees hold. (Shots tequila the quiz
-    // added can still be left out when the money goes further without it — its own note says so.)
+    // A tight budget only reports folds into a bottle it buys (the rest of those drinks are short).
+    if (out.trimmed) for (const x of out.folded) assert.ok(x.into.some((f) => fam(out, f).length), `fold into nothing bought: ${label}`);
+    // "Add them back" as the sheet does it (the tier holds, UNFOLD_ALL): nothing is folded any more —
+    // no other family folds in their place — and every family that was bought still is. (Shots
+    // tequila the quiz added can still be left out when the money goes further without it — its own
+    // note says so.)
     if (out.folded.length) {
-      const back = fillBar({ ...args, unfold: out.folded.map((x) => x.family) });
+      const back = fillBar({ ...args, unfold: UNFOLD_ALL, profile: { ...p.profile, tier: p.profile.tier === "auto" ? out.tier : p.profile.tier } });
       checkBudget(back, budget, `added back: ${label}`);
-      assert.ok(!back.folded.some((x) => out.folded.some((y) => y.family === x.family)), label);
-      if (back.feasible && !back.trimmed) for (const x of out.folded) assert.ok(fam(back, x.family).length || back.dropped.includes(x.family), `${x.family} not back: ${label}`);
+      assert.deepEqual(back.folded, [], `folded again: ${label}`);
+      if (back.feasible && !back.trimmed) {
+        for (const f of [...familiesOf(out), ...out.folded.map((x) => x.family)]) assert.ok(fam(back, f).length || back.dropped.includes(f), `${f} not there: ${label} | ${names(back)}`);
+      }
+    }
+  }
+});
+
+test("tight budgets: folding never covers fewer drinks than buying every family, nor empties the bar", () => {
+  // The reviewer's bars (real Gurgaon). Whisky lots and five more "some" at 30 ml, ₹987: a McDowell's
+  // rum covers all 15 — not a ₹900 Merlot for 5 (the whisky everything folded into is beyond ₹987).
+  const imp = { families: { whisky: 2, rum: 1, vodka: 1, gin: 1, wine: 1, bubbly: 1 }, style: ["mix"], tier: "value", origin: "imported" };
+  const r987 = fillBar({ catalog: GGN, drinks: 15, budget: 987, pegMl: 30, ...quizArgs(imp) });
+  assert.ok(r987.feasible && covered(r987) === 15, names(r987));
+  assert.deepEqual(familiesOf(r987), ["rum"], names(r987));
+  assert.deepEqual(r987.folded, [], "the plan before folding won: no fold to report");
+  // Brandy some + shots, 6 drinks, ₹900: the Morpheus brandy (₹800), not an empty bar.
+  const br = fillBar({ catalog: GGN, drinks: 6, budget: 900, pegMl: 60, ...quizArgs({ families: { brandy: 1 }, style: ["shots"] }) });
+  assert.ok(br.feasible && /morpheus/i.test(fam(br, "brandy")[0]?.item.name || ""), names(br));
+  // ₹513 for 28 drinks at 30 ml ("Not sure"): one Imperial Blue covers 25, as before.
+  const r513 = fillBar({ catalog: GGN, drinks: 28, budget: 513, ...NOT_SURE, pegMl: 30 });
+  assert.equal(covered(r513), 25, names(r513));
+
+  // Random tight asks, both catalogs: coverage never below the same ask with nothing folded, and a
+  // bar that buys something unfolded buys something folded.
+  const r = rng(31);
+  for (const [name, catalog] of [["GGN", GGN], ["legacy", OLD_GGN]]) for (let i = 0; i < 260; i++) {
+    const answers = randomAnswers(r);
+    const drinks = 1 + Math.floor(r() * 40), budget = Math.round(r() * r() * 6000), pegMl = r() < 0.3 ? 30 : 60;
+    const args = { catalog, drinks, budget, pegMl, ...quizArgs(answers) };
+    const out = fillBar(args), all = fillBar({ ...args, unfold: UNFOLD_ALL });
+    const label = `${name} ${JSON.stringify({ answers, drinks, budget, pegMl })}: ${names(out)} | unfolded ${names(all)}`;
+    checkBudget(out, budget, label);
+    assert.ok(covered(out) >= covered(all), label);
+    if (all.lines.length) assert.ok(out.lines.length, label);
+    if (out.trimmed) for (const x of out.folded) assert.ok(x.into.some((f) => fam(out, f).length), label);
+  }
+});
+
+test("small parties: the quiz's shots tequila never takes the host's own families", () => {
+  // Brandy some + shots, 6 drinks: the brandy is bought and the tequila's shots fold into it —
+  // before, one Camino Silver and "no separate brandy: its 3 drinks fit in the tequila bottle".
+  const shots = { families: { brandy: 1 }, style: ["shots"] };
+  for (const budget of [900, 3000, 20000]) {
+    const r = ask(shots, 6, { budget });
+    assert.deepEqual(familiesOf(r), ["brandy"], `₹${budget}: ${names(r)}`);
+    assert.deepEqual(r.folded.map((x) => [x.family, x.into]), [["tequila", ["brandy"]]], `₹${budget}`);
+  }
+  // The same with gin, rum or whisky (some or lots), and never a host's family poured from the tequila.
+  const r = rng(5);
+  for (let i = 0; i < 80; i++) {
+    const families = Object.fromEntries(["whisky", "rum", "gin", "brandy"].filter(() => r() < 0.5).map((id) => [id, r() < 0.6 ? 1 : 2]));
+    if (!Object.keys(families).length) continue;
+    const answers = { families, style: ["shots", ...(r() < 0.5 ? ["mix"] : [])] };
+    const drinks = 2 + Math.floor(r() * 20), budget = 1000 + Math.round(r() * 15000);
+    const out = ask(answers, drinks, { budget, pegMl: r() < 0.3 ? 30 : 60 });
+    const label = `${JSON.stringify(answers)} ${drinks} ₹${budget}: ${names(out)}`;
+    assert.ok(!out.folded.some((x) => x.into.includes("tequila")), label);
+    if (out.feasible && !out.trimmed) assert.ok(Object.keys(families).some((id) => fam(out, id).length), label);
+  }
+});
+
+test("small parties: bubbly is its own kind — never folded, never folded into", () => {
+  assert.equal(foldKind("bubbly"), "bubbly");
+  assert.equal(foldKind("redwine"), foldKind("whitewine"));
+  // Gurgaon has no sparkling rows: two real-looking ones (the Bubbly chip syncs these categories).
+  const row = (id, name, brand, price, rank) => ({ id, name, brand, sub: "Brut", ml: 750, vol: "750 ml", price, rating: 4.1, rank, origin: "India", flag: "", priceCategory: "Premium" });
+  const B = { ...GGN, sparkling: [row("sp-chandon", "Chandon Brut", "Chandon", 1800, 5), row("sp-sula", "Sula Brut", "Sula", 1100, 9)] };
+  // Beer lots, wine some, bubbly some, 8 drinks: the bubbly stays for the toast (before: poured from the red).
+  const toast = fillBar({ catalog: B, drinks: 8, budget: 20000, pegMl: 60, ...quizArgs({ families: { beer: 2, wine: 1, bubbly: 1 }, style: [] }) });
+  assert.ok(fam(toast, "bubbly").length && fam(toast, "beer").length, names(toast));
+  for (const answers of [{ families: { beer: 2, wine: 1, bubbly: 1 }, style: [] }, { families: { bubbly: 2, wine: 1 }, style: [] }, { families: { wine: 2, bubbly: 1 }, style: [] },
+    { families: { wine: 1, bubbly: 1 }, style: [] }, { families: { whisky: 2, bubbly: 1 }, style: ["mix"] }])
+    for (const drinks of [2, 4, 6, 8, 10, 15, 24]) for (const budget of [1500, 5000, 20000]) {
+      const out = fillBar({ catalog: B, drinks, budget, pegMl: 60, ...quizArgs(answers) });
+      const label = `${JSON.stringify(answers.families)} ${drinks} ₹${budget}: ${names(out)}`;
+      checkBudget(out, budget, label);
+      assert.ok(!out.folded.some((x) => x.family === "bubbly" || x.into.includes("bubbly")), label);
+      // Red and white still pour from each other (one "Wine" answer); bubbly drinkers keep their bottle
+      // (2 drinks split three ways can round the bubbly to none, as before).
+      if (out.feasible && !out.trimmed && drinks >= 4) assert.ok(fam(out, "bubbly").length, label);
+    }
+});
+
+test("small parties: ties keep the bigger share — a mixed bar keeps its rum over its gin", () => {
+  // Before, 17 and 18 drinks at premium bought a Roku Gin (₹6,280 bar) where 16 and 19 bought Bacardi
+  // (₹3,680): lowering 20 to 18 made the bar ₹2,600 dearer only because of a tie.
+  for (const tier of ["auto", "value", "classic", "premium"]) {
+    let cost = null;
+    for (let drinks = 14; drinks <= 22; drinks++) {
+      const r = fillBar({ catalog: GGN, drinks, budget: 15000, ...NOT_SURE, profile: { tier, style: { mix: true } } });
+      const label = `${tier} ${drinks}: ${names(r)}`;
+      assert.ok(fam(r, "rum").length && !fam(r, "gin").length && fam(r, "whisky").length, label);
+      if (cost != null) assert.ok(r.cost <= cost + 200, `${label} (₹${cost} the drink before)`);
+      cost = r.cost;
     }
   }
 });

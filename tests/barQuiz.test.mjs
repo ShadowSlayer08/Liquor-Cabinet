@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   normalizeQuiz, seedQuiz, profileFromQuiz, stepsFor, quizSummary, reasonsFor, resolveMoney, cycleFamily, familySplit,
-  syncCatsFor, menuByFamily, templateLabel, foldNote, COCKTAIL_SHARES, DEFAULT_QUIZ, STEPS, QUIZ_FAMILY,
+  syncCatsFor, menuByFamily, templateLabel, foldNote, COCKTAIL_SHARES, DEFAULT_QUIZ, STEPS,
 } from "../src/lib/barQuiz.js";
 import { fillBar, MIXES } from "../src/lib/optimise.js";
 import { familyContext, originChoice } from "../src/lib/barScore.js";
@@ -127,6 +127,13 @@ test("answers → shares: lots and some, wine, shots, not sure", () => {
   assert.deepEqual(profileFromQuiz({ families: null, style: ["cocktails"] }).shares, COCKTAIL_SHARES);
   assert.deepEqual(profileFromQuiz({ families: null, style: ["cocktails", "mix"] }).shares, MIXES.mixed.shares);
   assert.deepEqual(profileFromQuiz({}).keep, []);
+  // What a small party may pour from spare drinks: the "some" families, and red and white for lots
+  // of wine ("Wine" is one answer); never a "lots" spirit, nor the tequila the quiz added.
+  assert.deepEqual(p.some, ["beer"]);
+  assert.deepEqual(w.some, ["redwine", "whitewine"]);
+  assert.deepEqual(s.some, []);
+  assert.deepEqual(profileFromQuiz({ families: { whisky: 1, gin: 2, wine: 1 } }).some, ["whisky", "redwine", "whitewine"]);
+  assert.deepEqual(profileFromQuiz({}).some, []);
   // The rest of the profile passes through.
   const full = profileFromQuiz({ tier: "premium", origin: "desi", favs: { whisky: "Royal Stag" }, variety: false });
   assert.deepEqual(full.profile, { tier: "premium", style: { sip: false, mix: true, cocktails: false, shots: false }, origin: "desi", favs: { whisky: "royalstag" }, variety: false });
@@ -222,11 +229,10 @@ test("reasons: short, honest, never two of a kind", () => {
 });
 
 test("a small party's note: which families are poured from which bottle, honestly", () => {
-  // What the sheet passes: "some" families, and red and white for lots of wine (FillBarSheet someOf).
-  const someOf = (a) => Object.entries(a.families || {}).filter(([id, n]) => n === 1 || QUIZ_FAMILY[id].fams.length > 1).flatMap(([id]) => QUIZ_FAMILY[id].fams);
+  // What the sheet passes (the "some" families: profileFromQuiz).
   const ask = (answers, drinks, budget = 15000, extra = {}) => {
     const p = profileFromQuiz(answers);
-    return fillBar({ catalog: GGN, drinks, budget, pegMl: 60, shares: p.shares, keep: p.keep, some: someOf(answers), optional: p.auto, profile: p.profile, ...extra });
+    return fillBar({ catalog: GGN, drinks, budget, pegMl: 60, shares: p.shares, keep: p.keep, some: p.some, optional: p.auto, profile: p.profile, ...extra });
   };
   const notSure = { families: null, style: ["mix"] };
   // Real Gurgaon bars ("Not sure — a mixed bar", ₹15k).

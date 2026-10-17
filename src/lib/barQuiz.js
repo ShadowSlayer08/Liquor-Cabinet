@@ -9,7 +9,8 @@
 //  (party.prefs.drinks — still edited only in GuestPrefs), then the defaults. A
 //  template applied since the last answers re-seeds what they drink and how.
 //  profileFromQuiz() turns the answers into family shares, the families to keep
-//  and the scoring profile for lib/optimise.js; reasonsFor() writes the two short
+//  (and the ones a small party may pour from spare drinks) and the scoring
+//  profile for lib/optimise.js; reasonsFor() writes the two short
 //  "why this bottle" pills, and never claims Livcheers popularity it doesn't have;
 //  foldNote() says when a small party pours a family from another one's bottle.
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -188,12 +189,15 @@ export function seedQuiz({ saved = null, party = null, cocktailMenu = [] } = {})
 
 /**
  * Answers → what fillBar() takes (the cocktail menu's servings go to fillBar as minimums).
- * @returns { shares: { family: share }, keep: [family], auto: [family added for them], profile }
+ * `some`: the families a small party may pour from another bottle's spare drinks (fillBar `some`) —
+ * the ones they want "some" of (Q1's first tap), and red and white when they want lots of wine:
+ * "Wine" is one answer, and the red bought for three glasses holds the white's one.
+ * @returns { shares: { family: share }, keep: [family], some: [family], auto: [family added for them], profile }
  */
 export function profileFromQuiz(answers) {
   const a = normalizeQuiz(answers);
   const style = Object.fromEntries(STYLE_IDS.map((s) => [s, a.style.includes(s)]));
-  let shares, keep = [];
+  let shares, keep = [], some = [];
   const auto = [];
   if (!a.families) {
     shares = { ...(style.cocktails && !style.mix && !style.sip ? COCKTAIL_SHARES : MIXES.mixed.shares) };
@@ -204,13 +208,15 @@ export function profileFromQuiz(answers) {
       if (id === "wine") { shares.redwine = (shares.redwine || 0) + 0.6 * w; shares.whitewine = (shares.whitewine || 0) + 0.4 * w; }
       else shares[id] = (shares[id] || 0) + w;
       keep.push(...QUIZ_FAMILY[id].fams);
+      if (n === 1 || QUIZ_FAMILY[id].fams.length > 1) some.push(...QUIZ_FAMILY[id].fams);
     }
     if (style.shots && !shares.tequila && !shares.vodka) { shares.tequila = SOME; auto.push("tequila"); }
   }
   const total = Object.values(shares).reduce((s, x) => s + x, 0) || 1;
   for (const f of Object.keys(shares)) shares[f] = Math.round((shares[f] / total) * 1000) / 1000;
   keep = [...new Set(keep)];
-  return { shares, keep, auto, profile: { tier: a.tier, style, origin: a.origin, favs: { ...a.favs }, variety: a.variety } };
+  some = [...new Set(some)];
+  return { shares, keep, some, auto, profile: { tier: a.tier, style, origin: a.origin, favs: { ...a.favs }, variety: a.variety } };
 }
 
 // The live split under Q1: [{ id, label, emoji, color, pct }] in quiz families.
@@ -359,9 +365,10 @@ const or = (xs) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")
 /**
  * "For 10 drinks, no separate gin or rum: their 4 drinks fit in the whisky bottle." — the note over
  * a bar that folded families into others' bottles. "fit in" only when no bottle was added for them
- * (and the money bought the whole plan), else "come out of". When the bar doesn't buy a family they
- * went into (a tight budget can leave one out — its own note says so) it only says which families
- * it left out, so "Add it back" is always there. null when nothing was folded or nothing is bought.
+ * (and the money bought the whole plan), else "come out of". When the bar doesn't buy every family
+ * they went into (a tight budget can leave one out — its own note says so; fillBar only lists folds
+ * into a bottle it buys) it only says which families it left out, so "Add it back" is always there.
+ * null when nothing was folded or nothing is bought.
  * @param r  a fillBar() result ({ folded, lines, target, trimmed })
  */
 export function foldNote(r) {
