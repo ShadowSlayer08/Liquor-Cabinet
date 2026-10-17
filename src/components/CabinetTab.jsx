@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { CATEGORIES, CAT, cityName } from "../lib/parse/livcheers.js";
+import { CATEGORIES, CAT, TIER, cityName } from "../lib/parse/livcheers.js";
+import { withTiers, crowdFavourites } from "../lib/editorsPicks.js";
 import { STALE_MS } from "../lib/sources.js";
 import { fmt, fmtShort, ageStr } from "../lib/format.js";
 import ProductCard, { BottleStage, TierPill } from "./ProductCard.jsx";
@@ -30,7 +31,9 @@ export default function CabinetTab({
   const [open, setOpen] = useState(null); // { item, cat }
 
   const cm = CAT[activeCat] || CATEGORIES[0];
-  const items = catalog[activeCat] || [];
+  // Badges re-read with Livcheers popularity (lib/editorsPicks.js); prices cached before ranks keep theirs.
+  const tiered = useMemo(() => withTiers(catalog), [catalog]);
+  const items = tiered[activeCat] || [];
 
   // "↓ Price drops" — bottles cheaper than at the previous sync (only offered when there are some).
   const [dropsOnly, setDropsOnly] = useState(false);
@@ -51,12 +54,10 @@ export default function CabinetTab({
     return r;
   }, [items, tierF, origF, search, sortF, dropsOnly, drops]);
 
-  // Editor's picks across every synced category.
-  const picks = useMemo(() => {
-    const all = [];
-    for (const [cat, list] of Object.entries(catalog)) for (const it of list) if (it.tier === "editors" && it.img) all.push({ it, cat });
-    return all.sort((a, b) => b.it.rating - a.it.rating || a.it.price - b.it.price).slice(0, 12);
-  }, [catalog]);
+  // Crowd favourites across every synced category: well-known bottles, a few per category, each with
+  // its reason. Prices cached before ranks: the old top-rated strip until the next sync.
+  const favs = useMemo(() => crowdFavourites(catalog), [catalog]);
+  const picks = favs.picks, popular = favs.mode === "popular";
 
   const coverage = plan.needed ? Math.min(1, plan.available / plan.needed) : 0;
   const pct = budget > 0 ? Math.min(1, spent / budget) : 0;
@@ -113,22 +114,26 @@ export default function CabinetTab({
         })}
       </div>
 
-      {/* ── Editor's picks ── */}
+      {/* ── Crowd favourites (Livcheers popularity; the old top-rated picks until ranks are synced) ── */}
       {picks.length >= 3 && (
         <>
           <div className="section-head">
-            <div><div className="kicker">Top rated in {cityName(city)}</div><div className="h2">Editor's <em>picks</em></div></div>
+            {popular
+              ? <div style={{ minWidth: 0 }}><div className="kicker ellipsis">Popular on Livcheers · {cityName(city)}</div><div className="h2">Crowd <em>favourites</em></div></div>
+              : <div style={{ minWidth: 0 }}><div className="kicker ellipsis">Top rated in {cityName(city)}</div><div className="h2">Editor's <em>picks</em></div></div>}
+            {!popular && <button className="link" onClick={openScraper}>⚡ See what's popular</button>}
           </div>
           <div className="scroll-x">
-            {picks.map(({ it, cat }) => (
+            {picks.map(({ item: it, cat, reason }) => (
               <div role="button" tabIndex={0} key={`${cat}:${it.id}`} className="pick" onClick={() => setOpen({ item: it, cat })}>
-                <div style={{ position: "absolute", top: 10, left: 10, zIndex: 3 }}><TierPill tier={it.tier} /></div>
+                {TIER[it.tier] && <div style={{ position: "absolute", top: 10, left: 10, zIndex: 3 }}><TierPill tier={it.tier} /></div>}
                 <BottleStage item={it} cat={cat} artHeight={150} />
                 <div className="body">
                   <div className="tiny" style={{ color: CAT[cat].color, fontWeight: 600 }}>{CAT[cat].label.toUpperCase()} · {it.flag} {it.origin}</div>
                   <div className="display b clamp2" style={{ fontSize: 16, marginTop: 3, minHeight: 38 }}>{it.name}</div>
+                  {reason && <div className="opt-why"><span>{reason}</span></div>}
                   <div className="between" style={{ marginTop: 8 }}>
-                    <span><span className="stars">★ {it.rating}</span> <span className="tiny dim">· {it.vol}</span></span>
+                    <span><span className="stars">★ {it.rating || "–"}</span> <span className="tiny dim">· {it.vol}</span></span>
                     <b className="gold-text" style={{ fontSize: 17 }}>{fmt(it.price)}</b>
                   </div>
                 </div>

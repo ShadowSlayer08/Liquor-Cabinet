@@ -11,7 +11,8 @@
 //  We pull that array out and normalise each row into the planner's item shape.
 //  `rank` is Livcheers' popularity (1 = most popular). It's one all-India list —
 //  the same number in every city — with gaps, and most bottles have none (null).
-//  Ratings carry no vote counts, so Fill my bar leans on it (lib/barScore.js).
+//  Ratings carry no vote counts, so Fill my bar (lib/barScore.js) and the Cabinet's
+//  badges and carousel (lib/editorsPicks.js) lean on it.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const LC_BASE = "https://www.livcheers.com";
@@ -64,11 +65,23 @@ export const TIER = {
   good:    { icon: "✓",  label: "Good Value",      bg: "#0a140a", fg: "#50904a" },
 };
 
-// Same rule as the original planner's prompt: top-rated premium bottles are
-// Editor's Choice, well-rated ones Best Pick, everything else Good Value.
-export function tierFor(rating, priceCategory) {
-  if (rating >= 4.7 && (priceCategory === "luxury" || priceCategory === "premium")) return "editors";
-  if (rating >= 4.4) return "best";
+// The badges. Livcheers' average ratings carry no vote counts, so on rating alone every
+// unknown bottle with a few 5★ reviews was an Editor's Choice. A badge needs popularity too:
+//   🏆 Editor's Choice  ≥ 4.7★, premium or luxury, and ranked ≤ limits.editors
+//   ★ Best Pick        ≥ 4.4★ and ranked ≤ limits.best
+//   ✓ Good Value       any other bottle with a rank
+//   no badge (null)    no rank: nothing vouches for its rating
+// Here `rank` is the bottle's own; lib/editorsPicks.js re-reads every tier per spirit family
+// (a household name, the same brand's ranked bottle, a family Livcheers ranks lower overall).
+// rank === undefined (a category cached before the parser kept ranks) keeps the original
+// planner's rule, so no badge disappears before a re-sync.
+export const TIER_RANK = { editors: 200, best: 350 };
+export function tierFor(rating, priceCategory, rank, limits = TIER_RANK) {
+  const fancy = priceCategory === "luxury" || priceCategory === "premium";
+  if (rank === undefined) return rating >= 4.7 && fancy ? "editors" : rating >= 4.4 ? "best" : "good";
+  if (!(rank > 0)) return null;
+  if (rating >= 4.7 && fancy && rank <= limits.editors) return "editors";
+  if (rating >= 4.4 && rank <= limits.best) return "best";
   return "good";
 }
 
@@ -161,7 +174,7 @@ export function normalizeRow(row, citySlug) {
     flag: flagEmoji(val(country.code)),
     priceCategory,
     rank: rank > 0 ? rank : null,
-    tier: tierFor(rating, priceCategory),
+    tier: tierFor(rating, priceCategory, rank > 0 ? rank : null),
     notes: val(L.tastingNotes) || "",
     description: val(L.description) || "",
     url: `${LC_BASE}/${citySlug}/liquor/${val(L.slug) || ""}`,
