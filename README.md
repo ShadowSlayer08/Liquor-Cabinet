@@ -11,8 +11,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest"><b>⬇ Download v1.5 — Android APK &amp; iPhone IPA</b></a><br>
-  <sub>or straight from the repo: <a href="release/LiquorCabinet-1.5.apk">APK</a> · <a href="release/LiquorCabinet-1.5-unsigned.ipa">IPA</a> · free, non-commercial, personal use — see <a href="#data-sources--legal-notice">legal notice</a></sub>
+  <a href="https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest"><b>⬇ Download v1.5.1 — Android APK &amp; iPhone IPA</b></a><br>
+  <sub>or straight from the repo: <a href="release/LiquorCabinet-1.5.1.apk">APK</a> · <a href="release/LiquorCabinet-1.5.1-unsigned.ipa">IPA</a> · free, non-commercial, personal use — see <a href="#data-sources--legal-notice">legal notice</a></sub>
 </p>
 
 ---
@@ -21,24 +21,29 @@
 
 ### Android
 
-1. On your Android phone, download `LiquorCabinet-1.5.apk` from the [latest release](https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest) (or [`release/`](release/LiquorCabinet-1.5.apk) in the repo).
+1. On your Android phone, download `LiquorCabinet-1.5.1.apk` from the [latest release](https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest) (or [`release/`](release/LiquorCabinet-1.5.1.apk) in the repo).
 2. Open it. When Android asks, allow installs from that source.
 3. Launch **Liquor Cabinet**, tap **Use my location**, then **⚡ Smart Sync** to pull today's prices.
 
-It needs **Android 8.0 or newer** and an internet connection. v1.5 installs over v1.0–v1.4.1 and keeps your carts.
+It needs **Android 8.0 or newer** and an internet connection. v1.5.1 installs over v1.0–v1.5 and keeps your carts.
 It asks for **location** (restaurants that deliver to you), **notifications** (order checklist and party reminders) and, only if you turn on the floating checklist, **display over other apps**. All are optional.
 
 ### iPhone (beta, sideload)
 
 The same app runs on iPhone (iOS 15+). There's no App Store listing, and an iPhone won't install an app file the way Android does — it has to be signed with an Apple ID when you install it:
 
-1. Download `LiquorCabinet-1.5-unsigned.ipa` from the [latest release](https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest) (every push also builds one: [iOS workflow](https://github.com/ShadowSlayer08/Liquor-Cabinet/actions/workflows/ios.yml) → Artifacts).
+1. Download `LiquorCabinet-1.5.1-unsigned.ipa` from the [latest release](https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest) (every push also builds one: [iOS workflow](https://github.com/ShadowSlayer08/Liquor-Cabinet/actions/workflows/ios.yml) → Artifacts).
 2. Install it with [Sideloadly](https://sideloadly.io/) (Windows / Mac) or [AltStore](https://altstore.io/), signing in with your own Apple ID.
 3. On the iPhone: Settings → General → VPN & Device Management → trust your Apple ID; on iOS 16+ also turn on Settings → Privacy & Security → **Developer Mode**.
 
 With a free Apple ID the app runs for 7 days before it must be re-signed (AltStore can refresh it automatically), and you can have at most 3 sideloaded apps. A paid Apple Developer account (US$99/year) gives 1-year installs for up to 100 iPhones, or TestFlight. _At the time of writing._
 
 Different on iPhone: there's no floating checklist bubble — iOS doesn't let apps draw over other apps — so the order checklist arrives as a notification. Everything else is the same app; the beta features (Zomato sign-in, live Blinkit prices) are as untested on iPhone as on Android.
+
+## What's new in v1.5.1
+
+- **Crowd favourites** in the Cabinet: the strip under "Browse by spirit" now shows bottles people actually buy (Johnnie Walker Red, Bira, Absolut, Old Monk, Bombay Sapphire, Blenders Pride…), each with a short reason, instead of bottles with a single 5★ review. The 🏆 Editor's Choice and ★ Best Pick badges also need the bottle to be popular now.
+- **Small parties don't overbuy.** Fill my bar no longer buys a bottle of every spirit for a handful of drinks: for 10 drinks on a mixed bar it's a bottle of whisky and a beer, with a note saying the few gin, vodka and rum drinks fit in the whisky bottle — and **Add them back** if you want them all.
 
 ## What's new in v1.5
 

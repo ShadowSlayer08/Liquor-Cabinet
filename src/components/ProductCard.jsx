@@ -21,8 +21,11 @@ export function BottleStage({ item, cat, className = "stage", artHeight = 110, s
   );
 }
 
+// No badge (tier null) for a bottle nothing vouches for: no Livcheers rank, no well-known
+// brand (lib/editorsPicks.js). The empty span keeps the flag / close button on the right.
 export const TierPill = ({ tier }) => {
-  const t = TIER[tier] || TIER.good;
+  const t = TIER[tier];
+  if (!t) return <span aria-hidden="true" />;
   return <span className="pill pill-glass">{t.icon} {t.label}</span>;
 };
 

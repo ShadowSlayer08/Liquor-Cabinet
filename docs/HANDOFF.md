@@ -1,6 +1,6 @@
 # Handoff — where things stand
 
-_Updated 10 Oct 2026, v1.5 (party out with District + Fill my bar quiz) — local Claude Code on the user's Windows PC._
+_Updated 17 Oct 2026, v1.5.1 (popular picks, small parties) — local Claude Code on the user's Windows PC. The owner planned to pause the project after this release; v1.6 candidates are under "Ideas for next"._
 
 ## Shipped
 
@@ -12,9 +12,16 @@ _Updated 10 Oct 2026, v1.5 (party out with District + Fill my bar quiz) — loca
 | v1.3 | (history) | Bar tab + cocktails, dry days, price-drop badges, store finder, bill split + UPI QR card, invite card, reminders, exact Zomato prices (beta), live Blinkit prices (beta), floating order checklist (beta) |
 | v1.4 | (history) | iPhone (Capacitor iOS, Swift plugins, CI-built unsigned IPA), no upi:// links (NPCI), honest location copy, cfg in native storage, liquorcabinet:// links |
 | v1.4.1 | (history) | Fill my bar (budget optimiser), 75 cocktails + 22 mocktails, suggestions from bottles and guest prefs, 60 dishes, party templates, getting home (drivers + ride apps), settle up, Zepto / Instamart, in-app legal notice |
-| **v1.5** | `release/LiquorCabinet-1.5.apk` (versionCode 7) + `release/LiquorCabinet-1.5-unsigned.ipa` (iOS build 7) | Out tab: bars & pubs, club nights, BYOB places and events with District (lists from Zomato/District pages, booking hand-off), night-out costs and leave-by, invite/reminders/rides/split follow the outing, state drinking ages + BYOB rules + bars-on-dry-days; Fill my bar asks a short quiz and picks popular bottles |
+| v1.5 | (history) | Out tab: bars & pubs, club nights, BYOB places and events with District (lists from Zomato/District pages, booking hand-off), night-out costs and leave-by, invite/reminders/rides/split follow the outing, state drinking ages + BYOB rules + bars-on-dry-days; Fill my bar asks a short quiz and picks popular bottles |
+| **v1.5.1** | `release/LiquorCabinet-1.5.1.apk` (versionCode 8) + `release/LiquorCabinet-1.5.1-unsigned.ipa` (iOS build 8) | Cabinet "Crowd favourites" + 🏆/★ badges by Livcheers popularity; Fill my bar folds tiny families into other bottles for small parties (Add them back) |
 
 Repo: **https://github.com/ShadowSlayer08/Liquor-Cabinet** (public, pushed at the user's request). The signing key (`android/keystore/`, `android/keystore.properties`) is git-ignored and never committed; every APK since v1.2 is signed with the same key (cert SHA-256 `a3d9f3e7…98abd9`), so it installs over it.
+
+## v1.5.1 — popular picks, small parties (what was built)
+
+- **Crowd favourites & badges** (`lib/editorsPicks.js`: `withTiers`, `crowdFavourites`; `tierFor` in `parse/livcheers.js`; CabinetTab reads `withTiers(catalog)` so the grid, filter chips and bottle sheet agree). 🏆 needs ≥ 4.7★, premium/luxury and a popularity rank ≤ #200 (or 2× the family's best); ★ needs ≥ 4.4★ and ≤ #350 (or 2.5×); ranks can come from the bottle, a same-brand bottle or a staple. Gurgaon: 🏆 80 → 29, ★ 1,058 → 214; no lone 5★ bottle keeps a badge. The strip: 12 full-size, plain bottles with photos, ≤ 3 per category / 4 per family / 1 per brand, each with a reason ("Most popular whisky", "A household name"); kicker "Popular on Livcheers · <city>" (the rank is all-India, so not "popular in <city>"). Caches from before ranks keep the old rule and strip, with a "See what's popular" sync link.
+- **Small parties** (`foldSmall` in `optimise.js`): a family whose drinks are a third of a bottle or less is poured from another bottle of its kind (spirits together, red/white wine together, bubbly on its own), never a "lots" family, a cocktail-menu minimum, a pin or the last family; a "some" family only into spare pours. The sheet says so with **Add it/them back** (`UNFOLD_ALL`, no re-folding that visit). Tight budgets also try the plan from before folding and keep whichever covers more; the quiz's shots tequila folds first and never stands in for the host's picks. Lots of wine: red and white count as "some" for each other (`profileFromQuiz().some`). 6,000 random tight asks: never fewer drinks than v1.5; with folding off, identical to v1.5.
+- Checked: 339 offline tests; browser — the strip (JW Red, Bira, Absolut, Old Monk XXX, Bombay Sapphire, Jacob's Creek, Ballantine's, Budweiser, Bacardi White, Blenders Pride, Carlsberg Elephant, Jameson), a 10-drink mixed bar = JW Black + Corona with the fold note, Add them back → 5 bottles; no console errors.
 
 ## v1.5 — party out with District (what was built)
 
@@ -112,8 +119,11 @@ Nothing native has run on a device yet (same as v1.2). Check on the phone:
 
 ## Ideas for next
 
-- Cabinet's "Editor's picks" still ranks lone 5★ bottles — rank it by popularity like Fill my bar (`lib/barScore.js`).
-- Fill my bar overbuys for very small parties (a bottle per family); merging families for tiny asks needs its own rule.
+Candidates for a v1.6, in the order suggested to the owner:
+- **Real-phone hardening** (most valuable): run the "Not verified" list above on the owner's phone and fix what breaks; a small self-test screen in the Plan tab (open each hand-off, schedule a test reminder in 1 minute, fetch one page per source) would make it quick. Decides `USE_EDITION` for District links.
+- **Party history**: keep past parties (what was bought, what was actually spent from settle-up, what ran out) so the next plan starts from them.
+- **Share a plan with a co-host** without a server: the plan as a QR code / file the other phone imports.
+- **Rules freshness**: the 2027 dry-day dates and the Haryana BYOB policy (to 31 Mar 2027) need a yearly refresh — warn in the app when `RULES_CHECKED` / the dry-day tables get old.
 - District `/gw/` APIs (table slots, cover charges, BYOB-by-tag lists) as an opt-in beta, if the owner wants it (see RESEARCH.md).
 
 - Sync ticks from the floating bubble back into the Blinkit checklist (the plugin can `notifyListeners("toggle")`).

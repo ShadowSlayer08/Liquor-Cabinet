@@ -2,15 +2,18 @@
 // ₹15k and 12 people, what do I buy?": popular bottles from the city's Livcheers prices that suit
 // how the crowd drinks, cover the drinks and fit the amount, one tap into the cart and the active
 // batch. The answers are remembered (cfg.barQuiz) and each one can be changed from the strip on
-// top of the results; swaps and skipped spirits last for this visit. No sponsored picks.
+// top of the results; swaps, skipped spirits and families added back last for this visit. A small
+// party pours a few gin drinks from the whisky bottle rather than buying a gin (optimise.js
+// foldSmall): the sheet says so, with "Add it back". No sponsored picks.
 import { useEffect, useMemo, useState } from "react";
 import Sheet from "./Sheet.jsx";
 import { CAT, cityName } from "../lib/parse/livcheers.js";
 import { COCKTAIL, FAMILIES } from "../lib/cocktails.js";
-import { fillBar, barCost, topPick, haveByFamily, joinLabels } from "../lib/optimise.js";
+import { fillBar, barCost, topPick, haveByFamily, joinLabels, UNFOLD_ALL } from "../lib/optimise.js";
 import { TIERS, TIER_IDS, familyContext, originChoice } from "../lib/barScore.js";
 import {
   normalizeQuiz, seedQuiz, profileFromQuiz, stepsFor, quizSummary, resolveMoney, syncCatsFor, menuByFamily, templateLabel, shortName,
+  foldNote,
 } from "../lib/barQuiz.js";
 import { useBackHandler } from "../lib/back.js";
 import { fmt, fmtShort } from "../lib/format.js";
@@ -46,13 +49,14 @@ export default function FillBarSheet({ catalog, city, plan, party, budget, spent
   const [lock, setLock] = useState(null);       // the tier "auto" had when the host started changing picks
   const [open, setOpen] = useState(null);       // the line whose swap panel is open
   const [keepAuto, setKeepAuto] = useState(false);   // keep the tequila the quiz added for shots, even when money's tight
+  const [unfold, setUnfold] = useState([]);     // UNFOLD_ALL once the host adds back what a small party folded
   // A template applied since the last answers re-seeded them: keep that (once, on open).
   useEffect(() => { if (seed.reseeded) setQuiz?.(seed.answers); }, [seed]);
 
   const have = useMemo(() => haveByFamily(plan.byCat), [plan.byCat]);
   const argsFor = (a) => {
     const p = profileFromQuiz(a);
-    return { catalog, drinks, shares: p.shares, keep: p.keep, pegMl: peg, menu: cocktailMenu, have, profile: p.profile };
+    return { catalog, drinks, shares: p.shares, keep: p.keep, some: p.some, unfold, pegMl: peg, menu: cocktailMenu, have, profile: p.profile };
   };
   // What the whole bar costs at the tier they picked ("Let the budget decide" → Treat them).
   const enoughFor = (a) => { const t = a.tier === "auto" ? "premium" : a.tier; return { tier: t, cost: barCost(argsFor(a), t) }; };
@@ -67,7 +71,7 @@ export default function FillBarSheet({ catalog, city, plan, party, budget, spent
   const stepId = single || steps[at];
   const last = !!single || at >= steps.length - 1;
   const draftEnough = useMemo(() => (view === "quiz" && stepId === "budget" ? enoughFor(draft) : { tier: "premium", cost: 0 }),
-    [view, stepId, draft, catalog, drinks, peg, cocktailMenu, have]);
+    [view, stepId, draft, catalog, drinks, peg, cocktailMenu, have, unfold]);
   const draftAmount = draft.money?.kind === "amount" ? draft.money.value : moneyOf(draft, draftEnough.cost);
   // "e.g. Royal Stag ₹570 · Magic Moments ₹570": the best bottle at each tier of the two biggest families.
   // Worked out from the top tier down, and a tier skips the bottle the tier above showed when it has
@@ -92,22 +96,23 @@ export default function FillBarSheet({ catalog, city, plan, party, budget, spent
   const prof = useMemo(() => profileFromQuiz(answers), [answers]);
   const cats = useMemo(() => syncCatsFor(answers), [answers]);
   const synced = cats.some((c) => catalog?.[c]?.length);
+  // (families added back count: "Enough for…" is the bar they're looking at)
   const ansEnough = useMemo(() => (view === "results" && synced ? enoughFor(answers) : { tier: "premium", cost: 0 }),
-    [view, synced, answers, catalog, drinks, peg, cocktailMenu, have]);
+    [view, synced, answers, catalog, drinks, peg, cocktailMenu, have, unfold]);
   const money = moneyOf(answers, ansEnough.cost);
   const r = useMemo(() => fillBar({
-    catalog, drinks, budget: money, shares: prof.shares, keep: prof.keep, pegMl: peg, menu: cocktailMenu, have, skip, pins,
-    optional: keepAuto ? [] : prof.auto, profile: { ...prof.profile, tier: lock || prof.profile.tier },
-  }), [catalog, drinks, money, prof, peg, cocktailMenu, have, skip, pins, lock, keepAuto]);
+    catalog, drinks, budget: money, shares: prof.shares, keep: prof.keep, some: prof.some, unfold, pegMl: peg, menu: cocktailMenu, have,
+    skip, pins, optional: keepAuto ? [] : prof.auto, profile: { ...prof.profile, tier: lock || prof.profile.tier },
+  }), [catalog, drinks, money, prof, unfold, peg, cocktailMenu, have, skip, pins, lock, keepAuto]);
   const answerSteps = useMemo(() => stepsFor(answers, { choice: choiceOf(answers) }), [answers, catalog, peg]);
   const strip = quizSummary(answers, { amount: money, tier: r.tier, steps: answerSteps });
   const bottles = r.lines.reduce((s, l) => s + l.qty, 0);
-  const changed = skip.length > 0 || Object.keys(pins).length > 0;
+  const changed = skip.length > 0 || Object.keys(pins).length > 0 || unfold.length > 0;
   const reasonCtx = { profile: prof.profile, menu: menuByFamily(cocktailMenu) };
   const pairs = new Set(r.lines.filter((l) => l.slot).map((l) => l.family));
 
   // ── Answers ──
-  const resetPicks = () => { setPins({}); setSkip([]); setLock(null); setOpen(null); setKeepAuto(false); };
+  const resetPicks = () => { setPins({}); setSkip([]); setLock(null); setOpen(null); setKeepAuto(false); setUnfold([]); };
   const save = (a, { keepPicks = false } = {}) => {
     const n = normalizeQuiz(a);
     setAnswers(n); setQuiz?.(n);
@@ -149,6 +154,9 @@ export default function FillBarSheet({ catalog, city, plan, party, budget, spent
     save({ ...answers, favs }, { keepPicks: true });
   };
   const variety = (on) => { tap(); save({ ...answers, variety: on }, { keepPicks: true }); };
+  // "Add it back": the families a small party folded get their own bottle again (the tier holds).
+  // Every family is unfolded, so nothing on the bar folds in their place.
+  const addBack = () => { tap(); hold(); setUnfold(UNFOLD_ALL); setOpen(null); };
   const add = () => {
     if (!r.lines.length) return;
     addItems(r.lines.map((l) => ({ cat: l.cat, item: l.item, qty: l.qty })));
@@ -177,6 +185,7 @@ export default function FillBarSheet({ catalog, city, plan, party, budget, spent
   const otherUnsynced = r.unsynced.filter((c) => c !== "indian");
   const otherLabels = otherUnsynced.map((c) => CAT[c]?.label);
   const next2 = r.nextTier;
+  const fold = foldNote(r);   // a small party's families poured from another bottle
   // Where the pre-filled answers came from (shown until the host changes them).
   const seedNote = seed.from === "template" ? `From your ${templateLabel(party)} template`
     : seed.from === "tastes" ? "From Guests like… on the Food tab" : seed.from === "saved" ? "Your answers from last time" : null;
@@ -300,6 +309,12 @@ export default function FillBarSheet({ catalog, city, plan, party, budget, spent
                 <div className="note note-info opt-note quiz-note">
                   <span className="grow">No {joinLabels(r.dropped.map((f) => FAMILIES[f]?.label.toLowerCase()))} for shots: {fmtShort(money)} goes further without it.</span>
                   <button className="btn btn-xs btn-ghost" onClick={() => { tap(); setKeepAuto(true); }}>Add it</button>
+                </div>
+              )}
+              {fold && (
+                <div className="note note-info opt-note quiz-note">
+                  <span className="grow">{fold}</span>
+                  <button className="btn btn-xs btn-ghost" onClick={addBack}>{r.folded.length === 1 ? "Add it back" : "Add them back"}</button>
                 </div>
               )}
               {!r.feasible && r.lines.length > 0 && (

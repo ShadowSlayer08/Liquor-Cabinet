@@ -27,7 +27,7 @@ On the maintainer's Windows PC: JDK at `%LOCALAPPDATA%\Programs\jdk-21`, SDK at 
 ## Release signing & versioning
 
 - `android/keystore.properties` + `android/keystore/liquor-cabinet.jks` sign release builds. Both are **git-ignored and must never be committed**. Without them, `assembleRelease` falls back to the debug key (such an APK won't install over the user's current one).
-- Bump **both** `versionCode` and `versionName` in `android/app/build.gradle`, plus `version` in `package.json`, `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `ios/App/App.xcodeproj/project.pbxproj`, and the "Liquor Cabinet vX" line in `src/components/PlanTab.jsx`, for every APK you hand over. Current: v1.5 = versionCode 7 (iOS build 7).
+- Bump **both** `versionCode` and `versionName` in `android/app/build.gradle`, plus `version` in `package.json`, `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `ios/App/App.xcodeproj/project.pbxproj`, and the "Liquor Cabinet vX" line in `src/components/PlanTab.jsx`, for every APK you hand over. Current: v1.5.1 = versionCode 8 (iOS build 8).
 - The user sideloads APKs (no Play Store — alcohol-app policies). GitHub: https://github.com/ShadowSlayer08/Liquor-Cabinet (public; renamed from liquor-cabinet, old URLs redirect) — push only when the user asks. Releases page carries the APK + unsigned IPA per version (`gh release create vX.Y …`). The README's "Data sources & legal notice" (free, non-profit, personal use) must stay accurate when data sources change.
 
 ## Architecture
@@ -39,7 +39,7 @@ src/
   styles.css              design system (tokens in :root) — "midnight speakeasy"; v1.3 rules sit in per-feature blocks at the end
   components/
     Art.jsx               SVG bottle illustrations per category, line icons (Icon.*), Ring gauge, VegMark
-    CabinetTab.jsx        hero (cocktails chip, Fill my bar, dry-day banner, store finder), category tiles, Editor's picks, product grid/list, price-drop filter
+    CabinetTab.jsx        hero (cocktails chip, Fill my bar, dry-day banner, store finder), category tiles, "Crowd favourites" (popular picks), product grid/list (badges via withTiers), price-drop filter
     BarTab.jsx            Cocktails | Mocktails, "Picked for your party", makeable first + party menu;  CocktailSheet.jsx = recipe + servings
     FillBarSheet.jsx      Fill my bar: the quiz (fillbar/BarQuiz.jsx, answers in cfg.barQuiz) then results (fillbar/PickLine.jsx: reasons,
                           swaps, their usual brand) → addItems
@@ -80,9 +80,10 @@ src/
     dishes.js             DISHES (60, tagged: cuisines, spice, protein, jainOk, finger, pairsCocktails), CUISINES, PROTEINS, suggestDishes()
     cocktails.js          COCKTAILS (75) + MOCKTAILS (22), TAGS, DRINK_TASTES, makeable(), cocktailUses(), menu helpers
     suggestDrinks.js / suggestFood.js / prefs.js   ranked picks with reasons from bottles + party.prefs (pure)
-    optimise.js           fillBar(): exact knapsack on score × drinks, auto tier, pins/skips, cocktail minimums, trimmed fallback (pure)
+    optimise.js           fillBar(): exact knapsack on score × drinks, auto tier, pins/skips, cocktail minimums, foldSmall (small parties pour a few drinks from another bottle), trimmed fallback (pure)
     barScore.js           bottle score: Livcheers popularity rank (+ brand/staple fallbacks), shrunk rating, per-city price ladder + tiers (pure)
     barQuiz.js            the five quiz questions, answers → profile, reasons (pure)
+    editorsPicks.js       withTiers() (🏆/★ badges need popularity) + crowdFavourites() for the Cabinet strip (pure)
     templates.js          party templates (festivalDate() from drydays.js)
     rides.js / settle.js / grocers.js   rides home links, settle-up maths, Blinkit/Zepto/Instamart (pure)
     legal.js              in-app legal notice; LEGAL_SERVICES must name every https host in src (tests/legal.test.mjs, also checks the README table)
