@@ -4,6 +4,8 @@ import { STALE_MS } from "../lib/sources.js";
 import { fmt, fmtShort, ageStr } from "../lib/format.js";
 import { Icon, Ring } from "./Art.jsx";
 import InviteCard from "./plan/InviteCard.jsx";
+import ShareCard from "./plan/ShareCard.jsx";
+import HistoryCard from "./plan/HistoryCard.jsx";
 import SplitCard from "./plan/SplitCard.jsx";
 import RemindersCard from "./plan/RemindersCard.jsx";
 import DryDaysCard from "./plan/DryDaysCard.jsx";
@@ -40,6 +42,7 @@ export default function PlanTab({
   party, setParty, customDry, setCustomDry, cocktailMenu, liquorLines, liquorTotal, foodCart,
   reminders, setReminders, split, setSplit, bubble, setBubble, zomatoExact, setZomatoExact, toast,
   settle, openSettle, openLegal, out,
+  history, setHistory, planSnap, shareSnap, applyPlan, saveToHistory, openImport, catalog,
 }) {
   const [draft, setDraft] = useState(String(budget));
   const [editing, setEditing] = useState(false);
@@ -97,12 +100,15 @@ export default function PlanTab({
       </div>
 
       <InviteCard party={party} setParty={setParty} city={city} loc={loc} plan={plan} cocktailMenu={cocktailMenu} liquorLines={liquorLines} foodCart={foodCart} toast={toast} out={out} />
+      <ShareCard snapshot={shareSnap} openImport={openImport} toast={toast} />
       <SplitCard party={party} setParty={setParty} plan={plan} split={split} setSplit={setSplit}
         liquorTotal={liquorTotal} zomatoTotal={zomatoTotal} blinkitTotal={blinkitTotal} toast={toast}
         settle={settle} openSettle={openSettle} out={out} />
       <RemindersCard party={party} city={city} customDry={customDry} reminders={reminders} setReminders={setReminders} toast={toast} out={out} loc={loc} />
       <RidesCard party={party} setParty={setParty} plan={plan} loc={loc} locating={locating} onLocate={onLocate} toast={toast} out={out} />
       <DryDaysCard party={party} city={city} customDry={customDry} setCustomDry={setCustomDry} toast={toast} />
+      <HistoryCard history={history} setHistory={setHistory} snapshot={planSnap} settle={settle} applyPlan={applyPlan}
+        saveToHistory={saveToHistory} catalog={catalog} city={city} toast={toast} />
 
       <div className="card fade-up">
         <div className="card-title"><span className="kicker">Location</span></div>
