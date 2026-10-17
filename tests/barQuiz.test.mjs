@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   normalizeQuiz, seedQuiz, profileFromQuiz, stepsFor, quizSummary, reasonsFor, resolveMoney, cycleFamily, familySplit,
-  syncCatsFor, menuByFamily, templateLabel, COCKTAIL_SHARES, DEFAULT_QUIZ, STEPS,
+  syncCatsFor, menuByFamily, templateLabel, foldNote, COCKTAIL_SHARES, DEFAULT_QUIZ, STEPS,
 } from "../src/lib/barQuiz.js";
 import { fillBar, MIXES } from "../src/lib/optimise.js";
 import { familyContext, originChoice } from "../src/lib/barScore.js";
@@ -127,6 +127,13 @@ test("answers → shares: lots and some, wine, shots, not sure", () => {
   assert.deepEqual(profileFromQuiz({ families: null, style: ["cocktails"] }).shares, COCKTAIL_SHARES);
   assert.deepEqual(profileFromQuiz({ families: null, style: ["cocktails", "mix"] }).shares, MIXES.mixed.shares);
   assert.deepEqual(profileFromQuiz({}).keep, []);
+  // What a small party may pour from spare drinks: the "some" families, and red and white for lots
+  // of wine ("Wine" is one answer); never a "lots" spirit, nor the tequila the quiz added.
+  assert.deepEqual(p.some, ["beer"]);
+  assert.deepEqual(w.some, ["redwine", "whitewine"]);
+  assert.deepEqual(s.some, []);
+  assert.deepEqual(profileFromQuiz({ families: { whisky: 1, gin: 2, wine: 1 } }).some, ["whisky", "redwine", "whitewine"]);
+  assert.deepEqual(profileFromQuiz({}).some, []);
   // The rest of the profile passes through.
   const full = profileFromQuiz({ tier: "premium", origin: "desi", favs: { whisky: "Royal Stag" }, variety: false });
   assert.deepEqual(full.profile, { tier: "premium", style: { sip: false, mix: true, cocktails: false, shots: false }, origin: "desi", favs: { whisky: "royalstag" }, variety: false });
@@ -219,4 +226,42 @@ test("reasons: short, honest, never two of a kind", () => {
       if (n) assert.ok(l.of >= 3 * Number(n[1]) && l.rank <= 300, label);
     }
   }
+});
+
+test("a small party's note: which families are poured from which bottle, honestly", () => {
+  // What the sheet passes (the "some" families: profileFromQuiz).
+  const ask = (answers, drinks, budget = 15000, extra = {}) => {
+    const p = profileFromQuiz(answers);
+    return fillBar({ catalog: GGN, drinks, budget, pegMl: 60, shares: p.shares, keep: p.keep, some: p.some, optional: p.auto, profile: p.profile, ...extra });
+  };
+  const notSure = { families: null, style: ["mix"] };
+  // Real Gurgaon bars ("Not sure — a mixed bar", ₹15k).
+  assert.equal(foldNote(ask(notSure, 10)), "For 10 drinks, no separate gin, vodka or rum: their 5 drinks fit in the whisky bottle.");
+  assert.equal(foldNote(ask(notSure, 24)), "For 24 drinks, no separate gin or vodka: their 8 drinks fit in the whisky & rum bottles.");
+  assert.equal(foldNote(ask({ families: { whisky: 2, gin: 1, beer: 1 }, style: ["mix"] }, 6)), "For 6 drinks, no separate gin: its 1 drink fits in the whisky bottle.");
+  assert.equal(foldNote(ask({ families: { beer: 2, wine: 2 }, style: [] }, 6)), "For 6 drinks, no separate white wine: its 1 drink fits in the red wine bottle.");
+  // Nothing folded (a big party, or everything added back), or nothing bought: no note.
+  assert.equal(foldNote(ask(notSure, 40)), null);
+  assert.equal(foldNote(ask(notSure, 10, 15000, { unfold: ["gin", "vodka", "rum"] })), null);
+  assert.equal(foldNote(null), null);
+  const folded = [{ family: "gin", drinks: 2, into: ["whisky"], split: { whisky: 2 }, fits: true }];
+  const whisky = { family: "whisky", qty: 1 };
+  assert.equal(foldNote({ folded, lines: [], target: 10 }), null);
+  // Not all in spare drinks, or a tight budget: "come out of", never "fit in".
+  assert.equal(foldNote({ folded: [{ ...folded[0], fits: false }], lines: [whisky], target: 10 }), "For 10 drinks, no separate gin: its 2 drinks come out of the whisky.");
+  assert.equal(foldNote({ folded, lines: [whisky], target: 10, trimmed: true }), "For 10 drinks, no separate gin: its 2 drinks come out of the whisky.");
+  // The bottle they went into isn't bought (the money left it out): only what was left out.
+  assert.equal(foldNote({ folded, lines: [{ family: "beer", qty: 2 }], target: 10, trimmed: true }), "For 10 drinks, no separate gin.");
+  // "fit in" on real bars means it: each bottle they went into is bought for its own drinks alone.
+  for (const answers of [notSure, { families: { whisky: 2, rum: 1, gin: 1, beer: 1 }, style: ["mix"] }, { families: { vodka: 1, rum: 1, gin: 1 }, style: ["cocktails"] }])
+    for (const drinks of [3, 6, 10, 15, 24]) for (const budget of [1500, 4000, 15000]) {
+      const r = ask(answers, drinks, budget), note = foldNote(r) || "";
+      if (!/ fits? in /.test(note)) continue;
+      for (const f of new Set(r.folded.flatMap((x) => x.into))) {
+        const ls = r.lines.filter((l) => l.family === f);
+        const took = r.folded.reduce((s, x) => s + (x.split[f] || 0), 0);
+        assert.equal(ls.length, 1, note);
+        assert.equal(ls[0].qty, Math.ceil((ls[0].need - took) / ls[0].perBottle), `${note} (${ls[0].item.name})`);
+      }
+    }
 });
