@@ -968,7 +968,7 @@ body:has(.share-ask) .toast { bottom: calc(var(--safe-bottom) + var(--nav-h) + 1
 .ch-empty svg { color: var(--gold); margin-bottom: 4px; }
 .ch-qr { display: flex; justify-content: center; }
 .ch-qr-img { width: min(300px, 100%); height: auto; aspect-ratio: 1; border-radius: 16px; background: #fff; padding: 8px;
-  box-shadow: 0 14px 30px rgba(0, 0, 0, .4); }
+  box-shadow: 0 14px 30px rgba(0, 0, 0, .4); image-rendering: pixelated; /* sharp module edges scan faster than smoothed ones */ }
 .ch-qr-skel { width: min(300px, 100%); aspect-ratio: 1; border-radius: 16px; }
 .ch-qr-fail { display: grid; place-items: center; padding: 24px; text-align: center; background: var(--panel); border: 1px solid var(--stroke); }
 .ch-what { display: grid; gap: 2px; justify-items: center; text-align: center; margin-top: 12px; min-width: 0; }

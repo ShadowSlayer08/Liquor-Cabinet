@@ -1,13 +1,14 @@
 // [v1.6 · Co-host] A plan from a co-host (a liquorcabinet://plan link, a pasted message or a
 // file): preview it, then use theirs, add their items to mine, or keep it in Past parties.
-// Everything here comes from another phone, so it's decoded (lib/planShare.js, size-capped)
-// and checked (restoreSnapshot) before anything is shown, and nothing changes until a tap.
+// Everything here comes from another phone, so it's decoded (lib/planShare.js, size-capped),
+// checked (restoreSnapshot) and fitted to this app (fitToApp: supplies' search words back,
+// unknown cocktails out) before anything is shown, and nothing changes until a tap.
 // A lighter QR carries no food: "Use their plan" then keeps my food and supplies.
 // Props (App): input (link / text / file contents), mine (this plan, restoreSnapshot() shape),
 // onApply(restored, "replace"|"merge"), onSave(restored), onClose, toast.
 import { useMemo, useState } from "react";
 import Sheet from "./Sheet.jsx";
-import { decodePlan } from "../lib/planShare.js";
+import { decodePlan, fitToApp } from "../lib/planShare.js";
 import { restoreSnapshot, snapshotSummary, hasPlan } from "../lib/planSnapshot.js";
 import { prettyWhen } from "../lib/when.js";
 import { todayISO } from "../lib/drydays.js";
@@ -22,10 +23,10 @@ const SHOW = 6; // lines per list before "+ N more"
 function read(input) {
   try {
     const raw = decodePlan(input);
-    const plan = restoreSnapshot(raw);
-    return { plan, light: raw.light === true, skipped: Math.min(200, Math.max(0, Math.round(Number(raw.kitSkipped) || 0))), error: "" };
+    const { plan, unknownCocktails } = fitToApp(restoreSnapshot(raw));
+    return { plan, light: raw.light === true, skipped: Math.min(200, Math.max(0, Math.round(Number(raw.kitSkipped) || 0))), unknownCocktails, error: "" };
   } catch (e) {
-    return { plan: null, light: false, skipped: 0, error: e?.message || "Couldn't read that plan" };
+    return { plan: null, light: false, skipped: 0, unknownCocktails: 0, error: e?.message || "Couldn't read that plan" };
   }
 }
 
@@ -55,7 +56,7 @@ function More({ n }) {
 }
 
 export default function ImportSheet({ input, mine, onApply, onSave, onClose }) {
-  const { plan, light, skipped, error } = useMemo(() => read(input), [input]);
+  const { plan, light, skipped, unknownCocktails, error } = useMemo(() => read(input), [input]);
   const [confirm, setConfirm] = useState(false);
 
   if (error) {
@@ -120,7 +121,7 @@ export default function ImportSheet({ input, mine, onApply, onSave, onClose }) {
 
   return (
     <Sheet title="A plan from a co-host" onClose={onClose} footer={footer}
-      subtitle={[p.host && `From ${p.host}`, plan.savedAt && `plan as of ${ageStr(plan.savedAt)}`].filter(Boolean).join(" · ") || "Have a look before it changes yours"}>
+      subtitle={[p.host && `From ${p.host}`, plan.savedAt && `as of ${ageStr(plan.savedAt)}`].filter(Boolean).join(" · ") || "Have a look before it changes yours"}>
       <div className="ch-imp-hero">
         <div className="h2 ch-imp-name">{s.name}</div>
         <div className="small soft">{[when || "No date yet", plural(p.guests, "guest")].join(" · ")}</div>
@@ -131,6 +132,7 @@ export default function ImportSheet({ input, mine, onApply, onSave, onClose }) {
       {passed && <div className="note note-info ch-note">Their date has passed, so using it moves the party to next Saturday.</div>}
       {light && <div className="note note-info ch-note">This QR code has the party, bottles and cocktails{pick ? " and the night out" : ""}. Ask for the file for their food and supplies.</div>}
       {skipped > 0 && <div className="note note-warn ch-note">{plural(skipped, "supply", "supplies")} from a newer Liquor Cabinet couldn't be read and {skipped === 1 ? "was" : "were"} left out.</div>}
+      {unknownCocktails > 0 && <div className="note note-warn ch-note">{plural(unknownCocktails, "cocktail")} this app doesn't know (maybe from a newer Liquor Cabinet) {unknownCocktails === 1 ? "was" : "were"} left out.</div>}
       {!something && <div className="note note-info ch-note">There are no bottles, food or cocktails in it yet — just the party details.</div>}
 
       {bottles.length > 0 && (
@@ -150,7 +152,7 @@ export default function ImportSheet({ input, mine, onApply, onSave, onClose }) {
         <Section title={`Cocktails · ${plan.cocktailMenu.length}`}>
           <div className="ch-chips">
             {plan.cocktailMenu.slice(0, 12).map((c) => {
-              const info = COCKTAIL[c.id];
+              const info = COCKTAIL[c.id]; // fitToApp kept only ids the app knows
               return <span key={c.id} className="chip">{info?.emoji || "🍸"} {info?.name || titleCase(c.id)} <span className="count">×{c.servings}</span></span>;
             })}
           </div>

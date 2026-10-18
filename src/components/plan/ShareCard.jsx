@@ -20,6 +20,7 @@ import {
 import { Icon } from "../Art.jsx";
 
 const QR_OPTS = { errorCorrectionLevel: "M", margin: 2, color: { dark: INK.ink, light: "#ffffff" } };
+const FILE_TYPES = ".json,application/json,text/plain,application/octet-stream";
 
 // The clipboard's text: Capacitor natively (no permission prompt on Android), else the browser's.
 async function readClipboard() {
@@ -94,6 +95,7 @@ export default function ShareCard({ snapshot, openImport, toast }) {
   const copyLink = async () => {
     if (!enc) return;
     tap();
+    if (!enc.linkOk) { toast("This plan is too big for a link — send it as a file"); return; }
     if (await copyText(planMessage(snapshot, enc.link))) toast("Copied — paste it in a chat with your co-host");
     else toast("Couldn't copy the link — send it as a file instead");
   };
@@ -133,7 +135,10 @@ export default function ShareCard({ snapshot, openImport, toast }) {
                 : qrSrc ? <img className="ch-qr-img" src={qrSrc} alt={`QR code: ${title}`} /> : <div className="skel ch-qr-skel" />}
             </div>
           ) : (
-            <div className="note note-info">Too much for one QR code — send it as a file or copy the link instead; both carry the whole plan.</div>
+            <div className="note note-info">
+              {enc.linkOk ? "Too much for one QR code — send it as a file or copy the link instead; both carry the whole plan."
+                : "Too much for a QR code or a link — send it as a file; that carries the whole plan."}
+            </div>
           )}
           <div className="ch-what">
             <div className="h3 ellipsis">{title}</div>
@@ -154,7 +159,7 @@ export default function ShareCard({ snapshot, openImport, toast }) {
             <button className="btn btn-ghost btn-sm" disabled={!!busy || !qr} onClick={shareQr}>
               {busy === "qr" ? <span className="spin">◌</span> : <Icon.grid size={15} />} Share the QR
             </button>
-            <button className="btn btn-ghost btn-sm" onClick={copyLink}>🔗 Copy the link</button>
+            <button className="btn btn-ghost btn-sm" disabled={!enc.linkOk} onClick={copyLink}>🔗 Copy the link</button>
           </div>
         </>
       )}
@@ -164,10 +169,12 @@ export default function ShareCard({ snapshot, openImport, toast }) {
         <div className="kicker">Import a plan</div>
         <div className="tiny muted" style={{ marginTop: 4 }}>Got a plan from a co-host? Scan their QR with your camera, or open their file or message here.</div>
         <div className="ch-acts">
-          {/* A label opens the picker in every WebView (a script click on a hidden input doesn't everywhere). */}
+          {/* A label opens the picker in every WebView (a script click on a hidden input doesn't everywhere).
+              Some file managers call a .json "text" or "binary", and Android greys those out unless asked for;
+              whatever is chosen is size-capped and checked like a pasted plan. */}
           <label className="btn btn-ghost btn-sm" onClick={tap}>
             📄 Choose the file
-            <input className="ch-file" type="file" accept=".json,application/json" onChange={onFile} />
+            <input className="ch-file" type="file" accept={FILE_TYPES} onChange={onFile} />
           </label>
           <button className="btn btn-ghost btn-sm" onClick={pasteClipboard}>📋 Paste</button>
         </div>

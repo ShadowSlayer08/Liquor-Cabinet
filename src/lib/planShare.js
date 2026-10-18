@@ -15,19 +15,23 @@
 //  The file is the plain snapshot in a small wrapper, "<party name>.lcplan.json".
 //
 //  QR budget: byte mode, error correction M (survives glare and a cracked screen),
-//  at most QR_MAX characters = QR version 28, 129 × 129 modules. Shown about 300 px wide
-//  on a phone, that's ~2.3 px a module — 3–4 camera pixels at 10–15 cm, which phone
-//  cameras read reliably; from version 30 up (137+ modules) scans off a screen slow down
-//  and fail in dim party light. A plan bigger than that gets a lighter QR (party,
-//  bottles, cocktails and the night out; the food and supplies go by file or link).
+//  at most QR_MAX characters = QR version 28, 129 × 129 modules. The Plan card shows it
+//  about 290 px (≈ 4.5 cm) wide, so a module is ~2.2 px (6 screen pixels); a camera's
+//  preview frame at 10–15 cm gets 3–4 pixels a module, above the ~2 that decoders need.
+//  From version 30 up (137+ modules) scans off a screen slow down and fail in dim party
+//  light. A plan bigger than that gets a lighter QR (party, bottles, cocktails and the
+//  night out; the food and supplies go by file or link).
 //
 //  Untrusted input (another phone, a file, a pasted message): the text, the link's data
-//  and the inflated JSON are all capped, so a zip bomb stops at MAX_JSON bytes.
+//  and the inflated JSON are all capped, so a zip bomb stops at MAX_JSON bytes. After
+//  restoreSnapshot(), fitToApp() fills supplies back in from our own list and leaves out
+//  cocktails this app doesn't know.
 //  Pure (no Capacitor), so node --test covers it.
 // ═══════════════════════════════════════════════════════════════════════════════
 import { deflateSync, inflateSync, strToU8, strFromU8 } from "fflate";
 import { SNAPSHOT_V, snapshotSummary } from "./planSnapshot.js";
 import { GROCERIES, blinkitQuery } from "./food.js";
+import { COCKTAIL } from "./cocktails.js";
 import { prettyWhen } from "./when.js";
 
 export const PLAN_LINK = "liquorcabinet://plan";
@@ -299,19 +303,21 @@ function unpackKit(s) {
 // ── Encode ────────────────────────────────────────────────────────────────────
 const toLink = (s) => `${PLAN_LINK}?v=${LINK_V}&d=${toB64url(deflateSync(strToU8(JSON.stringify(s)), { level: 9, mem: 12, dictionary: PLAN_DICT }))}`;
 
-// "Diwali party.lcplan.json": the party's name, minus what file systems don't allow.
+// "Diwali party.lcplan.json": the party's name in letters, digits, spaces and plain
+// punctuation only — no slashes, no "#" or "%" that a file URL would misread, no emoji.
 export function planFileName(snap) {
   const name = String(snap?.party?.name || "")
-    .replace(/[\\/:*?"<>|\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").replace(/^[\s.]+/, "").slice(0, 40).trim();
+    .replace(/[^\p{L}\p{M}\p{N} _\-().,'!&+]+/gu, " ").replace(/\s+/g, " ").replace(/^[\s.]+/, "").slice(0, 40).trim();
   return `${name || "Party plan"}${FILE_EXT}`;
 }
 
 /**
  * A shareable snapshot → the link, the QR to show and the file.
- * @returns {{ link: string, bytes: number, fitsQr: boolean, json: string, fileName: string,
+ * @returns {{ link: string, bytes: number, fitsQr: boolean, linkOk: boolean, json: string, fileName: string,
  *             qr: { link: string, light: boolean } | null }}
  *   link   = the whole plan as a deep link (for a message); bytes = its length (ASCII, so bytes)
  *   fitsQr = the whole plan fits one QR code
+ *   linkOk = the link is small enough for decodePlan to take (else only the file carries it)
  *   qr     = what the QR code carries: the whole plan, else the lighter one (light: true — the
  *            party, bottles, cocktails and night out; food and supplies by file), else null (too big)
  *   json   = the file's contents; fileName = "<party name>.lcplan.json"
@@ -326,7 +332,8 @@ export function encodePlan(snapshot) {
     if (light.length <= QR_MAX) qr = { link: light, light: true };
   }
   const json = JSON.stringify({ app: FILE_APP, kind: "plan", v: FILE_V, plan: full });
-  return { link, bytes: link.length, fitsQr, json, fileName: planFileName(full), qr };
+  const linkOk = link.length - link.indexOf("&d=") - 3 <= MAX_DATA;
+  return { link, bytes: link.length, fitsQr, linkOk, json, fileName: planFileName(full), qr };
 }
 
 // ── Decode ────────────────────────────────────────────────────────────────────
@@ -334,8 +341,27 @@ export function encodePlan(snapshot) {
 const LINK_RE = /liquorcabinet:\/\/plan\/?\?([^\s"'<>]*)/i;
 const looksLikeSnapshot = (o) => plain(o) && typeof o.v === "number" && ["party", "liquor", "food", "cocktailMenu"].some((k) => k in o);
 
+// A plan nests about 6 deep (file → plan → food → line → restaurant → cuisines). Anything far
+// deeper is not a plan, and could overflow the stack later when the app saves it.
+export const MAX_DEPTH = 16;
+function tooDeep(text) {
+  let depth = 0, inStr = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if (inStr) { if (c === 92) i++; else if (c === 34) inStr = false; continue; } // \ skips one; " ends
+    if (c === 34) inStr = true;
+    else if (c === 123 || c === 91) { if (++depth > MAX_DEPTH) return true; } // { [
+    else if (c === 125 || c === 93) depth--;                                  // } ]
+  }
+  return false;
+}
+const parseJson = (text, err) => {
+  if (tooDeep(text)) fail(ERR.notPlan);
+  try { return JSON.parse(text); } catch { return fail(err); }
+};
+
 function fromLink(query) {
-  const params = {};
+  const params = Object.create(null);
   for (const part of query.replace(/&amp;/g, "&").split("&")) {
     const i = part.indexOf("=");
     if (i > 0) params[part.slice(0, i).toLowerCase()] = part.slice(i + 1);
@@ -351,15 +377,15 @@ function fromLink(query) {
   let raw;
   try { raw = inflateSync(bytes, { out: new Uint8Array(MAX_JSON + 1), dictionary: PLAN_DICT }); } catch { fail(ERR.damaged); }
   if (raw.length > MAX_JSON) fail(ERR.big);
-  let snap;
-  try { snap = JSON.parse(strFromU8(raw)); } catch { fail(ERR.damaged); }
+  let text;
+  try { text = strFromU8(raw); } catch { fail(ERR.damaged); }
+  const snap = parseJson(text, ERR.damaged);
   if (!looksLikeSnapshot(snap)) fail(ERR.notPlan);
   return unpackKit(snap);
 }
 
 function fromFile(text) {
-  let o;
-  try { o = JSON.parse(text); } catch { fail(ERR.notPlan); }
+  let o = parseJson(text, ERR.notPlan);
   if (plain(o) && ("app" in o || "kind" in o)) {
     if (o.app !== FILE_APP || o.kind !== "plan") fail(ERR.notPlan);
     const v = Number(o.v);
@@ -378,13 +404,38 @@ function fromFile(text) {
  * know. Untrusted: the caller always runs restoreSnapshot() on the result.
  */
 export function decodePlan(input) {
-  const text = String(input ?? "").replace(/^﻿/, "").trim();
+  const text = String(input ?? "").trim(); // trim() also drops a file's byte-order mark
   if (!text) fail(ERR.empty);
   if (text.length > MAX_INPUT) fail(ERR.big);
   if (text.startsWith("{")) return fromFile(text);
   const m = LINK_RE.exec(text);
   if (m) return fromLink(m[1]);
   fail(ERR.notPlan);
+}
+
+// ── After restoreSnapshot() ───────────────────────────────────────────────────
+const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+
+/**
+ * A restored plan (restoreSnapshot() shape) made ready for this app. restoreSnapshot keeps
+ * only what it can check, so a supply from our own list gets its Blinkit search words and
+ * pack size back from lib/food.js (a live pick searches by its name); cocktails this app
+ * doesn't know (a newer list, or junk) are left out and counted.
+ * @returns {{ plan: object, unknownCocktails: number }}
+ */
+export function fitToApp(plan) {
+  const food = (plan?.food || []).map((l) => {
+    if (l?.kind !== "blinkit") return l;
+    const hit = OPTIONS.get(l.product?.id);
+    const ours = hit && hit.g.id === l.groceryId ? hit : null;
+    const query = typeof l.query === "string" && l.query.trim() ? l.query
+      : ours ? blinkitQuery(ours.g, ours.o) : l.product?.name || l.name || "";
+    const product = ours && !plain(l.product.pack) ? { ...l.product, pack: ours.o.pack } : l.product;
+    return { ...l, query, product };
+  });
+  const menu = plan?.cocktailMenu || [];
+  const cocktailMenu = menu.filter((m) => typeof m?.id === "string" && own(COCKTAIL, m.id));
+  return { plan: { ...plan, food, cocktailMenu }, unknownCocktails: menu.length - cocktailMenu.length };
 }
 
 // ── Words for the card, the image and the message ─────────────────────────────
