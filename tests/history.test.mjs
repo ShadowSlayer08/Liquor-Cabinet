@@ -5,10 +5,13 @@ import {
   entryId, makeEntry, addEntry, removeEntry, HISTORY_MAX, readHistory, entryPlan, boughtFamilies,
   normalizeOutcome, hasOutcome, withLeftover, withRanOut, updateOutcome,
   settleBelongs, settleFilled, attachSettle, plannedSpend, plannedTotal, actualSpend, actualTotal, perHead, summaryLine,
-  replayPlan,
+  replayPlan, planKey, planInUse,
 } from "../src/lib/history.js";
-import { snapshotPlan, restoreSnapshot } from "../src/lib/planSnapshot.js";
-import { slimVenue, slimEvent } from "../src/lib/outModel.js";
+import { snapshotPlan, restoreSnapshot, mergePlans } from "../src/lib/planSnapshot.js";
+import { slimVenue, slimEvent, DEFAULT_OUT } from "../src/lib/outModel.js";
+import { startSettle } from "../src/lib/settle.js";
+import { DEFAULT_PARTY } from "../src/lib/food.js";
+import { nextSaturday, addDays } from "../src/lib/drydays.js";
 
 const DAY = 86400000;
 const at = (iso, hhmm = "20:00") => new Date(`${iso}T${hhmm}:00`).getTime();
@@ -139,6 +142,114 @@ test("attachSettle puts the morning-after settle-up into its party, once", () =>
   assert.equal(attachSettle(h, null), h);
   const imp = addEntry([], makeEntry(snap(), { source: "import" }));
   assert.equal(attachSettle(imp, s), imp);                                                // a co-host's plan never takes mine
+});
+
+test("a Friday party's morning-after settle-up is the Friday party's, not the rolled-on Saturday plan's", () => {
+  const fri = { ...state.party, name: "Friday bash", date: "2026-10-09", time: "21:00" };
+  const sat = { ...fri, date: nextSaturday("2026-10-10") };                               // App rolls the date on at launch
+  assert.equal(sat.date, "2026-10-10");
+  const friday = snapshotPlan({ ...state, party: fri }), rolled = snapshotPlan({ ...state, party: sat });
+  // Saturday 10:00, started from the rolled plan: its party is 11 h away, so settle.js gives it no date
+  const s = startSettle({ party: sat, split: {}, plan: { guests: 10, drinkers: 10 }, liquorTotal: 5400 }, at("2026-10-10", "10:00"));
+  assert.equal(s.when, null);
+  s.expenses[0] = { ...s.expenses[0], amount: 5200, planned: false };
+  assert.ok(settleBelongs(s, friday));
+  assert.ok(!settleBelongs(s, rolled));
+  assert.equal(makeEntry(rolled, { settle: s }).settle, null);
+
+  // archived on Saturday's launch, settled, then Sunday's launch archives the rolled plan nobody touched
+  let h = addEntry([], makeEntry(friday, { source: "auto", now: at("2026-10-10", "09:00") }));
+  h = attachSettle(h, s);
+  h = addEntry(h, makeEntry(rolled, { settle: s, source: "auto", now: at("2026-10-11", "09:00") }));
+  assert.deepEqual(h.map((e) => [e.id, actualTotal(e)]), [["2026-10-09|Friday bash", 5200]]);
+  // a later correction reaches the Friday party
+  const fixed = { ...s, expenses: [{ ...s.expenses[0], amount: 5000 }] };
+  h = attachSettle(h, fixed);
+  assert.equal(actualTotal(h[0]), 5000);
+  // "Save this party" on Saturday morning keeps the rolled plan without last night's bills
+  const h2 = addEntry(h, makeEntry(rolled, { settle: fixed, source: "manual" }));
+  assert.equal(h2.find((e) => e.id === "2026-10-10|Friday bash").settle, null);
+  assert.equal(attachSettle(h2, fixed), h2);
+});
+
+// ── The plan rolled on after a party ──────────────────────────────────────────
+
+test("planKey: the same plan on another date, whoever's name is on it", () => {
+  const a = planKey(snap());
+  assert.equal(planKey(snap({ party: { date: "2026-12-01", host: "Ravi", upi: "" } })), a);
+  assert.notEqual(planKey(snap({ party: { guests: 13 } })), a);
+  assert.notEqual(planKey(snap({ budget: 30000 })), a);
+  const pricier = { ...state.liquor, "gin:bom": { ...state.liquor["gin:bom"], item: { ...state.liquor["gin:bom"].item, price: 2700 } } };
+  assert.notEqual(planKey(snap({ liquor: pricier })), a);
+  assert.notEqual(planKey(snap({ cocktailMenu: [{ id: "mojito", servings: 8 }] })), a);
+  // the order things went into the carts doesn't matter
+  assert.equal(planKey(snap({ liquor: Object.fromEntries(Object.entries(state.liquor).reverse()), food: [...state.food].reverse() })), a);
+  // App's first archive reads the stored cfg as it is; the rolled plan has App's defaults filled in
+  assert.equal(planKey(snapshotPlan({ ...state, party: { name: "X", date: "2026-10-09" } })),
+    planKey(snapshotPlan({ ...state, party: { ...DEFAULT_PARTY, name: "X", date: "2026-10-17" }, out: { ...DEFAULT_OUT } })));
+  assert.equal(planKey(null), null);
+  assert.equal(planKey({ v: 99 }), null);
+});
+
+test("an untouched plan rolled on to next Saturday isn't archived again as a party every week", () => {
+  const cfg = { ...state, party: { ...state.party, name: "Friday bash", date: "2026-10-09", time: "21:00" } };
+  let party = cfg.party, h = [];
+  // App on each launch: archive a passed date, then roll it on to the coming Saturday (carts kept)
+  for (const today of ["2026-10-10", "2026-10-11", "2026-10-18", "2026-10-25", "2026-11-01"]) {
+    if (party.date >= today) continue;
+    h = addEntry(h, makeEntry(snapshotPlan({ ...cfg, party }), { source: "auto", now: at(today, "09:00") }));
+    party = { ...party, date: nextSaturday(today) };
+  }
+  assert.deepEqual(h.map((e) => e.id), ["2026-10-09|Friday bash"]);
+
+  const next = (over = {}, parts = {}) => snapshotPlan({ ...cfg, ...parts, party: { ...cfg.party, date: "2026-11-07", ...over } });
+  const n = h.length;
+  // anything changed is a real party
+  const more = { ...cfg.liquor, "gin:bom": { ...cfg.liquor["gin:bom"], qty: 2 } };
+  assert.equal(addEntry(h, makeEntry(next({}, { liquor: more }), { source: "auto" })).length, n + 1);
+  assert.equal(addEntry(h, makeEntry(next({ guests: 20 }), { source: "auto" })).length, n + 1);
+  assert.equal(addEntry(h, makeEntry(next({ name: "Another bash" }), { source: "auto" })).length, n + 1);
+  // the host saving it is kept
+  assert.equal(addEntry(h, makeEntry(next(), { source: "manual" })).length, n + 1);
+  // a settle-up of its own says that night happened
+  const own = startSettle({ party: { ...cfg.party, date: "2026-11-07" }, split: {}, plan: { guests: 12 }, liquorTotal: 100 }, at("2026-11-07", "23:00"));
+  assert.ok(own.when);
+  assert.equal(addEntry(h, makeEntry(next(), { source: "auto", settle: own })).length, n + 1);
+  // a co-host's plan with the same name isn't the last party
+  const imp = addEntry([], makeEntry(snapshotPlan(cfg), { source: "import" }));
+  assert.equal(addEntry(imp, makeEntry(next(), { source: "auto" })).length, 2);
+  // an older date than the last party isn't a roll-over either
+  assert.equal(addEntry(h, makeEntry(snapshotPlan({ ...cfg, party: { ...cfg.party, date: "2026-09-26" } }), { source: "auto" })).length, n + 1);
+});
+
+test("a full history drops the oldest party with nothing typed first, never the one just saved", () => {
+  const day = (i) => addDays("2025-01-04", i * 7);
+  const id = (i) => `${day(i)}|P${i}`;
+  let h = [];
+  for (let i = 0; i < HISTORY_MAX; i++) h = addEntry(h, makeEntry(snap({ party: { date: day(i), name: `P${i}` } }), { source: "auto", now: i }));
+  assert.equal(h.length, HISTORY_MAX);
+  h = updateOutcome(h, id(0), { note: "the first one" });
+  h = updateOutcome(h, id(1), { spent: 9000 });
+  h = h.map((e) => (e.id === id(2) ? { ...e, settle: settleOf({ title: "P2" }) } : e));        // real bills
+  h = addEntry(h, makeEntry(snap({ party: { date: day(HISTORY_MAX), name: "New" } })));
+  assert.equal(h.length, HISTORY_MAX);
+  for (const i of [0, 1, 2]) assert.ok(h.some((e) => e.id === id(i)), `P${i} kept`);
+  assert.ok(!h.some((e) => e.id === id(3)));                                               // the oldest with nothing typed went
+
+  // a co-host's old plan saved now stays, though it's older than everything here
+  const old = makeEntry(snap({ party: { date: "2020-01-04", name: "Ravi's" } }), { source: "import" });
+  h = addEntry(h, old);
+  assert.ok(h.some((e) => e.id === old.id));
+  assert.ok(!h.some((e) => e.id === id(4)));
+  assert.ok(h.some((e) => e.id === id(0)));
+
+  // everything typed in: the oldest other party goes, still not the new one
+  let full = h.map((e) => ({ ...e, outcome: normalizeOutcome({ note: "kept" }) }));
+  const older = makeEntry(snap({ party: { date: "2019-06-01", name: "Older" } }), { source: "manual" });
+  full = addEntry(full, older);
+  assert.equal(full.length, HISTORY_MAX);
+  assert.ok(full.some((e) => e.id === older.id));
+  assert.ok(!full.some((e) => e.id === old.id));
 });
 
 // ── Money ─────────────────────────────────────────────────────────────────────
@@ -304,6 +415,75 @@ test("replay never changes its inputs", () => {
   withRanOut(e.outcome, "gin");
   assert.equal(JSON.stringify(e), before);
   assert.equal(JSON.stringify(catalog), cat);
+});
+
+test("plan again keeps my name and UPI ID: the past party's are left out", () => {
+  const r = replayPlan(makeEntry(snap()), {});                                              // my own party, with my old UPI ID
+  assert.equal(r.party.host, "");
+  assert.equal(r.party.upi, "");
+  const shared = restoreSnapshot(snapshotPlan({ ...state, party: { ...state.party, host: "Cohost Ravi" } }, { share: true }));
+  const ri = replayPlan(makeEntry(snapshotPlan(shared), { source: "import" }), {});         // a co-host's plan kept here
+  assert.equal(ri.party.host, "");
+  assert.equal(ri.party.upi, "");
+  // App's applyPlan then takes mine: `next.party.host || party.host`
+  const applied = { ...ri.party, host: ri.party.host || "Asha", upi: ri.party.upi || "asha@okhdfc" };
+  assert.deepEqual([applied.host, applied.upi], ["Asha", "asha@okhdfc"]);
+});
+
+test("add to my plan keeps my party details and my night out", () => {
+  const pick = slimVenue({ resId: 1, name: "Soi 7", locality: "Cyber Hub", costForTwo: 2400 }, "https://www.district.in/dining/x");
+  const past = makeEntry(snap({ party: { name: "Bar night", date: "2026-10-03" }, out: { ...DEFAULT_OUT, active: true, kind: "bar", pick, booked: true } }));
+  const m = replayPlan(past, { catalog, city: "gurgaon", merge: true });
+  assert.equal(m.out, null);
+  assert.ok(!m.notes.some((n) => /Saturday|Soi 7|District/.test(n)));
+  const home = (out) => restoreSnapshot(snapshotPlan({ city: "gurgaon", budget: 20000, party: { name: "My house do", date: "2026-10-24", guests: 12 },
+    liquor: {}, cocktailMenu: [], food: [], out }));
+  const merged = mergePlans(home({ ...DEFAULT_OUT }), m);
+  assert.equal(merged.out.active, false);
+  assert.equal(merged.out.pick, null);
+  assert.equal(merged.party.name, "My house do");
+  assert.equal(merged.party.date, "2026-10-24");
+  assert.equal(merged.liquor["malts:g12"].item.price, 4300);
+  assert.equal(merged.liquor["indian:bd"].qty, 3);
+  // my own night out stays as it is
+  const mineOut = { ...DEFAULT_OUT, active: true, kind: "club", pick: slimVenue({ resId: 2, name: "Kitty Su" }, "https://www.district.in/dining/y") };
+  assert.equal(mergePlans(home(mineOut), m).out.pick.name, "Kitty Su");
+  // "Plan again" still keeps the venue to book again
+  assert.equal(replayPlan(past, { catalog, city: "gurgaon" }).out.pick.name, "Soi 7");
+
+  // a party from another city is added to this city's plan, so it takes this city's prices
+  const mm = replayPlan(makeEntry(snap()), { catalog, city: "mumbai", merge: true });
+  assert.equal(mm.liquor["malts:g12"].item.price, 4300);
+  assert.ok(!mm.notes.some((n) => /This party was in/.test(n)));
+});
+
+test("replay notes: many new prices summed up; a listed bottle with no price keeps last time's", () => {
+  const gins = Object.fromEntries([1, 2, 3, 4].map((i) => bottle("gin", `g${i}`, `Gin ${i}`, 1000, 1)));
+  const gin = (prices) => ({ gin: prices.map((price, i) => ({ id: `g${i + 1}`, name: `Gin ${i + 1}`, price })) });
+  const same = replayPlan(makeEntry(snap({ liquor: gins })), { catalog: gin([1100, 900, 1100, 900]), city: "gurgaon" });
+  assert.ok(same.notes.includes("New prices today for 4 kinds of bottle: the same as last time, in all"), same.notes.join("\n"));
+  const up = replayPlan(makeEntry(snap({ liquor: gins })), { catalog: gin([1100, 1300, 1100, 900]), city: "gurgaon" });
+  assert.ok(up.notes.includes("New prices today for 4 kinds of bottle: ₹400 more than last time, in all"), up.notes.join("\n"));
+
+  const r = replayPlan(makeEntry(snap()), { catalog: { ...catalog, gin: [{ id: "bom", name: "Bombay Sapphire", price: 0 }] }, city: "gurgaon" });
+  assert.equal(r.liquor["gin:bom"].item.price, 2600);
+  assert.ok(r.notes.includes("Bombay Sapphire has no price on Livcheers right now, so it keeps last time's ₹2,600"));
+  assert.ok(r.changes.some((c) => c.kind === "unpriced" && c.key === "gin:bom"));
+  assert.ok(!r.notes.some((n) => /Bombay Sapphire isn't on Livcheers/.test(n)));
+});
+
+test("planInUse: anything in the carts, or party details that aren't the defaults", () => {
+  const today = "2026-10-18";
+  const blank = snapshotPlan({ city: "gurgaon", budget: 80000, liquor: {}, food: [], cocktailMenu: [], out: { ...DEFAULT_OUT },
+    party: { ...DEFAULT_PARTY, date: nextSaturday(today), host: "Asha", upi: "asha@okaxis" } });
+  const withParty = (over) => ({ ...blank, party: { ...blank.party, ...over } });
+  assert.equal(planInUse(blank, today), false);                                             // my name and UPI ID don't count
+  assert.equal(planInUse(withParty({ name: "Diwali party" }), today), true);
+  assert.equal(planInUse(withParty({ guests: 25 }), today), true);
+  assert.equal(planInUse(withParty({ date: "2026-10-31" }), today), true);
+  assert.equal(planInUse(withParty({ prefs: { ...blank.party.prefs, jain: true } }), today), true);
+  assert.equal(planInUse(snap(), today), true);
+  assert.equal(planInUse(null, today), false);
 });
 
 test("legacy and garbage entries don't crash anything", () => {

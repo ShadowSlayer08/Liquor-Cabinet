@@ -1,18 +1,21 @@
 // [v1.6 · History] One past party: what was bought, planned vs actually spent (each labelled
 // for what it is), how it went (bottles left over and what ran out, per spirit family, plus
 // a note), and "Plan again from this" / "Add to my plan".
-// What the host types here goes straight into the entry (lib/history.js updateOutcome);
-// saving the same party again never replaces it. Planning again goes through
-// lib/history.js replayPlan(): today's prices, leftovers off the list, a bit more of what
-// ran out, each change in plain words before anything is replaced.
+// What the host types here goes into the entry (lib/history.js updateOutcome); saving the
+// same party again never replaces it. The spent box and the note are kept here while typing
+// and saved a moment after, on leaving the box or on closing the sheet, so a keystroke
+// doesn't rewrite the whole history; the steppers and "Ran out" save straight away.
+// Planning again goes through lib/history.js replayPlan(): today's prices, leftovers off the
+// list, a bit more of what ran out, each change in plain words before anything is replaced.
+// "Add to my plan" uses its merge kind, which keeps my party details and my night out.
 // Props (HistoryCard): entry, plan (its checked plan), current (this plan, snapshotPlan()),
 // setHistory, applyPlan(restored, "replace"|"merge"), catalog, city, toast, onClose.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Sheet, { Qty } from "../Sheet.jsx";
 import {
-  actualSpend, plannedSpend, boughtFamilies, normalizeOutcome, withLeftover, withRanOut, updateOutcome, removeEntry, replayPlan,
+  actualSpend, plannedSpend, boughtFamilies, normalizeOutcome, withLeftover, withRanOut, updateOutcome, removeEntry, replayPlan, planInUse,
 } from "../../lib/history.js";
-import { hasPlan, snapshotSummary } from "../../lib/planSnapshot.js";
+import { snapshotSummary } from "../../lib/planSnapshot.js";
 import { isOut } from "../../lib/outModel.js";
 import { COCKTAIL } from "../../lib/cocktails.js";
 import { CAT, cityName } from "../../lib/parse/livcheers.js";
@@ -22,21 +25,46 @@ import { fmt } from "../../lib/format.js";
 import { tap } from "../../lib/order.js";
 
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+const SAVE_AFTER = 400; // ms after the last keystroke
 
 export default function HistorySheet({ entry, plan, current, setHistory, applyPlan, catalog, city, toast, onClose }) {
   const [ask, setAsk] = useState(null);   // "replace" | "delete": the confirm on screen
   const [busy, setBusy] = useState(false);
-  const outcome = normalizeOutcome(entry.outcome, plan);
+  const stored = normalizeOutcome(entry.outcome, plan);
   const fams = useMemo(() => boughtFamilies(plan), [plan]);
   const replay = useMemo(() => { try { return replayPlan(entry, { catalog, city }); } catch { return null; } }, [entry, catalog, city]);
+  const merged = useMemo(() => { try { return replayPlan(entry, { catalog, city, merge: true }); } catch { return null; } }, [entry, catalog, city]);
+  const edit = (change) => setHistory((h) => updateOutcome(h, entry.id, change));
+
+  // ── The spent box and the note: a draft here, saved after a pause ──
+  const [spentText, setSpentText] = useState(stored.spent == null ? "" : String(stored.spent));
+  const [note, setNote] = useState(stored.note);
+  const pending = useRef(null);   // { spent?, note? } not saved yet
+  const timer = useRef(null);
+  const flush = () => {
+    clearTimeout(timer.current);
+    timer.current = null;
+    const patch = pending.current;
+    pending.current = null;
+    if (patch) setHistory((h) => updateOutcome(h, entry.id, (o) => ({ ...o, ...patch })));
+  };
+  const flushRef = useRef(flush);
+  flushRef.current = flush;
+  const later = (patch) => {
+    pending.current = { ...pending.current, ...patch };
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => flushRef.current(), SAVE_AFTER);
+  };
+  useEffect(() => () => flushRef.current(), []);   // closing the sheet keeps what was typed
+
+  const outcome = normalizeOutcome({ ...stored, spent: spentText ? Number(spentText) : null, note }, plan);
   const sum = snapshotSummary(plan);
   const planned = plannedSpend(plan);
-  const actual = actualSpend(entry, plan);
+  const actual = actualSpend({ ...entry, outcome }, plan);
   const fromSettle = actualSpend({ ...entry, outcome: { ...outcome, spent: null } }, plan); // what the settle-up says on its own
   const head = actual.total != null && actual.people > 0 ? Math.round(actual.total / actual.people) : null;
   const mine = snapshotSummary(current);
   const away = isOut(plan.out);
-  const edit = (change) => setHistory((h) => updateOutcome(h, entry.id, change));
 
   // ── What was bought ──
   const bottles = Object.values(plan.liquor);
@@ -46,9 +74,13 @@ export default function HistorySheet({ entry, plan, current, setHistory, applyPl
   const tickets = away ? (plan.out.tickets || []).filter((t) => t.qty > 0) : [];
 
   // ── Money, labelled honestly ──
-  const plannedNote = away
-    ? [planned.venue != null && "the venue's estimate", planned.tickets > 0 && "tickets as planned", planned.liquor > 0 && "bottles you'd bring"].filter(Boolean).join(", ") || "nothing priced"
-    : `Livcheers prices (indicative), Zomato estimates, supplies at MRP${planned.bistro ? "; Bistro not included" : ""}`;
+  const priced = planned.total > 0;
+  const plannedNote = !priced
+    ? (away ? "The venue gave no estimate and there were no tickets"
+      : planned.bistro ? "Bistro is priced in its app" : "Nothing in this plan had a price")
+    : away
+      ? [planned.venue != null && "the venue's estimate", planned.tickets > 0 && "tickets as planned", planned.liquor > 0 && "bottles you'd bring"].filter(Boolean).join(", ")
+      : `Livcheers prices (indicative), Zomato estimates, supplies at MRP${planned.bistro ? "; Bistro not included" : ""}`;
   const people = actual.people ? ` · ${plural(actual.people, "person", "people")}` : "";
   const actualNote = actual.source === "settle"
     ? `from your settle-up${people}${actual.planned ? ` · ${plural(actual.planned, "bill")} still at the planned figure` : ""}`
@@ -58,11 +90,13 @@ export default function HistorySheet({ entry, plan, current, setHistory, applyPl
 
   // ── Plan again ──
   const go = async (mode) => {
-    if (!replay || busy) return;
+    const p = mode === "merge" ? merged : replay;
+    if (!p || busy) return;
     tap();
+    flush();
     setBusy(true);
     try {
-      await applyPlan(replay, mode);
+      await applyPlan(p, mode);
       toast(mode === "merge" ? `Added ${sum.name}'s bottles, food and drinks to your plan` : `Planning again from ${sum.name}: it's set for the coming Saturday`);
       onClose();
     } catch {
@@ -72,6 +106,8 @@ export default function HistorySheet({ entry, plan, current, setHistory, applyPl
   };
   const del = () => {
     tap();
+    clearTimeout(timer.current);
+    pending.current = null;
     setHistory((h) => removeEntry(h, entry.id));
     toast("Deleted from Past parties");
     onClose();
@@ -82,10 +118,13 @@ export default function HistorySheet({ entry, plan, current, setHistory, applyPl
   const subtitle = [when, sum.guests && plural(sum.guests, "guest"), plan.city && cityName(plan.city)].filter(Boolean).join(" · ");
   const mineText = [mine.bottles && plural(mine.bottles, "bottle"), mine.dishes && plural(mine.dishes, "dish", "dishes"),
     mine.supplies && plural(mine.supplies, "supply", "supplies"), mine.out && mine.place].filter(Boolean).join(", ");
+  const mineDay = mine.date ? prettyDate(mine.date) : "";
 
   const footer = ask === "replace" ? (
     <div>
-      <div className="small hist-ask">This replaces your current plan{mineText ? ` (${mineText})` : ""} with {sum.name}. Your name and UPI ID stay.</div>
+      <div className="small hist-ask">
+        This replaces your current plan, {mine.name}{mineDay ? ` on ${mineDay}` : ""}{mineText ? ` (${mineText})` : ""}, with the party details and carts of {sum.name}. Your name and UPI ID stay.
+      </div>
       <div className="hist-acts">
         <button className="btn btn-gold" disabled={busy} onClick={() => go("replace")}>{busy ? <span className="spin">◌</span> : null} Replace my plan</button>
         <button className="btn btn-ghost" onClick={() => setAsk(null)}>Cancel</button>
@@ -93,8 +132,8 @@ export default function HistorySheet({ entry, plan, current, setHistory, applyPl
     </div>
   ) : (
     <div className="hist-acts">
-      <button className="btn btn-gold" disabled={!replay || busy} onClick={() => (hasPlan(current) ? (tap(), setAsk("replace")) : go("replace"))}>Plan again from this</button>
-      <button className="btn btn-ghost" disabled={!replay || busy} onClick={() => go("merge")}>Add to my plan</button>
+      <button className="btn btn-gold" disabled={!replay || busy} onClick={() => (planInUse(current) ? (tap(), setAsk("replace")) : go("replace"))}>Plan again from this</button>
+      <button className="btn btn-ghost" disabled={!merged || busy} onClick={() => go("merge")}>Add to my plan</button>
     </div>
   );
 
@@ -105,7 +144,7 @@ export default function HistorySheet({ entry, plan, current, setHistory, applyPl
         <div className="hist-totals">
           <div className="hist-total">
             <div className="kicker">Planned</div>
-            <div className="h2">{fmt(planned.total)}</div>
+            {priced ? <div className="h2">{fmt(planned.total)}</div> : <div className="h2 dim">Not priced</div>}
             <div className="tiny muted">{plannedNote}</div>
           </div>
           <div className="hist-total">
@@ -143,8 +182,8 @@ export default function HistorySheet({ entry, plan, current, setHistory, applyPl
           <>
             <div className="hist-sec"><span className="kicker">Drinks menu</span></div>
             <div className="hist-tags">
-              {plan.cocktailMenu.map((m) => (
-                <span key={m.id} className="pill hist-pill">{COCKTAIL[m.id]?.emoji} {COCKTAIL[m.id]?.name || m.id} × {m.servings}</span>
+              {plan.cocktailMenu.map((m, i) => (
+                <span key={`${m.id}:${i}`} className="pill hist-pill">{COCKTAIL[m.id]?.emoji} {COCKTAIL[m.id]?.name || m.id} × {m.servings}</span>
               ))}
             </div>
           </>
@@ -197,7 +236,7 @@ export default function HistorySheet({ entry, plan, current, setHistory, applyPl
               {planned.venue != null && <span className="small b">{fmt(planned.venue)}</span>}
             </div>
             {tickets.map((t, i) => (
-              <div key={t.id || i} className="hist-line">
+              <div key={`${t.id ?? ""}:${i}`} className="hist-line">
                 <span className="hist-emo" aria-hidden="true">🎟️</span>
                 <div className="grow"><div className="small ellipsis">{t.qty} × {t.name}</div><div className="tiny muted">tickets as planned</div></div>
                 <span className="small b">{fmt(t.price * t.qty)}</span>
@@ -216,9 +255,10 @@ export default function HistorySheet({ entry, plan, current, setHistory, applyPl
           <label htmlFor="hist-spent">Actually spent, in all</label>
           <div className="hist-amt">
             <span>₹</span>
-            <input id="hist-spent" className="input" inputMode="numeric" value={outcome.spent ?? ""} aria-label="What the party actually cost"
+            <input id="hist-spent" className="input" inputMode="numeric" value={spentText} aria-label="What the party actually cost"
               placeholder={fromSettle.total != null ? String(fromSettle.total) : "not known"}
-              onChange={(ev) => { const v = ev.target.value.replace(/\D/g, "").slice(0, 8); edit((o) => ({ ...o, spent: v ? Number(v) : null })); }} />
+              onChange={(ev) => { const v = ev.target.value.replace(/\D/g, "").slice(0, 8); setSpentText(v); later({ spent: v ? Number(v) : null }); }}
+              onBlur={flush} />
           </div>
           <div className="tiny muted hist-help">
             {fromSettle.total != null ? `Your settle-up says ${fmt(fromSettle.total)}. Type a total only if it was different.` : "Leave it empty if you don't know. Nothing is guessed."}
@@ -251,9 +291,10 @@ export default function HistorySheet({ entry, plan, current, setHistory, applyPl
 
         <div className="field hist-note-field">
           <label htmlFor="hist-note">Note</label>
-          <textarea id="hist-note" className="input hist-note" rows={2} maxLength={200} value={outcome.note}
+          <textarea id="hist-note" className="input hist-note" rows={2} maxLength={200} value={note}
             placeholder="e.g. Ice ran out by 11, nobody touched the rosé"
-            onChange={(ev) => { const v = ev.target.value; edit((o) => ({ ...o, note: v })); }} />
+            onChange={(ev) => { const v = ev.target.value.slice(0, 200); setNote(v); later({ note: v }); }}
+            onBlur={flush} />
         </div>
 
         {/* ── Plan again ── */}
@@ -264,7 +305,9 @@ export default function HistorySheet({ entry, plan, current, setHistory, applyPl
           <div className="small muted">This party can't be planned again.</div>
         )}
         <div className="tiny dim hist-help">
-          <b>Plan again</b> replaces your plan with this one. <b>Add to my plan</b> keeps your party details and adds its bottles, food and drinks to yours.
+          <b>Plan again</b> replaces your plan with this one. <b>Add to my plan</b> keeps your party details and night out, and adds its
+          bottles, food and drinks to yours{bottles.length && plan.city && city && plan.city !== city ? ` (bottles at today's ${cityName(city)} prices where they're loaded)` : ""}.
+          {away ? ` Its night out at ${plan.out.pick.name} isn't added.` : ""}
         </div>
 
         <div className="hist-foot">

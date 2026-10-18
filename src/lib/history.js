@@ -13,6 +13,11 @@
 //  Actual spend is never guessed: no filled-in settle-up and no figure from the
 //  host means it's unknown.
 //
+//  After a party App rolls the date on to the coming Saturday and keeps the carts, so
+//  an untouched plan would be archived again every week as a party that never
+//  happened: addEntry() skips that one. When the list is full, the oldest parties
+//  with nothing typed and no real bills go first, never the one just saved.
+//
 //  replayPlan() turns an entry back into a plan for App's applyPlan(): the same
 //  settings with no date (it rolls on to the coming Saturday), today's prices,
 //  leftovers off what to buy, a little more of what ran out, and a plain note for
@@ -21,20 +26,23 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 import { CAT, cityName } from "./parse/livcheers.js";
 import { FAMILIES, familyOfCat } from "./cocktails.js";
-import { restoreSnapshot, snapshotSummary } from "./planSnapshot.js";
+import { hasPlan, restoreSnapshot, snapshotSummary } from "./planSnapshot.js";
 import { normalizeSettle } from "./settle.js";
 import { isOut, outSpend } from "./outModel.js";
 import { homeParts } from "./split.js";
 import { partyStart } from "./when.js";
-import { todayISO } from "./drydays.js";
+import { nextSaturday, todayISO } from "./drydays.js";
 import { fmt, fmtShort } from "./format.js";
 
 export const HISTORY_MAX = 30;
 
 const HOUR = 3600000, DAY = 24 * HOUR;
-// A settle-up started from 12 h before the party to three weeks after it is that party's.
-// (The morning after, App has already rolled the date on, so the settle-up has no date of its own.)
-const SETTLE_FROM = 12 * HOUR, SETTLE_TO = 21 * DAY;
+// A settle-up with no date of its own is a party's when it was started from 6 h before the
+// party to three weeks after it. (The morning after, App has already rolled the date on, so
+// settle.js leaves the date out.) 6 h is settle.js's own window: a settle-up started earlier
+// than that before the plan's party gets no date, so it can never be that plan's, which is
+// what keeps a Friday party's morning-after bills off the rolled-on Saturday plan.
+const SETTLE_FROM = 6 * HOUR, SETTLE_TO = 21 * DAY;
 const SOURCES = ["auto", "manual", "import"];
 const plain = (o) => !!o && typeof o === "object" && !Array.isArray(o);
 const isoDay = (v) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
@@ -168,7 +176,7 @@ export function updateOutcome(list, id, change, now = Date.now()) {
 /**
  * Whether a settle-up is this party's: the same name (settle.js titles a nameless party
  * "House party" or "Night out") and either its own date, or started on the night or in the
- * three weeks after (from 12 h before, for one started ahead).
+ * three weeks after (from 6 h before, for one started ahead).
  */
 export function settleBelongs(settle, snapshot) {
   const s = normalizeSettle(settle);
@@ -220,23 +228,86 @@ export const makeEntry = (snapshot, { settle = null, source = "manual", now = Da
 });
 
 /**
- * Newest party first; at most HISTORY_MAX (the oldest parties go). The same party saved
- * again takes the new plan but keeps the host's outcome and the filled-in settle-up.
+ * What a plan is, leaving out its date and the host's own name and UPI ID: the party
+ * settings, every bottle, dish and supply with its quantity and price, the drinks menu and
+ * the night out. Two snapshots with the same key are the same plan on another date.
+ * null when the snapshot can't be read.
+ */
+export function planKey(snapshot) {
+  let p;
+  try { p = restoreSnapshot(snapshot); } catch { return null; }
+  const { date: _d, host: _h, upi: _u, ...party } = p.party;
+  const out = isOut(p.out)
+    ? [p.out.kind, p.out.pick.type, p.out.pick.url || p.out.pick.name, (p.out.tickets || []).map((t) => [String(t.id ?? t.name), t.qty, t.price]).sort()]
+    : null;
+  return JSON.stringify([
+    p.city, p.budget, party,
+    Object.entries(p.liquor).map(([k, l]) => [k, l.qty, l.item.price]).sort(),
+    p.food.map((l) => [l.key, l.qty, l.kind === "zomato" ? l.unitPrice : l.kind === "blinkit" ? l.product.price : 0]).sort(),
+    p.cocktailMenu.map((m) => [m.id, m.servings]).sort(),
+    out,
+  ]);
+}
+
+const nameOf = (e) => String(e?.snapshot?.party?.name || "").trim().toLowerCase();
+const kept = (e) => hasOutcome(e?.outcome) || settleFilled(e?.settle);
+
+/**
+ * The plan App archives by itself after a party is the plan it rolled on to the coming Saturday
+ * and nobody touched: the same name and plan as the last party kept, on a later date, with no
+ * settle-up of its own. That party never happened, so it isn't kept.
+ */
+function rolledOver(all, entry) {
+  if (entry.source !== "auto" || entry.settle) return false;
+  const day = isoDay(entry.snapshot?.party?.date);
+  const key = planKey(entry.snapshot);
+  if (!day || !key) return false;
+  const last = sortEntries(all.filter((e) => e.source !== "import" && nameOf(e) === nameOf(entry)))[0];
+  const lastDay = isoDay(last?.snapshot?.party?.date);
+  return !!lastDay && lastDay < day && planKey(last.snapshot) === key;
+}
+
+/**
+ * Newest party first; at most HISTORY_MAX. The same party saved again takes the new plan but
+ * keeps the host's outcome and the filled-in settle-up. An untouched plan archived again by
+ * itself is skipped (see rolledOver). Over the cap, the oldest party with nothing typed and no
+ * real bills goes first, then the oldest; the entry being saved always stays.
  */
 export function addEntry(list, entry) {
   const all = (Array.isArray(list) ? list : []).filter((e) => plain(e) && typeof e.id === "string");
   if (!plain(entry) || typeof entry.id !== "string") return all;
   const prev = all.find((e) => e.id === entry.id);
+  if (!prev && rolledOver(all, entry)) return all;
   const next = !prev ? entry : {
     ...entry,
     source: SOURCES.includes(prev.source) ? prev.source : entry.source,
     outcome: hasOutcome(prev.outcome) ? normalizeOutcome(prev.outcome) : normalizeOutcome(entry.outcome),
     settle: pickSettle(prev.settle || null, entry.settle || null),
   };
-  return sortEntries([next, ...all.filter((e) => e.id !== entry.id)]).slice(0, HISTORY_MAX);
+  const rows = sortEntries([next, ...all.filter((e) => e.id !== entry.id)]);
+  while (rows.length > HISTORY_MAX) {
+    let drop = -1;
+    for (let i = rows.length - 1; i >= 0 && drop < 0; i--) if (rows[i] !== next && !kept(rows[i])) drop = i;
+    for (let i = rows.length - 1; i >= 0 && drop < 0; i--) if (rows[i] !== next) drop = i;
+    rows.splice(drop, 1);
+  }
+  return rows;
 }
 
 export const removeEntry = (list, id) => (Array.isArray(list) ? list : []).filter((e) => e?.id !== id);
+
+/**
+ * Whether replacing this plan would lose something the host set up: anything in the carts, or
+ * party details that aren't the app's defaults (a name, guests, prefs, a date other than the
+ * coming Saturday). The host's own name and UPI ID don't count: "Plan again" keeps them.
+ */
+export function planInUse(snapshot, today = todayISO()) {
+  if (hasPlan(snapshot)) return true;
+  let p;
+  try { p = restoreSnapshot(snapshot).party; } catch { return false; }
+  const settings = ({ date: _d, host: _h, upi: _u, ...rest }) => JSON.stringify(rest);
+  return settings(p) !== settings(restoreSnapshot({ v: 1 }).party) || (!!p.date && p.date !== nextSaturday(today));
+}
 
 // ── Money ─────────────────────────────────────────────────────────────────────
 
@@ -305,17 +376,22 @@ export function summaryLine(entry, plan = entryPlan(entry)) {
 
 /**
  * A past party as a new plan, restoreSnapshot()-shaped, for App's applyPlan():
- *  - the same party settings, date null (App rolls it on to the coming Saturday);
- *  - bottles re-priced from today's catalog (same cat:id; one Livcheers no longer lists keeps
- *    last time's price and is flagged; a party in another city keeps its prices until that
- *    city's load);
+ *  - the same party settings, date null (App rolls it on to the coming Saturday), and no host
+ *    name or UPI ID, so applyPlan keeps the current ones (an old entry's UPI ID could be stale,
+ *    and a co-host's plan names them, not you);
+ *  - bottles re-priced from today's catalog (same cat:id; one Livcheers no longer lists, or
+ *    lists with no price, keeps last time's price and is flagged; a party in another city keeps
+ *    last time's prices, since the catalog here is this city's);
  *  - leftovers come off what to buy (you still have them), a family that ran out gets one more
  *    bottle (beer and cans: a few more);
  *  - cocktails, food and supplies as they were; a past event is dropped, a venue kept unbooked.
+ * `merge: true` is for "Add to my plan" (applyPlan's "merge"), which keeps my party details and
+ * my night out: `out` is null (mergePlans then keeps mine), the bottles take this city's prices
+ * (they're added to this city's plan), and there are no notes about the date or the night out.
  * `notes` says what changed, in plain words; `changes` lists it for the UI.
  * @returns {object & { notes: string[], changes: object[] }}  throws when the entry can't be read
  */
-export function replayPlan(entry, { catalog = {}, city = null } = {}) {
+export function replayPlan(entry, { catalog = {}, city = null, merge = false } = {}) {
   const base = entryPlan(entry);
   if (!base) throw new Error("This past party can't be opened");
   const outcome = normalizeOutcome(entry.outcome, base);
@@ -360,8 +436,9 @@ export function replayPlan(entry, { catalog = {}, city = null } = {}) {
   }
   for (const k of Object.keys(liquor)) if (!(liquor[k].qty > 0)) delete liquor[k];
 
-  // Today's prices.
-  const here = !city || !base.city || base.city === city;
+  // Today's prices. (The carts keep the prices they were filled at, so these are the ones the
+  // new plan will show: a later sync doesn't change them.)
+  const here = merge || !city || !base.city || base.city === city;
   const repriced = [], unsynced = new Set();
   for (const [key, l] of Object.entries(liquor)) {
     const items = here && Array.isArray(catalog?.[l.cat]) ? catalog[l.cat] : null;
@@ -370,6 +447,9 @@ export function replayPlan(entry, { catalog = {}, city = null } = {}) {
     if (live && price > 0) {
       if (price !== l.item.price) repriced.push({ key, name: l.item.name, from: l.item.price, to: price, qty: l.qty });
       liquor[key] = { ...l, item: { ...l.item, price, img: live.img || l.item.img } };
+    } else if (live) {
+      changes.push({ kind: "unpriced", key, name: l.item.name, price: l.item.price });
+      notes.push(`${l.item.name} has no price on Livcheers right now, so it keeps last time's ${fmt(l.item.price)}`);
     } else if (items?.length) {
       changes.push({ kind: "unlisted", key, name: l.item.name, price: l.item.price });
       notes.push(`${l.item.name} isn't on Livcheers right now, so it keeps last time's ${fmt(l.item.price)}: check it's still sold`);
@@ -380,19 +460,23 @@ export function replayPlan(entry, { catalog = {}, city = null } = {}) {
     for (const r of repriced) notes.push(`${r.name} is ${fmt(r.to)} now (${fmt(r.from)} last time)`);
   } else if (repriced.length) {
     const d = repriced.reduce((s, r) => s + (r.to - r.from) * r.qty, 0);
-    notes.push(`Today's prices for ${repriced.length} of the bottles: ${d === 0 ? "the same in all as" : `${fmt(Math.abs(d))} ${d > 0 ? "more" : "less"} in all than`} last time`);
+    notes.push(`New prices today for ${repriced.length} kinds of bottle: ${d === 0 ? "the same as last time" : `${fmt(Math.abs(d))} ${d > 0 ? "more" : "less"} than last time`}, in all`);
   }
   if (!here && Object.keys(liquor).length) {
-    notes.push(`This party was in ${cityName(base.city)}: bottles keep last time's prices until ${cityName(base.city)}'s prices load`);
+    notes.push(`This party was in ${cityName(base.city)}, so its bottles keep last time's prices: today's ${cityName(base.city)} prices aren't loaded here`);
   } else if (unsynced.size) {
     const labels = [...unsynced].map((c) => CAT[c]?.label || c).join(", ");
-    notes.push(`No ${labels} prices loaded yet, so those bottles keep last time's prices: sync to update them`);
+    notes.push(`No ${labels} prices loaded yet, so those bottles keep last time's prices: sync first to get today's`);
   }
 
   // Food, supplies and cocktails as they were.
   const food = base.food.map((l) => ({ ...l, ordered: false }));
   if (food.some((l) => l.kind === "zomato")) notes.push("Food and supplies are as last time. Zomato restaurants and prices may have changed, so check each one before you order");
   else if (food.length) notes.push("Food and supplies are as last time");
+
+  const party = { ...base.party, date: null, host: "", upi: "" };
+  // Added to my plan: my party details and my night out stay as they are.
+  if (merge) return { ...base, party, liquor, food, out: null, notes, changes };
 
   // The night out: a venue stays (book again), a past event goes.
   let out = { ...base.out, booked: false };
@@ -404,5 +488,5 @@ export function replayPlan(entry, { catalog = {}, city = null } = {}) {
   }
 
   notes.push(`Planning again sets the date to the coming Saturday: change it on the ${isOut(out) ? "Out" : "Food"} tab`);
-  return { ...base, party: { ...base.party, date: null }, liquor, food, out, notes, changes };
+  return { ...base, party, liquor, food, out, notes, changes };
 }

@@ -65,7 +65,7 @@ export default function HistoryCard({ history = [], setHistory, snapshot, settle
 
       {/* The card animates in (.fade-up), which would trap a fixed overlay inside it: the sheet goes to <body>. */}
       {open && createPortal(
-        <HistorySheet entry={open.entry} plan={open.plan} current={snapshot} setHistory={setHistory} applyPlan={applyPlan}
+        <HistorySheet key={open.entry.id} entry={open.entry} plan={open.plan} current={snapshot} setHistory={setHistory} applyPlan={applyPlan}
           catalog={catalog} city={city} toast={toast} onClose={() => setOpenId(null)} />,
         document.body,
       )}
@@ -95,7 +95,7 @@ function Row({ entry, plan, onOpen }) {
         <div className="small b ellipsis">{s.name}</div>
         {sub && <div className="tiny muted ellipsis">{sub}</div>}
         <div className="hist-money tiny">
-          <span className="soft">Planned <b>{fmtShort(planned)}</b></span>
+          {planned > 0 ? <span className="soft">Planned <b>{fmtShort(planned)}</b></span> : <span className="dim">Not priced</span>}
           {a.total != null && <span className="gold">Spent <b>{fmtShort(a.total)}</b>{head != null && ` · ${fmt(head)} a head`}</span>}
         </div>
       </div>
