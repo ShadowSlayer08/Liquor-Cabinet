@@ -961,3 +961,44 @@ body:has(.share-ask) .toast { bottom: calc(var(--safe-bottom) + var(--nav-h) + 1
 .chip.on .opt-chip-diff { color: inherit; }
 
 /* (end v1.5 Fill my bar quiz) */
+
+/* ── v1.6 Co-host sharing ── */
+/* Plan tab "Plan with a co-host" (QR on a white tile, actions, import area) and the import sheet's preview */
+.ch-empty { display: grid; justify-items: center; gap: 4px; text-align: center; padding: 14px 8px 6px; color: var(--muted); }
+.ch-empty svg { color: var(--gold); margin-bottom: 4px; }
+.ch-qr { display: flex; justify-content: center; }
+.ch-qr-img { width: min(300px, 100%); height: auto; aspect-ratio: 1; border-radius: 16px; background: #fff; padding: 8px;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, .4); }
+.ch-qr-skel { width: min(300px, 100%); aspect-ratio: 1; border-radius: 16px; }
+.ch-qr-fail { display: grid; place-items: center; padding: 24px; text-align: center; background: var(--panel); border: 1px solid var(--stroke); }
+.ch-what { display: grid; gap: 2px; justify-items: center; text-align: center; margin-top: 12px; min-width: 0; }
+.ch-what .h3 { max-width: 100%; }
+.ch-light { margin-top: 8px; text-align: center; line-height: 1.45; }
+.ch-scan { margin-top: 6px; text-align: center; line-height: 1.45; }
+.ch-acts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; margin-top: 8px; }
+.ch-acts .btn { min-width: 0; overflow: hidden; text-overflow: ellipsis; position: relative; }
+.ch-file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; overflow: hidden; }
+.ch-import .ch-acts { margin-top: 10px; }
+.ch-paste { margin-top: 8px; }
+.ch-paste textarea { display: block; font: inherit; font-size: 13px; line-height: 1.4; resize: vertical; min-height: 54px; }
+.ch-privacy { display: grid; gap: 3px; margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--stroke-2); line-height: 1.45; }
+
+.ch-imp-hero { display: grid; gap: 3px; margin: 2px 0 12px; }
+.ch-imp-name { overflow-wrap: anywhere; }
+.ch-note { margin-bottom: 10px; }
+.ch-sec { margin-top: 14px; }
+.ch-sec > .between { margin-bottom: 6px; }
+.ch-line { display: flex; align-items: center; gap: 10px; padding: 7px 0; font-size: 13px; min-width: 0; }
+.ch-line + .ch-line { border-top: 1px solid var(--stroke); }
+.ch-qty { flex-shrink: 0; min-width: 28px; font-weight: 700; color: var(--gold); font-variant-numeric: tabular-nums; }
+.ch-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ch-chips .chip { padding: 6px 11px; font-size: 12px; white-space: normal; }
+.ch-more { margin-top: 6px; }
+.ch-mine { margin-top: 16px; padding-top: 10px; border-top: 1px dashed var(--stroke-2); }
+.ch-choices { display: grid; gap: 8px; }
+.ch-confirm .row .btn { min-width: 0; }
+.ch-error { display: grid; justify-items: center; gap: 8px; text-align: center; padding: 18px 6px 8px; }
+.ch-error-icon { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: var(--red);
+  background: rgba(255, 93, 98, .1); border: 1px solid rgba(255, 93, 98, .3); }
+
+/* (end v1.6 Co-host sharing) */
