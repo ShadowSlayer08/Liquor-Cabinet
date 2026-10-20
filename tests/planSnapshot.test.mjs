@@ -102,3 +102,27 @@ test("summary and hasPlan", () => {
   assert.ok(hasPlan(r));
   assert.ok(!hasPlan(restoreSnapshot(snapshotPlan({ party: {} }))));
 });
+
+test("a hostile night out from another phone can't crash the app", () => {
+  const bad = snapshotPlan({ ...state, out: { active: true, kind: "bar", booked: true,
+    pick: { type: "venue", zcity: "ncr", slug: "soi-7", name: "Soi 7", tags: "BYOB", hours: "x", closes: "99:99", lat: "north", closesFor: "2026-02-30" },
+    tickets: [{ id: 1, name: "Stag", price: "lots", qty: 2, gateCover: "INR 1500" }] } }, { share: true });
+  const r = restoreSnapshot(JSON.parse(JSON.stringify(bad)));
+  assert.deepEqual(r.out.pick.tags, []);
+  assert.deepEqual(r.out.pick.hours, []);
+  assert.equal(r.out.pick.closes, "");
+  assert.equal(r.out.pick.lat, null);
+  assert.equal(r.out.pick.closesFor, null);
+  assert.deepEqual(r.out.tickets, []);                                    // tickets only for an event
+  const noSlug = restoreSnapshot({ v: 1, out: { active: true, pick: { type: "venue", name: "X", zcity: "ncr", slug: "../../etc" } } });
+  assert.equal(noSlug.out.pick, null);
+  assert.equal(noSlug.out.active, false);
+});
+
+test("impossible dates and times, duplicate cocktails", () => {
+  const r = restoreSnapshot({ v: 1, party: { date: "2026-13-45", time: "99:99" }, cocktailMenu: [{ id: "mojito", servings: 2 }, { id: "mojito", servings: 5 }] });
+  assert.equal(r.party.date, null);
+  assert.equal(r.party.time, "20:00");
+  assert.deepEqual(r.cocktailMenu, [{ id: "mojito", servings: 5 }]);
+  assert.equal(restoreSnapshot({ v: 1, party: { date: "2028-02-29" } }).party.date, "2028-02-29");
+});

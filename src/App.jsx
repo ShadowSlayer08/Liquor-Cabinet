@@ -367,8 +367,11 @@ export default function App() {
   // A past party or a co-host's plan (restoreSnapshot() shape) becomes this plan. "replace" swaps it
   // in; "merge" adds their bottles, dishes, supplies and cocktails to mine (planSnapshot.js mergePlans).
   // My own name and UPI ID stay when theirs has none (a shared plan never carries a UPI ID).
+  const livePlan = { city, budget, party, liquor, cocktailMenu, food, out };   // mine as it is (ordered ticks, live picks and all)
   const applyPlan = async (p, mode = "replace") => {
-    const next = mode === "merge" ? mergePlans(restoreSnapshot(planSnap), p) : p;
+    const next = mode === "merge" ? mergePlans(livePlan, p) : p;
+    // A replace keeps a copy of what it replaces in Past parties, so one tap brings it back.
+    if (mode === "replace" && hasPlan(planSnap)) saveToHistory(planSnap, { source: "manual" });
     setParty(withDate({ ...next.party, host: next.party.host || party.host, upi: next.party.upi || party.upi,
       prefs: { ...DEFAULT_PARTY.prefs, ...next.party.prefs } }));
     if (next.budget) setBudget(next.budget);
@@ -508,8 +511,13 @@ export default function App() {
       )}
       {showLegal && <LegalSheet onClose={() => setShowLegal(false)} />}
       {importing != null && (
-        <ImportSheet input={importing} mine={restoreSnapshot(planSnap)} toast={toast} onClose={() => setImporting(null)}
-          onApply={async (p, mode) => { setImporting(null); await applyPlan(p, mode); toast(mode === "merge" ? "Added their items to your plan" : "Their plan is now yours to edit"); }}
+        <ImportSheet key={importing} input={importing} mine={livePlan} toast={toast} onClose={() => setImporting(null)}
+          onApply={async (p, mode) => {
+            setImporting(null);
+            // Their name and UPI ID never replace mine (the payment card and invite are mine).
+            await applyPlan({ ...p, party: { ...p.party, host: "", upi: "" } }, mode);
+            toast(mode === "merge" ? "Added their items to your plan" : hasPlan(planSnap) ? "Their plan is yours to edit · your old one is in Past parties" : "Their plan is now yours to edit");
+          }}
           onSave={(p) => { setImporting(null); saveToHistory(snapshotPlan(p), { source: "import" }); toast("Saved to Past parties"); }} />
       )}
       <RemindersWatcher party={party} city={city} customDry={customDry} reminders={reminders} setReminders={setReminders} toast={toast} out={out} loc={loc} />

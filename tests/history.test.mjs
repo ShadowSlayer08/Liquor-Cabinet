@@ -285,7 +285,7 @@ test("actual spend comes from the settle-up's real bills or the host, never inve
 });
 
 test("a night at a bar counts the venue's estimate, not the home carts", () => {
-  const pick = slimVenue({ resId: 1, name: "Soi 7", locality: "Cyber Hub", costForTwo: 2400, lat: 28.5, lon: 77.1 }, "https://www.district.in/dining/x");
+  const pick = slimVenue({ resId: 1, zcity: "ncr", slug: "soi-7-pub-brewery-dlf-cyber-city", name: "Soi 7", locality: "Cyber Hub", costForTwo: 2400, lat: 28.5, lon: 77.1 }, "https://www.district.in/dining/x");
   const p = restoreSnapshot(snap({ out: { active: true, kind: "bar", pick, tickets: [] } }));
   const sp = plannedSpend(p);
   assert.equal(sp.liquor, 0);
@@ -388,7 +388,7 @@ test("replay: date cleared, food as it was (with a word about Zomato), the night
   const again = restoreSnapshot({ ...snapshotPlan(r), v: 1 });
   assert.equal(Object.keys(again.liquor).length, 4);
 
-  const venue = slimVenue({ resId: 1, name: "Soi 7", costForTwo: 2400 }, "https://www.district.in/dining/x");
+  const venue = slimVenue({ resId: 1, zcity: "ncr", slug: "soi-7-pub-brewery-dlf-cyber-city", name: "Soi 7", costForTwo: 2400 }, "https://www.district.in/dining/x");
   const rv = replayPlan(makeEntry(snap({ out: { active: true, kind: "bar", pick: venue, booked: true, tickets: [] } })), {});
   assert.equal(rv.out.pick.name, "Soi 7");
   assert.equal(rv.out.booked, false);
@@ -431,7 +431,7 @@ test("plan again keeps my name and UPI ID: the past party's are left out", () =>
 });
 
 test("add to my plan keeps my party details and my night out", () => {
-  const pick = slimVenue({ resId: 1, name: "Soi 7", locality: "Cyber Hub", costForTwo: 2400 }, "https://www.district.in/dining/x");
+  const pick = slimVenue({ resId: 1, zcity: "ncr", slug: "soi-7-pub-brewery-dlf-cyber-city", name: "Soi 7", locality: "Cyber Hub", costForTwo: 2400 }, "https://www.district.in/dining/x");
   const past = makeEntry(snap({ party: { name: "Bar night", date: "2026-10-03" }, out: { ...DEFAULT_OUT, active: true, kind: "bar", pick, booked: true } }));
   const m = replayPlan(past, { catalog, city: "gurgaon", merge: true });
   assert.equal(m.out, null);
@@ -446,7 +446,7 @@ test("add to my plan keeps my party details and my night out", () => {
   assert.equal(merged.liquor["malts:g12"].item.price, 4300);
   assert.equal(merged.liquor["indian:bd"].qty, 3);
   // my own night out stays as it is
-  const mineOut = { ...DEFAULT_OUT, active: true, kind: "club", pick: slimVenue({ resId: 2, name: "Kitty Su" }, "https://www.district.in/dining/y") };
+  const mineOut = { ...DEFAULT_OUT, active: true, kind: "club", pick: slimVenue({ resId: 2, zcity: "ncr", slug: "kitty-su-the-lalit", name: "Kitty Su" }, "https://www.district.in/dining/y") };
   assert.equal(mergePlans(home(mineOut), m).out.pick.name, "Kitty Su");
   // "Plan again" still keeps the venue to book again
   assert.equal(replayPlan(past, { catalog, city: "gurgaon" }).out.pick.name, "Soi 7");

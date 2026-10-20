@@ -10,6 +10,7 @@ import { useMemo, useState } from "react";
 import Sheet from "./Sheet.jsx";
 import { decodePlan, fitToApp } from "../lib/planShare.js";
 import { restoreSnapshot, snapshotSummary, hasPlan } from "../lib/planSnapshot.js";
+import { DEFAULT_PARTY } from "../lib/food.js";
 import { prettyWhen } from "../lib/when.js";
 import { todayISO } from "../lib/drydays.js";
 import { cityName } from "../lib/parse/livcheers.js";
@@ -34,8 +35,11 @@ const plural = (k, one, many = `${one}s`) => `${k} ${k === 1 ? one : many}`;
 const titleCase = (id) => String(id).replace(/[-_]+/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 
 // What mine has, in one line ("House party · 4 bottles · 2 dishes · ₹6,450").
+// My party has been set up (named, dated, sized) even if nothing is in it yet.
+const partySet = (p) => !!p && ["name", "guests", "time", "hours", "drinkersPct", "vegPct"].some((k) => p[k] != null && p[k] !== DEFAULT_PARTY[k]);
+
 function mineLine(m) {
-  if (!m || !hasPlan(m)) return "Your plan is empty, so nothing of yours is lost.";
+  if (!m || !hasPlan(m)) return partySet(m?.party) ? "No bottles or food yet — using theirs replaces your party details (name, date, guests)." : "Your plan is empty, so nothing of yours is lost.";
   const s = snapshotSummary(m);
   const bits = [s.bottles && plural(s.bottles, "bottle"), s.cocktails && plural(s.cocktails, "cocktail"), s.dishes && plural(s.dishes, "dish", "dishes"),
     s.supplies && plural(s.supplies, "supply", "supplies"), s.out && s.place].filter(Boolean);
@@ -83,10 +87,11 @@ export default function ImportSheet({ input, mine, onApply, onSave, onClose }) {
   const otherCity = plan.city && mine?.city && plan.city !== mine.city;
   const something = hasPlan(plan);
   const mineHas = hasPlan(mine);
+  const mineSet = mineHas || partySet(mine?.party);
 
   // A lighter QR has no food: replacing keeps mine (theirs wasn't sent).
   const apply = (mode) => { tap(); onApply(light && mode === "replace" ? { ...plan, food: mine?.food || [] } : plan, mode); };
-  const useTheirs = () => { if (mineHas && !confirm) { tap(); setConfirm(true); } else apply("replace"); };
+  const useTheirs = () => { if (mineSet && !confirm) { tap(); setConfirm(true); } else apply("replace"); };
   // What of mine "Use their plan" swaps out.
   const ms = snapshotSummary(mine);
   const goes = [ms.bottles && plural(ms.bottles, "bottle"), ms.cocktails && plural(ms.cocktails, "cocktail"),
@@ -97,7 +102,7 @@ export default function ImportSheet({ input, mine, onApply, onSave, onClose }) {
     <div className="ch-confirm">
       <div className="small soft">
         Replace your plan with theirs? Your {goesText} will be swapped for theirs.
-        {light ? " Your food and supplies stay — this QR didn't carry theirs." : ""} Your name and UPI ID stay.
+        {light ? " Your food and supplies stay — this QR didn't carry theirs." : ""} Your party details and budget become theirs; your name and UPI ID stay.{mineHas ? " A copy of your plan goes to Past parties first." : ""}
       </div>
       <div className="row" style={{ marginTop: 10 }}>
         <button className="btn btn-gold grow" onClick={() => apply("replace")}>Yes, use theirs</button>

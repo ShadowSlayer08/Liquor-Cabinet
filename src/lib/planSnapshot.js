@@ -24,8 +24,16 @@ const PARTY_KEYS = ["name", "date", "time", "guests", "hours", "drinkersPct", "v
 const str = (v, max = 160) => (typeof v === "string" ? v.slice(0, max) : v == null ? "" : String(v).slice(0, max));
 const num = (v, lo = 0, hi = 1e7) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : null; };
 const int = (v, lo = 0, hi = 1e6) => { const n = num(v, lo, hi); return n == null ? null : Math.round(n); };
-const iso = (v) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
-const hhmm = (v) => (typeof v === "string" && /^\d{2}:\d{2}$/.test(v) ? v : null);
+// A real calendar day and a real clock time (not just the right shape: "2026-13-45", "99:99" are out).
+const iso = (v) => {
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+  const [y, m, d] = v.split("-").map(Number), t = new Date(Date.UTC(y, m - 1, d));
+  return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d ? v : null;
+};
+const hhmm = (v) => (typeof v === "string" && /^\d{2}:\d{2}$/.test(v) && Number(v.slice(0, 2)) < 24 && Number(v.slice(3)) < 60 ? v : null);
+const SLUG = /^[a-z0-9-]{1,120}$/;
+const strs = (a, n, max) => (Array.isArray(a) ? a.filter((x) => typeof x === "string").slice(0, n).map((x) => str(x, max)) : []);
+const when = (v) => (typeof v === "string" && v.length < 40 && !Number.isNaN(Date.parse(v)) ? v : "");
 const link = (v, prefixes) => (typeof v === "string" && v.length < 600 && !/[\s"'<>]/.test(v) && prefixes.some((p) => v.startsWith(p)) ? v : "");
 const ZOMATO_LINKS = ["https://www.zomato.com/", "zomato://"];
 const LIVCHEERS_LINKS = ["https://www.livcheers.com/"];
@@ -145,16 +153,44 @@ function restoreFood(lines) {
   return out;
 }
 
+// The picked place, rebuilt from the fields the Out tab keeps (lib/outModel.js slimVenue /
+// slimEvent, lib/out.js venuePick), each of the type the code reading it expects — a string
+// where an array belongs would crash the reminders or the night-out card on every start.
+function restorePick(p) {
+  if (!plain(p) || (p.type !== "venue" && p.type !== "event") || !SLUG.test(String(p.slug || ""))) return null;
+  const base = {
+    type: p.type, slug: p.slug, name: str(p.name, 120), locality: str(p.locality, 80),
+    lat: num(p.lat, -90, 90), lon: num(p.lon, -180, 180), url: link(p.url, DISTRICT_LINKS), fetchedAt: int(p.fetchedAt, 0, 1e14) || 0,
+    ...(typeof p.kind === "string" ? { kind: str(p.kind, 20) } : {}),
+  };
+  if (p.type === "event") {
+    return { ...base, venue: str(p.venue, 120), start: when(p.start), end: when(p.end), priceFrom: int(p.priceFrom, 0, 1e6),
+      ageEntry: int(p.ageEntry, 0, 30), stag: str(p.stag, 160), ...(num(p.feePct, 0, 0.5) != null ? { feePct: num(p.feePct, 0, 0.5) } : {}) };
+  }
+  if (!SLUG.test(String(p.zcity || ""))) return null;
+  const hours = Array.isArray(p.hours) ? p.hours.slice(0, 40).filter(plain)
+    .map((h) => ({ day: str(h.day, 12), opens: hhmm(h.opens) || "", closes: hhmm(h.closes) || "" })).filter((h) => h.opens && h.closes) : [];
+  return { ...base, resId: int(p.resId, 0, 1e12), zcity: p.zcity, costForTwo: int(p.costForTwo, 0, 1e6), rating: num(p.rating, 0, 5),
+    tags: strs(p.tags, 30, 40), bookable: !!p.bookable, phone: str(p.phone, 30), closes: hhmm(p.closes) || "", hours, closesFor: iso(p.closesFor) };
+}
+
+const restoreTicket = (t) => ({
+  id: str(t.id, 60), name: str(t.name, 80), price: int(t.price, 0, 1e6) || 0, qty: int(t.qty, 0, 100) || 0, kind: str(t.kind, 20) || "general",
+  service: t.service === "cover" || t.service === "entry" ? t.service : null, groupSize: int(t.groupSize, 1, 50),
+  gateCover: plain(t.gateCover) && int(t.gateCover.amount, 1, 1e5)
+    ? { amount: int(t.gateCover.amount, 1, 1e5), per: t.gateCover.per === "person" || t.gateCover.per === "couple" ? t.gateCover.per : null } : null,
+});
+
 function restoreOut(o) {
   if (!plain(o)) return { ...DEFAULT_OUT };
   const w = withOut(o);
-  const p = plain(w.pick) ? w.pick : null;
-  const pick = p && (p.type === "venue" || p.type === "event") ? {
-    ...p, type: p.type, name: str(p.name, 120), url: link(p.url, DISTRICT_LINKS),
-    lat: num(p.lat, -90, 90), lon: num(p.lon, -180, 180),
-  } : null;
-  return { ...w, active: !!w.active && !!pick, pick, perHead: int(w.perHead, 0, 1e6), corkage: int(w.corkage, 0, 1e5),
-    tickets: (w.tickets || []).slice(0, 30).filter(plain).map((t) => ({ ...t, name: str(t.name, 80), price: int(t.price, 0, 1e6) || 0, qty: int(t.qty, 0, 100) || 0 })) };
+  const pick = restorePick(w.pick);
+  return {
+    ...DEFAULT_OUT, kind: ["bar", "club", "byob", "events"].includes(w.kind) ? w.kind : DEFAULT_OUT.kind,
+    active: !!w.active && !!pick, pick, perHead: int(w.perHead, 0, 1e6), corkage: int(w.corkage, 0, 1e5),
+    bigGroup: !!w.bigGroup, booked: !!w.booked && !!pick,
+    tickets: pick?.type === "event" ? (w.tickets || []).slice(0, 30).filter(plain).map(restoreTicket).filter((t) => t.qty > 0 && t.name) : [],
+  };
 }
 
 /**
@@ -171,8 +207,10 @@ export function restoreSnapshot(snap) {
     budget: int(snap.budget, 0, 1e8),
     party: restoreParty(snap.party),
     liquor: restoreLiquor(snap.liquor),
-    cocktailMenu: (Array.isArray(snap.cocktailMenu) ? snap.cocktailMenu.slice(0, 100) : [])
-      .filter((m) => plain(m) && typeof m.id === "string" && int(m.servings, 1, 1000)).map((m) => ({ id: str(m.id, 40), servings: int(m.servings, 1, 1000) })),
+    cocktailMenu: [...(Array.isArray(snap.cocktailMenu) ? snap.cocktailMenu.slice(0, 100) : [])
+      .filter((m) => plain(m) && typeof m.id === "string" && int(m.servings, 1, 1000))
+      .reduce((acc, m) => { const id = str(m.id, 40), n = int(m.servings, 1, 1000); acc.set(id, Math.max(n, acc.get(id) || 0)); return acc; }, new Map())]
+      .map(([id, servings]) => ({ id, servings })),   // one row per cocktail (the larger servings)
     food: restoreFood(snap.food),
     out: restoreOut(snap.out),
   };
