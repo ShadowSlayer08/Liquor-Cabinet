@@ -85,6 +85,8 @@ function Row({ entry, plan, onOpen }) {
     s.guests && `${s.guests} ${s.guests === 1 ? "guest" : "guests"}`,
     s.out ? `out at ${s.place}` : s.bottles > 0 && `${s.bottles} ${s.bottles === 1 ? "bottle" : "bottles"}`,
     entry.source === "import" && "a co-host's plan",
+    // A plan kept before "Use their plan" / "Plan again" replaced it can be for a date still to come.
+    d && d > todayISO() && "saved for later",
   ].filter(Boolean).join(" · ");
   return (
     <button className="hist-row" onClick={onOpen}>
