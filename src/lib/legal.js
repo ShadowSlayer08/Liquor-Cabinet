@@ -47,6 +47,7 @@ export const LEGAL_DATA = [
   "Your location goes to Zomato, rounded to about 10 m, to find restaurants that deliver to you and bars near you, and to a ride app as the pickup when you open one.",
   "District pages are fetched by venue and city; your location isn't sent to District.",
   "Zomato sign-in and live Blinkit prices (beta) use your own account and connection.",
+  "A plan you share with a co-host as a QR code, link or file holds the party details and lists — never your location or UPI ID — and goes only where you send it.",
   "The services still see what any website sees, like your IP address. Clear cached data any time in the Plan tab.",
 ];
 

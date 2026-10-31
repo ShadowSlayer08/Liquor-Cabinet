@@ -11,6 +11,8 @@ import { isNative } from "./lib/http.js";
 import { onChecklistTap, tap } from "./lib/order.js";
 import { onBubbleToggle } from "./lib/bubble.js";
 import { DEFAULT_OUT, withOut } from "./lib/outModel.js";
+import { snapshotPlan, restoreSnapshot, mergePlans, hasPlan } from "./lib/planSnapshot.js";
+import { makeEntry, addEntry } from "./lib/history.js";
 import { outForDate } from "./lib/out.js";
 import { AGE_LINE } from "./lib/age.js";
 import { normalizeQuiz } from "./lib/barQuiz.js";
@@ -26,6 +28,7 @@ import RemindersWatcher from "./components/RemindersWatcher.jsx";
 import FillBarSheet from "./components/FillBarSheet.jsx";
 import SettleSheet from "./components/SettleSheet.jsx";
 import LegalSheet from "./components/LegalSheet.jsx";
+import ImportSheet from "./components/ImportSheet.jsx";
 import Sheet from "./components/Sheet.jsx";
 import { Icon } from "./components/Art.jsx";
 
@@ -91,6 +94,8 @@ export default function App() {
   const [barKind, setBarKind] = useState("cocktails");  // Bar tab: cocktails | mocktails
   const [focusCard, setFocusCard] = useState(null);     // { tab, id }: a card to scroll to once its tab is on screen
   const [out, setOut] = useState(DEFAULT_OUT);          // party outside: kind, pick, tickets… (lib/outModel.js)
+  const [history, setHistory] = useState([]);           // past parties (lib/history.js), own durable key "history"
+  const [importing, setImporting] = useState(null);     // a co-host's plan to look at: link, pasted text or file contents
   const [syncIds, setSyncIds] = useState(CATEGORIES.filter((c) => c.sync).map((c) => c.id));
   const [showScraper, setShowScraper] = useState(false);
   const [autoSync, setAutoSync] = useState(false);
@@ -102,6 +107,15 @@ export default function App() {
   useEffect(() => {
     (async () => {
       const cfg = (await store.get("cfg")) || {};
+      // Past parties (v1.6). A party whose date has passed goes into the history before its date
+      // rolls on to next Saturday below; the carts stay as they are.
+      const saved = await store.get("history");
+      let hist = Array.isArray(saved) ? saved : [];
+      if (cfg.party?.date && cfg.party.date < todayISO()) {
+        const snap = snapshotPlan(cfg);
+        if (hasPlan(snap)) hist = addEntry(hist, makeEntry(snap, { settle: cfg.settle || null, source: "auto" }));
+      }
+      setHistory(hist);
       const c = cfg.city && CITIES.some((x) => x.slug === cfg.city) ? cfg.city : "gurgaon";
       setCity(c);
       if (cfg.budget) setBudget(cfg.budget);
@@ -141,6 +155,7 @@ export default function App() {
     });
   }, [ready, city, loc, budget, liquor, batches, activeBatch, food, party, syncIds, activeCat, onboarded,
     cocktailMenu, customDry, reminders, split, bubble, zomatoExact, settle, grocer, out, barQuiz]);
+  useEffect(() => { if (ready) store.set("history", history); }, [ready, history]);
 
   // ── Android back button + notification taps ──────────────────────────────
   useEffect(() => {
@@ -164,6 +179,8 @@ export default function App() {
     if (!isNative() && !import.meta.env.DEV) return;
     const open = (url) => {
       if (/^liquorcabinet:\/\/sync(?:$|[/?#])/.test(url || "")) { linked.current = true; setOnboarded(true); setAutoSync(true); setShowScraper(true); return; }
+      // A co-host's plan (v1.6): the QR code / link carries it; the import sheet shows it first.
+      if (/^liquorcabinet:\/\/plan(?:$|[/?#])/.test(url || "")) { linked.current = true; setOnboarded(true); setImporting(url); return; }
       const m = /^liquorcabinet:\/\/tab\/(cabinet|bar|food|cart|plan|out)(?:\?view=(liquor|food))?/.exec(url || "");
       if (!m) return;
       if (m[2]) setCartView(m[2]);
@@ -342,6 +359,39 @@ export default function App() {
   const goBar = (kind = "cocktails") => { setBarKind(kind); goTab("bar"); };
   // Jump to a Plan card (invite, split, rides…) from the Out tab.
   const goPlanCard = (id) => { setTab("plan"); setFocusCard({ tab: "plan", id }); };
+
+  // ── Plans as data (v1.6: party history, co-host sharing) ──────────────────
+  const planSnap = useMemo(() => snapshotPlan({ city, budget, party, liquor, cocktailMenu, food, out }), [city, budget, party, liquor, cocktailMenu, food, out]);
+  const shareSnap = useMemo(() => snapshotPlan({ city, budget, party, liquor, cocktailMenu, food, out }, { share: true }), [city, budget, party, liquor, cocktailMenu, food, out]);
+  const saveToHistory = (snap, meta = {}) => setHistory((h) => addEntry(h, makeEntry(snap, meta)));
+  // A past party or a co-host's plan (restoreSnapshot() shape) becomes this plan. "replace" swaps it
+  // in; "merge" adds their bottles, dishes, supplies and cocktails to mine (planSnapshot.js mergePlans).
+  // My own name and UPI ID stay when theirs has none (a shared plan never carries a UPI ID).
+  const livePlan = { city, budget, party, liquor, cocktailMenu, food, out };   // mine as it is (ordered ticks, live picks and all)
+  const applyPlan = async (p, mode = "replace") => {
+    const next = mode === "merge" ? mergePlans(livePlan, p) : p;
+    // A replace keeps a copy of what it replaces in Past parties, so one tap brings it back.
+    if (mode === "replace" && hasPlan(planSnap)) saveToHistory(planSnap, { source: "manual" });
+    setParty(withDate({ ...next.party, host: next.party.host || party.host, upi: next.party.upi || party.upi,
+      prefs: { ...DEFAULT_PARTY.prefs, ...next.party.prefs } }));
+    if (next.budget) setBudget(next.budget);
+    if (mode === "merge") {
+      setBatches((bs) => bs.map((b, i) => {
+        if (i !== activeBatch) return b;
+        const items = { ...b.items };
+        for (const [k, l] of Object.entries(next.liquor)) { const d = l.qty - (liquor[k]?.qty || 0); if (d > 0) items[k] = (items[k] || 0) + d; }
+        return { ...b, items };
+      }));
+    } else {
+      setBatches([{ name: "Batch 1", items: Object.fromEntries(Object.entries(next.liquor).map(([k, l]) => [k, l.qty])) }]);
+      setActiveBatch(0);
+    }
+    setLiquor(next.liquor);
+    setCocktailMenu(next.cocktailMenu);
+    setFood(next.food);
+    setOut(withOut(next.out));
+    if (next.city && next.city !== city) await switchCity(next.city);
+  };
   // Sync some extra categories too (e.g. the optimiser asks for Indian whisky and brandy).
   const openScraperWith = (ids = []) => { setSyncIds((cur) => [...new Set([...cur, ...ids])]); setShowScraper(true); };
 
@@ -412,7 +462,9 @@ export default function App() {
               liquorLines={liquorLines} liquorTotal={liquorTotal} foodCart={food}
               reminders={reminders} setReminders={setReminders} split={split} setSplit={setSplit}
               bubble={bubble} setBubble={setBubble} zomatoExact={zomatoExact} setZomatoExact={setZomatoExact} toast={toast}
-              settle={settle} openSettle={() => setShowSettle(true)} openLegal={() => setShowLegal(true)} out={out} />
+              settle={settle} openSettle={() => setShowSettle(true)} openLegal={() => setShowLegal(true)} out={out}
+              history={history} setHistory={setHistory} planSnap={planSnap} shareSnap={shareSnap} applyPlan={applyPlan}
+              saveToHistory={saveToHistory} openImport={setImporting} catalog={catalog} />
           )}
           {tab === "out" && (
             <OutTab city={city} loc={loc} locating={locating} onLocate={detectLocation} party={party} setParty={setParty} plan={plan}
@@ -458,6 +510,16 @@ export default function App() {
           liquorTotal={liquorTotal} foodCart={food} blinkitTotal={blinkitTotal} toast={toast} onClose={() => setShowSettle(false)} />
       )}
       {showLegal && <LegalSheet onClose={() => setShowLegal(false)} />}
+      {importing != null && (
+        <ImportSheet key={importing} input={importing} mine={livePlan} toast={toast} onClose={() => setImporting(null)}
+          onApply={async (p, mode) => {
+            setImporting(null);
+            // Their name and UPI ID never replace mine (the payment card and invite are mine).
+            await applyPlan({ ...p, party: { ...p.party, host: "", upi: "" } }, mode);
+            toast(mode === "merge" ? "Added their items to your plan" : hasPlan(planSnap) ? "Their plan is yours to edit · your old one is in Past parties" : "Their plan is now yours to edit");
+          }}
+          onSave={(p) => { setImporting(null); saveToHistory(snapshotPlan(p), { source: "import" }); toast("Saved to Past parties"); }} />
+      )}
       <RemindersWatcher party={party} city={city} customDry={customDry} reminders={reminders} setReminders={setReminders} toast={toast} out={out} loc={loc} />
       {toastMsg && <div className="toast">{toastMsg}</div>}
     </>

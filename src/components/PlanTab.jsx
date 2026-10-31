@@ -4,6 +4,8 @@ import { STALE_MS } from "../lib/sources.js";
 import { fmt, fmtShort, ageStr } from "../lib/format.js";
 import { Icon, Ring } from "./Art.jsx";
 import InviteCard from "./plan/InviteCard.jsx";
+import ShareCard from "./plan/ShareCard.jsx";
+import HistoryCard from "./plan/HistoryCard.jsx";
 import SplitCard from "./plan/SplitCard.jsx";
 import RemindersCard from "./plan/RemindersCard.jsx";
 import DryDaysCard from "./plan/DryDaysCard.jsx";
@@ -40,6 +42,7 @@ export default function PlanTab({
   party, setParty, customDry, setCustomDry, cocktailMenu, liquorLines, liquorTotal, foodCart,
   reminders, setReminders, split, setSplit, bubble, setBubble, zomatoExact, setZomatoExact, toast,
   settle, openSettle, openLegal, out,
+  history, setHistory, planSnap, shareSnap, applyPlan, saveToHistory, openImport, catalog,
 }) {
   const [draft, setDraft] = useState(String(budget));
   const [editing, setEditing] = useState(false);
@@ -97,12 +100,15 @@ export default function PlanTab({
       </div>
 
       <InviteCard party={party} setParty={setParty} city={city} loc={loc} plan={plan} cocktailMenu={cocktailMenu} liquorLines={liquorLines} foodCart={foodCart} toast={toast} out={out} />
+      <ShareCard snapshot={shareSnap} openImport={openImport} toast={toast} />
       <SplitCard party={party} setParty={setParty} plan={plan} split={split} setSplit={setSplit}
         liquorTotal={liquorTotal} zomatoTotal={zomatoTotal} blinkitTotal={blinkitTotal} toast={toast}
         settle={settle} openSettle={openSettle} out={out} />
       <RemindersCard party={party} city={city} customDry={customDry} reminders={reminders} setReminders={setReminders} toast={toast} out={out} loc={loc} />
       <RidesCard party={party} setParty={setParty} plan={plan} loc={loc} locating={locating} onLocate={onLocate} toast={toast} out={out} />
       <DryDaysCard party={party} city={city} customDry={customDry} setCustomDry={setCustomDry} toast={toast} />
+      <HistoryCard history={history} setHistory={setHistory} snapshot={planSnap} settle={settle} applyPlan={applyPlan}
+        saveToHistory={saveToHistory} catalog={catalog} city={city} toast={toast} />
 
       <div className="card fade-up">
         <div className="card-title"><span className="kicker">Location</span></div>
@@ -158,7 +164,7 @@ export default function PlanTab({
         <div>🛒 <b style={{ color: "var(--blinkit)" }}>Blinkit</b> — mixers, ice & munchies at usual MRP, or the live price read from Blinkit on your phone (beta); each opens in Blinkit.</div>
         <div>🗓️ <b className="gold">Dry days</b> — national days are certain; festival and state days vary, so check your state's notice.</div>
         <div className="tiny dim" style={{ marginTop: 10 }}>Not affiliated with or endorsed by any of these services. <button className="gold tiny" onClick={openLegal}>Legal notice & privacy ›</button></div>
-        <div className="tiny dim" style={{ marginTop: 4 }}>Liquor Cabinet v1.5.1 · Prices are indicative. Drink responsibly, and only where it's legal for you.</div>
+        <div className="tiny dim" style={{ marginTop: 4 }}>Liquor Cabinet v1.6 · Prices are indicative. Drink responsibly, and only where it's legal for you.</div>
       </div>
     </div>
   );

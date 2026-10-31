@@ -1,6 +1,6 @@
 # Handoff — where things stand
 
-_Updated 17 Oct 2026, v1.5.1 (popular picks, small parties) — local Claude Code on the user's Windows PC. The owner planned to pause the project after this release; v1.6 candidates are under "Ideas for next"._
+_Updated 31 Oct 2026, v1.6 (past parties, co-host sharing) — local Claude Code on the user's Windows PC._
 
 ## Shipped
 
@@ -13,9 +13,23 @@ _Updated 17 Oct 2026, v1.5.1 (popular picks, small parties) — local Claude Cod
 | v1.4 | (history) | iPhone (Capacitor iOS, Swift plugins, CI-built unsigned IPA), no upi:// links (NPCI), honest location copy, cfg in native storage, liquorcabinet:// links |
 | v1.4.1 | (history) | Fill my bar (budget optimiser), 75 cocktails + 22 mocktails, suggestions from bottles and guest prefs, 60 dishes, party templates, getting home (drivers + ride apps), settle up, Zepto / Instamart, in-app legal notice |
 | v1.5 | (history) | Out tab: bars & pubs, club nights, BYOB places and events with District (lists from Zomato/District pages, booking hand-off), night-out costs and leave-by, invite/reminders/rides/split follow the outing, state drinking ages + BYOB rules + bars-on-dry-days; Fill my bar asks a short quiz and picks popular bottles |
-| **v1.5.1** | `release/LiquorCabinet-1.5.1.apk` (versionCode 8) + `release/LiquorCabinet-1.5.1-unsigned.ipa` (iOS build 8) | Cabinet "Crowd favourites" + 🏆/★ badges by Livcheers popularity; Fill my bar folds tiny families into other bottles for small parties (Add them back) |
+| v1.5.1 | (history) | Cabinet "Crowd favourites" + 🏆/★ badges by Livcheers popularity; Fill my bar folds tiny families into other bottles for small parties (Add them back) |
+| **v1.6** | `release/LiquorCabinet-1.6.apk` (versionCode 9) + `release/LiquorCabinet-1.6-unsigned.ipa` (iOS build 9) | Past parties (actual spend, leftovers / ran out, plan again with today's prices) and co-host sharing (QR code, file or link; import with preview, replace or merge) |
 
 Repo: **https://github.com/ShadowSlayer08/Liquor-Cabinet** (public, pushed at the user's request). The signing key (`android/keystore/`, `android/keystore.properties`) is git-ignored and never committed; every APK since v1.2 is signed with the same key (cert SHA-256 `a3d9f3e7…98abd9`), so it installs over it.
+
+## v1.6 — past parties and co-host sharing (what was built)
+
+Foundation `7a3fb2a` (`lib/planSnapshot.js`: one plan as data for both features — `snapshotPlan` (share mode drops the UPI ID and photos), `restoreSnapshot` (checks everything from another phone), `mergePlans`; App wiring: history in its own durable key `history` (store.js), auto-archive of a party whose date has passed before it rolls on, `applyPlan(replace|merge)`, `liquorcabinet://plan` → ImportSheet), then two tracks, each reviewed adversarially and fixed:
+
+- **Past parties** (`lib/history.js`, `plan/HistoryCard.jsx`, `plan/HistorySheet.jsx`): entries keep the plan, the settle-up that belongs to them (same name, from 6 h before to 3 weeks after) and an outcome the host types (actual spend, leftovers and ran-out per spirit family, a note) — never lost on re-save. Actual spend is never guessed. `replayPlan` re-prices from today's catalog, takes leftovers off, adds 1 bottle (beer: max(4, 20%)) for what ran out, clears the date, and explains every change. An untouched plan isn't re-archived every week; when the list is full (30), parties with nothing typed go first. A plan kept for a date still to come says "saved for later".
+- **Co-host sharing** (`lib/planShare.js`, `lib/shareFile.js`, `plan/ShareCard.jsx`, `ImportSheet.jsx`): link format v1 = the shared snapshot, supplies as product ids, raw-deflated with a fixed dictionary (pinned by a test hash) and base64url; QR budget 1,150 characters (version 28, level M; a lighter QR without food above that); the file is `<name>.lcplan.json`. Input, link data and inflated JSON are all capped (no zip bombs).
+- **Lead fixes after the sharing review**: a shared night-out pick and its tickets are rebuilt field by field with types (a string `tags`/`hours` crashed reminders on every start); real dates and times only; one row per cocktail; imports never carry the co-host's name or UPI ID onto mine; merge and the preview use my live plan (ordered ticks and live picks kept); a replace saves my plan to Past parties first; ImportSheet asks before replacing a set-up party.
+
+### How v1.6 was checked
+
+- 393 tests (385 offline pass, 8 live skipped offline), including `planSnapshot`, `history` and `planShare` suites.
+- Browser walkthrough (375×812, live Livcheers sync): Fill my bar + supplies + a cocktail → the Share card's QR (300 px) and copied message (574-character link; decoded: no UPI field, no coordinates); a co-host's variant opened by link → preview → **Add their items to mine** (beer to the larger 10, Mojito added, my party and batch kept) → **Use their plan** (confirm lists what goes; my name and UPI ID stayed; my old plan went to Past parties) → Past parties sheet → outcome (₹15,000 spent, 1 whisky left, beer ran out) → **Plan again** (JW Black 2→1, Corona 10→14, date to the coming Saturday) → a past-dated party auto-archived once, no duplicate on reload. No console errors, no horizontal scroll.
 
 ## v1.5.1 — popular picks, small parties (what was built)
 
@@ -100,6 +114,11 @@ Capacitor iOS added (SPM) with Swift ports of ExternalApp and WebRender, a new C
 
 ## Not verified — needs a real phone
 
+v1.6:
+- Scanning the plan QR off another phone's screen with the camera (iOS Camera, Google Lens) and whether it opens the app via `liquorcabinet://plan…`; in dim light, whether `QR_MAX` 1,150 needs lowering (planShare.js explains the budget).
+- Sharing the `.lcplan.json` file through WhatsApp and choosing it with the file picker on Android and iPhone; pasting from the clipboard (Capacitor Clipboard).
+- Auto-archive on a real phone the day after a party, with the settle-up done the morning after (should attach to the archived party).
+
 v1.5 (District):
 - With District installed: does `https://www.district.in/dining/<zcity>/<slug>/book` (and `/events/<slug>-buy-tickets`) open the District app on Android (explicit-package intent) and iPhone (universal link)? Does `edition://r/<resId>` open a venue (decides `USE_EDITION` in `lib/order.js`)? Without District: the page opens in the browser.
 - CapacitorHttp GETs of www.district.in on mobile data (Akamai never challenged desktop IPs); Zomato bars/BYOB lists localised by the zone cookie on the phone.
@@ -119,10 +138,8 @@ Nothing native has run on a device yet (same as v1.2). Check on the phone:
 
 ## Ideas for next
 
-Candidates for a v1.6, in the order suggested to the owner:
+Still open after v1.6:
 - **Real-phone hardening** (most valuable): run the "Not verified" list above on the owner's phone and fix what breaks; a small self-test screen in the Plan tab (open each hand-off, schedule a test reminder in 1 minute, fetch one page per source) would make it quick. Decides `USE_EDITION` for District links.
-- **Party history**: keep past parties (what was bought, what was actually spent from settle-up, what ran out) so the next plan starts from them.
-- **Share a plan with a co-host** without a server: the plan as a QR code / file the other phone imports.
 - **Rules freshness**: the 2027 dry-day dates and the Haryana BYOB policy (to 31 Mar 2027) need a yearly refresh — warn in the app when `RULES_CHECKED` / the dry-day tables get old.
 - District `/gw/` APIs (table slots, cover charges, BYOB-by-tag lists) as an opt-in beta, if the owner wants it (see RESEARCH.md).
 

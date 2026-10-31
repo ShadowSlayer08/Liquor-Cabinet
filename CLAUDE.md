@@ -27,7 +27,7 @@ On the maintainer's Windows PC: JDK at `%LOCALAPPDATA%\Programs\jdk-21`, SDK at 
 ## Release signing & versioning
 
 - `android/keystore.properties` + `android/keystore/liquor-cabinet.jks` sign release builds. Both are **git-ignored and must never be committed**. Without them, `assembleRelease` falls back to the debug key (such an APK won't install over the user's current one).
-- Bump **both** `versionCode` and `versionName` in `android/app/build.gradle`, plus `version` in `package.json`, `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `ios/App/App.xcodeproj/project.pbxproj`, and the "Liquor Cabinet vX" line in `src/components/PlanTab.jsx`, for every APK you hand over. Current: v1.5.1 = versionCode 8 (iOS build 8).
+- Bump **both** `versionCode` and `versionName` in `android/app/build.gradle`, plus `version` in `package.json`, `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `ios/App/App.xcodeproj/project.pbxproj`, and the "Liquor Cabinet vX" line in `src/components/PlanTab.jsx`, for every APK you hand over. Current: v1.6 = versionCode 9 (iOS build 9).
 - The user sideloads APKs (no Play Store — alcohol-app policies). GitHub: https://github.com/ShadowSlayer08/Liquor-Cabinet (public; renamed from liquor-cabinet, old URLs redirect) — push only when the user asks. Releases page carries the APK + unsigned IPA per version (`gh release create vX.Y …`). The README's "Data sources & legal notice" (free, non-profit, personal use) must stay accurate when data sources change.
 
 ## Architecture
@@ -58,7 +58,9 @@ src/
     OutTab.jsx            v1.5 party out: plan card (home|out, outing type, budget a head, bars dry-day banner, state age line),
                           venue/event lists, "Your night out" (#night-out); out/ = OutPlanCard, VenueCard/VenueSheet, EventCard/EventSheet,
                           ByobBlock, NightOutCard. Lists only; booking a table / buying tickets always hands off to District
-    plan/                 InviteCard, SplitCard (→ settle up), RemindersCard, RidesCard (getting home), DryDaysCard, ZomatoAccountCard, BubbleCard
+    plan/                 InviteCard, ShareCard (co-host: QR / file / link + import), SplitCard (→ settle up), RemindersCard, RidesCard (getting home),
+                          DryDaysCard, HistoryCard + HistorySheet (past parties, outcome, plan again), ZomatoAccountCard, BubbleCard
+    ImportSheet.jsx       a co-host's plan (link / pasted text / file): preview, then use theirs / add to mine / save to Past parties
     RemindersWatcher.jsx  App-level: offers to move reminders when the party date/time changes
     DryDayBanner.jsx      red/amber dry-day warning for a date; mode="bars" for the Out tab (barsDryOn)
     Sheet.jsx             bottom sheet + Stepper/Qty/Spinner/Skeleton
@@ -97,7 +99,12 @@ src/
     blinkitLive.js        live Blinkit prices via WebRenderPlugin; CARD_SCRIPT + pure card-text parser
     bubble.js             floating order checklist via OrderBubblePlugin
     order.js              hand-offs (Zomato/Bistro/grocers/rides/Maps), checklist notification, share/clipboard, haptics
-    store.js / back.js / format.js
+    planSnapshot.js       one plan as data (v1.6): snapshotPlan (share mode: no UPI, no photos), restoreSnapshot (checks every field from
+                          another phone), mergePlans, snapshotSummary — shared by history and co-host sharing (pure)
+    history.js            past parties: entries + settle-up + outcome (spent, leftovers, ran out), addEntry/attachSettle, replayPlan (pure)
+    planShare.js          the v1 plan link (deflate + fixed dictionary + base64url), QR budget, .lcplan.json file, bounded decode (pure);
+                          shareFile.js shares a text file like shareImage.js
+    store.js / back.js / format.js   (store: cfg and history are durable — Preferences on the phone)
 android/app/src/main/java/com/shadowslayer/liquorcabinet/
     MainActivity.java     registers the three plugins below
     ExternalAppPlugin.java  open(url, pkg, fallback) / launch(pkg) / isInstalled(pkg)
@@ -118,7 +125,8 @@ ios/App/App/              (Capacitor iOS, SPM — CapApp-SPM/Package.swift is CL
 
 - Native plugins exist twice (Java + Swift) with **identical JS contracts**; OrderBubble is Android-only (`bubbleAvailable()` = `isAndroid()`). Gate platform differences with `isAndroid()` / `isIOS()` from `lib/http.js`.
 - `cfg` (plan + carts) is stored with `@capacitor/preferences` on the phone (iOS can purge IndexedDB); everything else in IndexedDB is re-fetchable cache.
-- Deep links: `liquorcabinet://tab/<cabinet|bar|food|cart|plan|out>[?view=liquor|food]` and `liquorcabinet://sync` (both platforms).
+- Deep links: `liquorcabinet://tab/<cabinet|bar|food|cart|plan|out>[?view=liquor|food]`, `liquorcabinet://sync` and `liquorcabinet://plan?v=1&d=…` (a co-host's plan → ImportSheet) (both platforms).
+- Anything that came from another phone or a file goes through `restoreSnapshot` (planSnapshot.js) before use; never trust a field's type. Never put the GPS fix or the UPI ID in a shared plan.
 - District: read only public pages with plain GETs (never its `/gw/` JSON APIs, never `?` URLs — robots.txt), always `www.district.in`, never framed (InAppBrowser/WebRender); `openDistrict()` hands off. `edition://` app links stay off (`USE_EDITION`) until a phone proves them. See docs/RESEARCH.md "District".
 - The split's WhatsApp text has no `upi://pay` links (NPCI disallowed P2P intent payments in 2024); the payment card's QR codes are the way to pay.
 - Parsers in `src/lib/parse/*` stay **pure** (no Capacitor imports) so `node --test` can run them.

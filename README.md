@@ -11,8 +11,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest"><b>⬇ Download v1.5.1 — Android APK &amp; iPhone IPA</b></a><br>
-  <sub>or straight from the repo: <a href="release/LiquorCabinet-1.5.1.apk">APK</a> · <a href="release/LiquorCabinet-1.5.1-unsigned.ipa">IPA</a> · free, non-commercial, personal use — see <a href="#data-sources--legal-notice">legal notice</a></sub>
+  <a href="https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest"><b>⬇ Download v1.6 — Android APK &amp; iPhone IPA</b></a><br>
+  <sub>or straight from the repo: <a href="release/LiquorCabinet-1.6.apk">APK</a> · <a href="release/LiquorCabinet-1.6-unsigned.ipa">IPA</a> · free, non-commercial, personal use — see <a href="#data-sources--legal-notice">legal notice</a></sub>
 </p>
 
 ---
@@ -21,24 +21,30 @@
 
 ### Android
 
-1. On your Android phone, download `LiquorCabinet-1.5.1.apk` from the [latest release](https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest) (or [`release/`](release/LiquorCabinet-1.5.1.apk) in the repo).
+1. On your Android phone, download `LiquorCabinet-1.6.apk` from the [latest release](https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest) (or [`release/`](release/LiquorCabinet-1.6.apk) in the repo).
 2. Open it. When Android asks, allow installs from that source.
 3. Launch **Liquor Cabinet**, tap **Use my location**, then **⚡ Smart Sync** to pull today's prices.
 
-It needs **Android 8.0 or newer** and an internet connection. v1.5.1 installs over v1.0–v1.5 and keeps your carts.
+It needs **Android 8.0 or newer** and an internet connection. v1.6 installs over v1.0–v1.5.1 and keeps your carts.
 It asks for **location** (restaurants that deliver to you), **notifications** (order checklist and party reminders) and, only if you turn on the floating checklist, **display over other apps**. All are optional.
 
 ### iPhone (beta, sideload)
 
 The same app runs on iPhone (iOS 15+). There's no App Store listing, and an iPhone won't install an app file the way Android does — it has to be signed with an Apple ID when you install it:
 
-1. Download `LiquorCabinet-1.5.1-unsigned.ipa` from the [latest release](https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest) (every push also builds one: [iOS workflow](https://github.com/ShadowSlayer08/Liquor-Cabinet/actions/workflows/ios.yml) → Artifacts).
+1. Download `LiquorCabinet-1.6-unsigned.ipa` from the [latest release](https://github.com/ShadowSlayer08/Liquor-Cabinet/releases/latest) (every push also builds one: [iOS workflow](https://github.com/ShadowSlayer08/Liquor-Cabinet/actions/workflows/ios.yml) → Artifacts).
 2. Install it with [Sideloadly](https://sideloadly.io/) (Windows / Mac) or [AltStore](https://altstore.io/), signing in with your own Apple ID.
 3. On the iPhone: Settings → General → VPN & Device Management → trust your Apple ID; on iOS 16+ also turn on Settings → Privacy & Security → **Developer Mode**.
 
 With a free Apple ID the app runs for 7 days before it must be re-signed (AltStore can refresh it automatically), and you can have at most 3 sideloaded apps. A paid Apple Developer account (US$99/year) gives 1-year installs for up to 100 iPhones, or TestFlight. _At the time of writing._
 
 Different on iPhone: there's no floating checklist bubble — iOS doesn't let apps draw over other apps — so the order checklist arrives as a notification. Everything else is the same app; the beta features (Zomato sign-in, live Blinkit prices) are as untested on iPhone as on Android.
+
+## What's new in v1.6
+
+**📒 Past parties.** Every party is kept on your phone once its date has passed: what you bought, what you planned to spend and — once you settle up, or type it in — what it really cost, per head too. Note what was left over and what ran out, and **Plan again from this** starts the next party from it: today's prices, fewer of what you still have, more of what ran out, and a plain note for every change. **Save this party** keeps a copy any time.
+
+**👥 Plan with a co-host.** Send your whole plan to a friend as a **QR code** their phone camera opens, a **file**, or a **link** to paste — no server, nothing uploaded, and never your location or UPI ID. On their phone a preview shows everything first; then **Use their plan**, **Add their items to mine** (the larger quantity where you both have one) or **Save to Past parties**. Your own name and UPI ID always stay yours, and replacing your plan keeps a copy of it in Past parties. It's a copy, not a live sync: send it again after changes.
 
 ## What's new in v1.5.1
 
@@ -104,7 +110,7 @@ Host features — the app now helps before, during and after the party:
 | 🍸 **Bar** | 75 cocktails and 22 mocktails. Cocktails you can make with your bottles come first (the rest show which spirit they need), with a "Picked for your party" row based on your bottles and your guests' tastes. Recipes with per-glass ingredients and steps, and a party menu that feeds the supplies list. |
 | 🍽️ **Food** | The calculator. Start from a party template or set the party name, date and time, guests, hours, how many are drinking (and driving), vegetarian share, appetite, peg size (30/60 ml), whether there's dinner, and what your guests like. It tells you whether your bottles cover the night, then works out mixers, soft drinks, ice, water, lemons, cocktail extras, munchies, cups/plates/napkins, starter plates, main servings, breads and desserts. 60 dishes, ranked for your party, each saying why ("pairs with your whisky", "your guests like Chinese"). Pick a dish to see Zomato restaurants that deliver **to your GPS location**, open a restaurant's **real menu** and add exact dishes. A **Bistro** tab lists 10-minute snacks where Bistro operates. |
 | 🛒 **Cart** | Your liquor list (share it, or find a store nearby) plus the food & supplies cart: exact Zomato dishes grouped by restaurant, the Bistro order and the supplies checklist for Blinkit, Zepto or Instamart, each with a **Send order** button. |
-| 📊 **Plan** | Budget ring and spend donut, invite card, bill split and **settle up**, reminders, **getting home** (rides and designated drivers), dry days ahead, location, shopping batches, Zomato account, floating checklist, how fresh the price data is, and the legal notice. |
+| 📊 **Plan** | Budget ring and spend donut, invite card, **plan with a co-host** (QR code, file or link), bill split and **settle up**, reminders, **getting home** (rides and designated drivers), dry days ahead, location, shopping batches, Zomato account, floating checklist, **past parties** (plan again from one), how fresh the price data is, and the legal notice. |
 | 🌃 **Out** | Plan the party outside instead: **bars & pubs**, **club nights**, **BYOB places** and **food & drink events** near you. Venues show the venue's own "for two" estimate, rating, distance, hours, offers and what District lists (BYOB, full bar, DJ, large-group seating); club nights show their tickets, door rules (age, stag, ID, dress code) and any cover charge at the gate. Set a budget per head or a big group, and see your state's dry-day, drinking-age and BYOB rules. "Your night out" adds it up (each line marked exact, estimate or unknown, BYOB bottles from your Cabinet included) and says when to leave. Book the table or buy tickets in the **District** app; the invite, reminders, rides home and the bill split then use the venue. |
 
 ## Where the data comes from
@@ -157,6 +163,8 @@ src/
   lib/blinkitLive.js      live Blinkit prices (beta);  lib/bubble.js floating checklist;  lib/zomatoAccount.js Zomato sign-in
   lib/sources.js          scrapers with on-device caching
   lib/order.js            Zomato / Bistro / Blinkit / District / Maps hand-off, checklist notification, haptics
+  lib/planSnapshot.js     one plan as data (history + sharing), checked field by field when it comes from another phone
+  lib/history.js          past parties: actual spend, leftovers / ran out, plan again;  lib/planShare.js the QR / link / file format
 android/                  Capacitor Android project; native plugins in app/src/main/java/…/liquorcabinet:
                           ExternalAppPlugin (open other apps), WebRenderPlugin (hidden page reader), OrderBubblePlugin (overlay)
 ios/                      Capacitor iOS project (Swift Package Manager); ios/App/App has the Swift plugins:

@@ -12,7 +12,7 @@ import { get, set, del, keys, clear } from "idb-keyval";
 import { Preferences } from "@capacitor/preferences";
 import { isNative } from "./http.js";
 
-const DURABLE = new Set(["cfg"]);
+const DURABLE = new Set(["cfg", "history"]);   // history (v1.6): past parties can't be fetched again either
 const durable = (key) => DURABLE.has(key) && isNative();
 
 async function getDurable(key) {
